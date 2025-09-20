@@ -1,9 +1,10 @@
 // CodeVault/server.js
-// ✅ جاهز لـ Vercel: من غير app.listen()، ويشتغل محليًا لو شغّلته يدويًا.
+// ✅ جاهز لـ Vercel: من غير app.listen() في الإنتاج،
+// ويشتغل محليًا لو شغّلته يدويًا بـ `node server.js`.
 
 const app = require("./index.js");
 
-// لو بتشغّله محليًا: node server.js
+// تشغيل محلي فقط
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
@@ -11,5 +12,5 @@ if (require.main === module) {
   });
 }
 
-// على Vercel: نُصدّر الـ app كـ handler بلا استماع على بورت
+// على Vercel بنصدّر الـ app كـ handler
 module.exports = app;
