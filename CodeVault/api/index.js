@@ -1,3 +1,5 @@
-// Vercel serverless entrypoint
-const app = require("../index.js");
-module.exports = app;
+// CodeVault/api/index.js
+const app = require("../server.js");
+
+// Vercel Serverless handler
+module.exports = (req, res) => app(req, res);
