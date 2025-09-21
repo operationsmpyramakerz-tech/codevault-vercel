@@ -15,6 +15,8 @@ const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit");
 
 const app = express();
+// بعد: const app = express();
+app.set("trust proxy", 1); // مهم لـ Vercel علشان يعتبر الاتصال HTTPS ويقبل secure cookies
 
 // ================== الإعدادات والبيئة ==================
 const notion = new Client({ auth: process.env.Notion_API_Key });
