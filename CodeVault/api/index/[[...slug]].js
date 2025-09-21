@@ -1,19 +1,22 @@
 // CodeVault/api/index/[[...slug]].js
-// يمسك كل المسارات تحت /api/index/* ويحوّلها لتطبيق Express.
-// وكمان يرد مباشرة على /api/index/health لو تطبيقك مش مٌعرّف /health.
+const loadApp = require("../../server.js");
 
-const app = require("../../server.js");
-
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   const original = req.url || "/";
 
-  // ردّ صحّة سريع بدون دخول Express (احتياطيًا)
+  // ردّ صحّة سريع (لو عايز تتأكد بدون دخول التطبيق)
   if (req.method === "GET" && /\/api\/index\/health\/?$/.test(original)) {
     return res.status(200).json({ ok: true, via: "api/index/[[...slug]].js" });
   }
 
-  // اشطب بادئة /api/index عشان Express يشوف /health
+  // خلي Express يشوف /health بدل /api/index/health
   req.url = original.replace(/^\/api\/index/, "") || "/";
 
-  return app(req, res);
+  try {
+    const app = await loadApp();   // يدعم CJS/ESM
+    return app(req, res);
+  } catch (err) {
+    console.error("Failed to load Express app:", err);
+    return res.status(500).json({ ok: false, error: "APP_LOAD_FAILED" });
+  }
 };
