@@ -21,14 +21,6 @@ app.set("trust proxy", 1); // مهم لـ Vercel علشان يعتبر الات�
 // ================== الإعدادات والبيئة ==================
 const notion = new Client({ auth: process.env.Notion_API_Key });
 
-// ---- Helpers for stable login ----
-function withTimeout(promise, ms, name = "operation") {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(name + " timeout after " + ms + "ms")), ms);
-    promise.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
-  });
-}
-
 const componentsDatabaseId   = process.env.Products_Database;
 const ordersDatabaseId       = process.env.Products_list;
 const teamMembersDatabaseId  = process.env.Team_Members;
@@ -143,65 +135,33 @@ function requireAuth(req, res, next) {
   }
   next();
 }
+// عندك صفحة مذكورة في UI؛ هنا بس بنعدّيها (مكانك تفعّل تحقق إضافي لو حابب)
+function requirePage(_pageName) {
+  return (_req, _res, next) => next();
+}
 
+// ================== Health ==================
+app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// ================== Auth بسيط (اختياري لكنه مفيد للتجربة) ==================
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body || {};
-    if (!username || typeof password === "undefined") {
+    if (!username || typeof password === "undefined")
       return res.status(400).json({ error: "username & password required" });
-    }
 
-    // Optional fast mode for demos or poor network: set SKIP_NOTION_LOGIN=1
-    if (String(process.env.SKIP_NOTION_LOGIN || "").toLowerCase() === "1") {
-      req.session.username = username;
-      return res.json({ success: true, mode: "session-only" });
-    }
-
-    if (!teamMembersDatabaseId) {
+    if (!teamMembersDatabaseId)
       return res.status(500).json({ error: "Team_Members DB not configured" });
-    }
 
-    // Query Notion with timeout so the client never hangs forever
-    const queryPromise = notion.databases.query({
+    const q = await notion.databases.query({
       database_id: teamMembersDatabaseId,
-      filter: { property: "Name", title: { equals: username } }
+      filter: { property: "Name", title: { equals: username } },
     });
-    let userQuery;
-    try {
-      userQuery = await withTimeout(queryPromise, 8000, "Notion login");
-    } catch (e) {
-      // Allow offline login if explicitly enabled
-      if (String(process.env.ALLOW_OFFLINE_LOGIN || "").toLowerCase() === "1") {
-        req.session.username = username;
-        return res.json({ success: true, mode: "offline-fallback" });
-      }
-      console.error("Login Notion timeout/error:", e?.body || e);
-      return res.status(503).json({ error: "notion_unavailable", details: "Notion API timeout or unreachable" });
-    }
+    if (!q.results.length) return res.status(401).json({ error: "Invalid credentials" });
 
-    if (!userQuery.results?.length) {
-      return res.status(401).json({ error: "User not found" });
-    }
-    const userPage = userQuery.results[0];
-    const passProp = userPage.properties?.Password;
-    let ok = false;
-    if (typeof passProp?.number === "number") {
-      ok = Number(password) === Number(passProp.number);
-    } else {
-      ok = String(password).trim().length > 0; // fallback: accept any non-empty
-    }
-    if (!ok) return res.status(401).json({ error: "Invalid password" });
-
-    req.session.username = username;
-    // Make session cookie immediately visible to client
-    res.set("Cache-Control", "no-store");
-    return res.json({ success: true });
-  } catch (err) {
-    console.error("Login error:", err?.body || err);
-    res.status(500).json({ error: "Login failed" });
-  }
-});
-number;
+    // لو عندك خاصية Password رقم في Notion
+    const page = q.results[0];
+    const pw = page.properties?.Password?.number;
     if (typeof pw === "number" && Number(password) !== pw) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -1429,14 +1389,4 @@ app.post(
 );
 
 // ============== التصدير للسيرفرلس ==============
-
-// Simple session helpers
-app.get("/api/session", (req, res) => {
-  res.set("Cache-Control", "no-store");
-  res.json({ username: req.session?.username || null });
-});
-app.post("/api/logout", (req, res) => {
-  if (req.session) req.session = null;
-  res.json({ success: true });
-});
 module.exports = app;

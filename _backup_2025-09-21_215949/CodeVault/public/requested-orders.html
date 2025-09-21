@@ -1,0 +1,139 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+      <title>Schools Requested Orders</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+      <link rel="stylesheet" href="/css/style.css"/>
+      <script src="https://unpkg.com/feather-icons"></script>
+    </head>
+    <body>
+      <script>
+        (function() {
+          try {
+            if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
+              document.body.classList.add('sidebar-mini');
+            }
+          } catch(e) {}
+        })();
+      </script>
+
+      <div class="app-container">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <h2>Dashboard</h2>
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
+              <i data-feather="chevrons-left"></i>
+            </button>
+          </div>
+
+          <!-- Sidebar: flat links -->
+          <nav class="sidebar-nav">
+            <ul class="nav-list">
+              <li>
+                <a href="/orders" class="nav-link">
+                  <i data-feather="list"></i>
+                  <span class="nav-label">Current Orders</span>
+                </a>
+              </li>
+              <li>
+                <a href="/orders/requested" class="nav-link active">
+                  <i data-feather="users"></i>
+                  <span class="nav-label">Schools Requested Orders</span>
+                </a>
+              </li>
+              <li>
+                <a href="/orders/new" class="nav-link">
+                  <i data-feather="plus-circle"></i>
+                  <span class="nav-label">Create New Order</span>
+                </a>
+              </li>
+              <li>
+                <a href="/stocktaking" class="nav-link">
+                  <i data-feather="archive"></i>
+                  <span class="nav-label">Stocktaking</span>
+                </a>
+              </li>
+              <li>
+                <a class="nav-link" href="/orders/assigned">
+                  <i data-feather="user-check" class="nav-icon"></i>
+                  <span class="nav-label">Assigned Schools Requested Orders</span>
+                </a>
+              </li>
+              <li>
+                <a href="/funds" class="nav-link">
+                  <i data-feather="dollar-sign"></i>
+                  <span class="nav-label">Funds</span>
+                </a>
+              </li>
+            </ul>
+          </nav>
+
+          <div class="sidebar-footer">
+            <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
+          </div>
+        </aside>
+
+        <div class="main-content">
+          <header class="main-header">
+            <div class="header-row1">
+              <div class="left">
+                <div class="greeting-pill" aria-live="polite">
+                  <span class="greeting-avatar">
+                    <img src="/images/greeting-icon.png" alt="Hi icon"/>
+                  </span>
+                  <div class="greet-text">
+                    <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
+                    <div class="greet-sub">Manage requested orders</div>
+                  </div>
+                </div>
+                <div class="searchbar" id="req-searchbar" role="search" style="margin-left:8px;">
+                  <i data-feather="search"></i>
+                  <input id="requestedSearch" type="search" placeholder="Search by reason or user..." aria-label="Search requested orders"/>
+                </div>
+              </div>
+              <div class="right topbar-right">
+                <a href="/account" class="account-mini" aria-label="My account" title="My account">
+                  <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
+                  <span class="label">My account</span>
+                </a>
+              </div>
+            </div>
+            <div class="header-row2">
+              <h1 class="page-title">Schools Requested Orders</h1>
+            </div>
+          </header>
+
+          <main class="container-full-width">
+            <section class="card">
+              <div id="requested-list">
+                <p><i data-feather="loader" class="loading-icon"></i> Loading requested orders...</p>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+
+      <!-- Assign modal -->
+      <div id="assignModal" class="modal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true">
+          <button class="close-btn" id="assignClose" aria-label="Close"><i data-feather="x"></i></button>
+          <h3 style="margin-bottom:.75rem;">Assign order</h3>
+          <div class="form-group">
+            <label for="assignSelect">Select member</label>
+            <select id="assignSelect" multiple size="6"></select>
+          </div>
+          <div class="form-actions">
+            <button id="assignCancel" class="nav-link" style="padding:.6rem 1rem; border:1px solid #D1D5DB; border-radius:8px; background:#fff; color:#374151;">Cancel</button>
+            <button id="assignApply" class="submit-btn">Assign</button>
+          </div>
+        </div>
+      </div>
+
+      <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+      <script>feather.replace();</script>
+      <script src="/js/common-ui.js"></script>
+      <script src="/js/requested-orders.js"></script>
+    </body>
+    </html>

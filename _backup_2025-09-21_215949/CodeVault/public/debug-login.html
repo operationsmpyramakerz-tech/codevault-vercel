@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Debug Login</title>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, Arial; padding:16px; }
+  input, button { font-size: 16px; padding: 10px; width: 100%; margin: 6px 0; }
+  pre { background:#f6f6f6; padding:10px; border-radius:8px; overflow:auto; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  a { color:#0a58ca; text-decoration: none; }
+</style>
+
+<h2>Debug Login</h2>
+
+<div class="row">
+  <a href="/api/health" target="_blank">/api/health</a>
+  <a href="/api/whoami" target="_blank">/api/whoami</a>
+  <a href="/api/debug/ping" target="_blank">/api/debug/ping</a>
+</div>
+
+<input id="u" placeholder="username (e.g. abdullah)" />
+<input id="p" type="number" placeholder="password (number in Notion)" />
+<button id="btn">Try Login</button>
+
+<h3>Result</h3>
+<pre id="out">...</pre>
+
+<script>
+  const out = document.getElementById('out');
+  const btn = document.getElementById('btn');
+
+  function log(o) {
+    out.textContent = (typeof o === 'string') ? o : JSON.stringify(o, null, 2);
+  }
+
+  btn.onclick = async () => {
+    btn.disabled = true;
+    log('Sending...');
+    const username = document.getElementById('u').value.trim();
+    const password = document.getElementById('p').value.trim();
+    try {
+      const resp = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',           // مهم علشان الكوكي
+        body: JSON.stringify({ username, password: Number(password) })
+      });
+      const text = await resp.text();     // نقرأ النص كما هو
+      let body;
+      try { body = JSON.parse(text); } catch { body = text; }
+      log({
+        status: resp.status,
+        ok: resp.ok,
+        headers: Object.fromEntries(resp.headers.entries()),
+        body,
+        documentCookie: document.cookie || '(no cookies visible)'
+      });
+    } catch (e) {
+      log({ error: String(e) });
+    } finally {
+      btn.disabled = false;
+    }
+  };
+</script>
+</html>

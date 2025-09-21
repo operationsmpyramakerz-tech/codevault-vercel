@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assigned Schools Requested Orders</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+  <script>
+    (function() {
+      try {
+        if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
+          document.body.classList.add('sidebar-mini');
+        }
+      } catch(e) {}
+    })();
+  </script>
+
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Dashboard</h2>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
+          <i data-feather="chevrons-left"></i>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul class="nav-list">
+          <li>
+            <a href="/orders" class="nav-link">
+              <i data-feather="list"></i>
+              <span class="nav-label">Current Orders</span>
+            </a>
+          </li>
+          <li>
+            <a href="/orders/requested" class="nav-link">
+              <i data-feather="users"></i>
+              <span class="nav-label">Schools Requested Orders</span>
+            </a>
+          </li>
+          <li>
+            <a class="nav-link active" href="/orders/assigned">
+              <i data-feather="user-check"></i>
+              <span class="nav-label">Assigned Schools Requested Orders</span>
+            </a>
+          </li>
+          <li>
+            <a href="/orders/new" class="nav-link">
+              <i data-feather="plus-circle"></i>
+              <span class="nav-label">Create New Order</span>
+            </a>
+          </li>
+          <li>
+            <a href="/stocktaking" class="nav-link">
+              <i data-feather="archive"></i>
+              <span class="nav-label">Stocktaking</span>
+            </a>
+          </li>
+          <li>
+            <a href="/funds" class="nav-link">
+              <i data-feather="dollar-sign"></i>
+              <span class="nav-label">Funds</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-row1">
+          <div class="left">
+            <div class="greeting-pill" aria-live="polite">
+              <span class="greeting-avatar">
+                <img src="/images/greeting-icon.png" alt="Hi icon" />
+              </span>
+              <div class="greet-text">
+                <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
+                <div class="greet-sub">Your assigned items overview</div>
+              </div>
+            </div>
+
+            <div class="searchbar" id="assigned-searchbar" role="search">
+              <i data-feather="search"></i>
+              <input id="assignedSearch" type="search" placeholder="Search assigned items..." aria-label="Search assigned items" />
+            </div>
+          </div>
+
+          <div class="right topbar-right">
+            <a href="/account" class="account-mini" aria-label="My account" title="My account">
+              <span class="ico-circle"><img src="/images/logo.png" alt="Logo" /></span>
+              <span class="label">My account</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="header-row2">
+          <h1 class="page-title">
+            Assigned Schools Requested Orders
+          </h1>
+        </div>
+      </header>
+
+      <main class="container-full-width">
+        <!-- Actions -->
+
+        <!-- Stats -->
+        <div class="stats">
+          <div class="stat">
+            <div class="stat__label">Total assigned</div>
+            <div class="stat__value" id="st-total">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">Fully available</div>
+            <div class="stat__value stat__value--ok" id="st-full">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">Missing</div>
+            <div class="stat__value stat__value--warn" id="st-missing">0</div>
+          </div>
+        </div>
+
+        <!-- Cards grid -->
+        <div id="assigned-empty" class="muted" style="display:none;">لا يوجد طلبات مُسندة لك.</div>
+        <div id="assigned-grid" class="assigned-grid"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Small popover for partial quantity -->
+  <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-labelledby="partial-popover-title">
+    <div class="popover__body">
+      <div class="popover__title" id="partial-popover-title">
+        <i data-feather="edit-3"></i>
+        Set available quantity
+      </div>
+      <label class="popover__label">Available</label>
+      <input type="number" id="popover-input" class="input" min="0" step="1" />
+      <small id="popover-hint" class="hint"></small>
+      <div class="popover__actions">
+        <button class="btn btn-outline" data-pop="cancel">Cancel</button>
+        <button class="btn btn-primary" data-pop="save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>feather.replace();</script>
+  <script src="/js/common-ui.js"></script>
+  <script src="/js/assigned-orders.js"></script>
+</body>
+</html>
