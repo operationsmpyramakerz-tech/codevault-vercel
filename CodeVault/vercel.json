@@ -1,5 +1,7 @@
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index/$1" }
+  "version": 2,
+  "routes": [
+    { "src": "^/dashboard/?$", "dest": "/index.html" },
+    { "src": "^/(?!api/)([a-zA-Z0-9-_]+)/?$", "dest": "/$1.html" }
   ]
 }
