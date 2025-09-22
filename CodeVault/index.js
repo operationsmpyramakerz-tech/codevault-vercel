@@ -169,7 +169,7 @@ app.post("/api/login", async (req, res) => {
     let userQuery;
     try {
       userQuery = await withTimeout(queryPromise, 8000, "Notion login");
-    } catch (e) {
+catch (e) {
       // Allow offline login if explicitly enabled
       if (String(process.env.ALLOW_OFFLINE_LOGIN || "").toLowerCase() === "1") {
         req.session.username = username;
