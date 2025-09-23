@@ -1,55 +1,106 @@
 {
   "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
     {
       "source": "/",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/login",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/logout",
-      "destination": "/login.html"
+      "destination": "/public/index.html"
     },
     {
       "source": "/dashboard",
-      "destination": "/index.html"
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/public/login.html"
+    },
+    {
+      "source": "/logout",
+      "destination": "/public/logout.html"
+    },
+    {
+      "source": "/debug-login",
+      "destination": "/public/debug-login.html"
     },
     {
       "source": "/orders",
-      "destination": "/index.html"
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/orders/current",
+      "destination": "/public/index.html"
     },
     {
       "source": "/orders/requested",
-      "destination": "/requested_orders.html"
+      "destination": "/public/requested_orders.html"
     },
     {
       "source": "/orders/assigned",
-      "destination": "/assigned_schools_requested_orders.html"
+      "destination": "/public/assigned_schools_requested_orders.html"
     },
     {
       "source": "/orders/new",
-      "destination": "/create_new_order.html"
+      "destination": "/public/create_new_order.html"
     },
     {
       "source": "/stock",
-      "destination": "/stocktaking.html"
+      "destination": "/public/stocktaking.html"
     },
     {
       "source": "/funds",
-      "destination": "/funds.html"
+      "destination": "/public/funds.html"
     },
     {
       "source": "/account",
-      "destination": "/account.html"
+      "destination": "/public/account.html"
     },
     {
-      "source": "/orders/:path*",
-      "destination": "/index.html"
+      "source": "/attached_assets/(.*)",
+      "destination": "/public/attached_assets/$1"
+    },
+    {
+      "source": "/assets/(.*)",
+      "destination": "/public/assets/$1"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/public/favicon.ico"
+    },
+    {
+      "source": "/favicon.png",
+      "destination": "/public/favicon.png"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/public/manifest.json"
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": "text/html.*"
+        }
+      ],
+      "destination": "/public/index.html"
     }
   ],
-  "cleanUrls": true,
-  "trailingSlash": false
+  "headers": [
+    {
+      "source": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
 }
