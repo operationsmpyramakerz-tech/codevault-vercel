@@ -1,35 +1,93 @@
 {
   "version": 2,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/public/login.html"
+    },
+    {
+      "source": "/debug-login",
+      "destination": "/public/debug-login.html"
+    },
+    {
+      "source": "/orders/requested",
+      "destination": "/public/requested-orders.html"
+    },
+    {
+      "source": "/orders/assigned",
+      "destination": "/public/assigned-orders.html"
+    },
+    {
+      "source": "/orders/new",
+      "destination": "/public/create-order-products.html"
+    },
+    {
+      "source": "/orders/new/products",
+      "destination": "/public/create-order-products.html"
+    },
+    {
+      "source": "/orders/new/details",
+      "destination": "/public/create-order-details.html"
+    },
+    {
+      "source": "/orders/new/review",
+      "destination": "/public/create-order-review.html"
+    },
+    {
+      "source": "/stock",
+      "destination": "/public/stocktaking.html"
+    },
+    {
+      "source": "/funds",
+      "destination": "/public/funds.html"
+    },
+    {
+      "source": "/account",
+      "destination": "/public/account.html"
+    },
+    {
+      "source": "/attached_assets/(.*)",
+      "destination": "/public/attached_assets/$1"
+    },
+    {
+      "source": "/images/(.*)",
+      "destination": "/public/images/$1"
+    },
+    {
+      "source": "/js/(.*)",
+      "destination": "/public/js/$1"
+    },
+    {
+      "source": "/css/(.*)",
+      "destination": "/public/css/$1"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/public/favicon.ico"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/public/manifest.json"
+    }
+  ],
   "cleanUrls": true,
   "trailingSlash": false,
-
-  "rewrites": [
-    { "source": "/",                    "destination": "/public/index.html" },
-    { "source": "/dashboard",           "destination": "/public/index.html" },
-
-    { "source": "/login",               "destination": "/public/login.html" },
-    { "source": "/logout",              "destination": "/public/logout.html" },
-    { "source": "/debug-login",         "destination": "/public/debug-login.html" },
-
-    { "source": "/orders/requested",    "destination": "/public/requested_orders.html" },
-    { "source": "/orders/assigned",     "destination": "/public/assigned_schools_requested_orders.html" },
-    { "source": "/orders/new",          "destination": "/public/create_new_order.html" },
-
-    { "source": "/stock",               "destination": "/public/stocktaking.html" },
-    { "source": "/funds",               "destination": "/public/funds.html" },
-    { "source": "/account",             "destination": "/public/account.html" },
-
-    { "source": "/attached_assets/(.*)","destination": "/public/attached_assets/$1" },
-    { "source": "/assets/(.*)",         "destination": "/public/assets/$1" },
-    { "source": "/favicon.ico",         "destination": "/public/favicon.ico" },
-    { "source": "/manifest.json",       "destination": "/public/manifest.json" }
-  ],
-
   "headers": [
     {
       "source": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     }
   ]
