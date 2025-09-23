@@ -1,18 +1,19 @@
 {
-  "name": "notion-order-dashboard",
+  "name": "codevault-vercel",
   "version": "1.0.0",
-  "description": "An order management dashboard connected to Notion.",
+  "private": true,
+  "description": "Operations dashboard connected to Notion (Vercel).",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "start": "node server.js"
   },
   "dependencies": {
     "@notionhq/client": "^2.3.0",
+    "cookie-session": "^2.0.0",
     "express": "^4.21.2",
     "express-session": "^1.18.2",
-    "pdfkit": "^0.17.2",
-    "cookie-session": "^2.0.0"
+    "pdfkit": "^0.12.7"
   },
   "engines": {
     "node": ">=20"
