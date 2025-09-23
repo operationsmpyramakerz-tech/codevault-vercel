@@ -1,63 +1,31 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/public/index.html"
-    },
-    {
-      "source": "/login",
-      "destination": "/public/login.html"
-    },
-    {
-      "source": "/dashboard",
-      "destination": "/public/index.html"
-    },
-    {
-      "source": "/orders/requested",
-      "destination": "/public/requested-orders.html"
-    },
-    {
-      "source": "/orders/assigned",
-      "destination": "/public/assigned-orders.html"
-    },
-    {
-      "source": "/orders/new",
-      "destination": "/public/create-order-details.html"
-    },
-    {
-      "source": "/orders/new/products",
-      "destination": "/public/create-order-products.html"
-    },
-    {
-      "source": "/orders/new/review",
-      "destination": "/public/create-order-review.html"
-    },
-    {
-      "source": "/stock",
-      "destination": "/public/stocktaking.html"
-    },
-    {
-      "source": "/funds",
-      "destination": "/public/funds.html"
-    },
-    {
-      "source": "/account",
-      "destination": "/public/account.html"
-    },
-    {
-      "source": "/debug-login",
-      "destination": "/public/debug-login.html"
-    }
+  "framework": null,
+
+  "routes": [
+    { "src": "^/$",                         "dest": "/public/login.html" },
+    { "src": "^/login$",                    "dest": "/public/login.html" },
+    { "src": "^/dashboard$",                "dest": "/public/index.html" },
+
+    { "src": "^/orders/requested$",         "dest": "/public/requested-orders.html" },
+    { "src": "^/orders/assigned$",          "dest": "/public/assigned-orders.html" },
+    { "src": "^/orders/new$",               "dest": "/public/create-order-details.html" },
+    { "src": "^/orders/new/products$",      "dest": "/public/create-order-products.html" },
+    { "src": "^/orders/new/review$",        "dest": "/public/create-order-review.html" },
+
+    { "src": "^/stock$",                    "dest": "/public/stocktaking.html" },
+    { "src": "^/funds$",                    "dest": "/public/funds.html" },
+    { "src": "^/account$",                  "dest": "/public/account.html" },
+
+  
+    { "src": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)", "dest": "/public/$1.$2" }
   ],
+
   "headers": [
     {
       "source": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
   ]
