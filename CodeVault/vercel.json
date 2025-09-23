@@ -1,63 +1,64 @@
 {
   "version": 2,
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/$",
-      "dest": "/public/login.html"
+      "source": "/",
+      "destination": "/public/index.html"
     },
     {
-      "src": "^/login/?$",
-      "dest": "/public/login.html"
+      "source": "/login",
+      "destination": "/public/login.html"
     },
     {
-      "src": "^/logout/?$",
-      "dest": "/public/login.html"
+      "source": "/dashboard",
+      "destination": "/public/index.html"
     },
     {
-      "src": "^/orders/?$",
-      "dest": "/public/index.html"
+      "source": "/orders/requested",
+      "destination": "/public/requested-orders.html"
     },
     {
-      "src": "^/current-orders/?$",
-      "dest": "/public/index.html"
+      "source": "/orders/assigned",
+      "destination": "/public/assigned-orders.html"
     },
     {
-      "src": "^/orders/requested/?$",
-      "dest": "/public/requested-orders.html"
+      "source": "/orders/new",
+      "destination": "/public/create-order-details.html"
     },
     {
-      "src": "^/orders/assigned/?$",
-      "dest": "/public/assigned-orders.html"
+      "source": "/orders/new/products",
+      "destination": "/public/create-order-products.html"
     },
     {
-      "src": "^/orders/new/?$",
-      "dest": "/public/create-order-details.html"
+      "source": "/orders/new/review",
+      "destination": "/public/create-order-review.html"
     },
     {
-      "src": "^/orders/new/products/?$",
-      "dest": "/public/create-order-products.html"
+      "source": "/stock",
+      "destination": "/public/stocktaking.html"
     },
     {
-      "src": "^/orders/new/review/?$",
-      "dest": "/public/create-order-review.html"
+      "source": "/funds",
+      "destination": "/public/funds.html"
     },
     {
-      "src": "^/stocktaking/?$",
-      "dest": "/public/stocktaking.html"
+      "source": "/account",
+      "destination": "/public/account.html"
     },
     {
-      "src": "^/funds/?$",
-      "dest": "/public/funds.html"
-    },
+      "source": "/debug-login",
+      "destination": "/public/debug-login.html"
+    }
+  ],
+  "headers": [
     {
-      "src": "^/account/?$",
-      "dest": "/public/account.html"
-    },
-    {
-      "src": "^/(css|js|images|fonts)/(.*)$",
-      "dest": "/public/$1/$2"
+      "source": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }
