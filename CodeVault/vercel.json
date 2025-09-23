@@ -17,7 +17,8 @@
     { "src": "^/funds$",             "dest": "/public/funds.html" },
     { "src": "^/account$",           "dest": "/public/account.html" },
 
-    
+    /* أي ملفات أصول تُطلب من أي مسار (حتى لو داخل /orders/..)
+       تتعاد كتابتها إلى مجلد public */
     { "src": "^/(?:.*/)?(css|js|images)/(.*)$", "dest": "/public/$1/$2" }
   ],
 
