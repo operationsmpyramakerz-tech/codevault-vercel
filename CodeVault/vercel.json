@@ -2,6 +2,18 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/logout",
+      "destination": "/login.html"
+    },
+    {
       "source": "/dashboard",
       "destination": "/index.html"
     },
@@ -15,7 +27,7 @@
     },
     {
       "source": "/orders/assigned",
-      "destination": "/assigned_requested_orders.html"
+      "destination": "/assigned_schools_requested_orders.html"
     },
     {
       "source": "/orders/new",
@@ -30,8 +42,14 @@
       "destination": "/funds.html"
     },
     {
-      "source": "/login",
-      "destination": "/login.html"
+      "source": "/account",
+      "destination": "/account.html"
+    },
+    {
+      "source": "/orders/:path*",
+      "destination": "/index.html"
     }
-  ]
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false
 }
