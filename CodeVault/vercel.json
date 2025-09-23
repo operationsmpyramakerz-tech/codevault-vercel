@@ -1,7 +1,37 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "^/dashboard/?$", "dest": "/index.html" },
-    { "src": "^/(?!api/)([a-zA-Z0-9-_]+)/?$", "dest": "/$1.html" }
+  "rewrites": [
+    {
+      "source": "/dashboard",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/orders",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/orders/requested",
+      "destination": "/requested_orders.html"
+    },
+    {
+      "source": "/orders/assigned",
+      "destination": "/assigned_requested_orders.html"
+    },
+    {
+      "source": "/orders/new",
+      "destination": "/create_new_order.html"
+    },
+    {
+      "source": "/stock",
+      "destination": "/stocktaking.html"
+    },
+    {
+      "source": "/funds",
+      "destination": "/funds.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    }
   ]
 }
