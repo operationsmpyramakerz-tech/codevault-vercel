@@ -2,63 +2,47 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/public/index.html"
-    },
-    {
-      "source": "/index",
-      "destination": "/public/index.html"
+      "destination": "/login.html"
     },
     {
       "source": "/login",
-      "destination": "/public/login.html"
+      "destination": "/login.html"
     },
     {
-      "source": "/orders",
-      "destination": "/public/index.html"
+      "source": "/dashboard",
+      "destination": "/index.html"
     },
     {
-      "source": "/requested-orders",
-      "destination": "/public/requested-orders.html"
+      "source": "/orders/requested",
+      "destination": "/requested-orders.html"
     },
     {
-      "source": "/assigned-orders",
-      "destination": "/public/assigned-orders.html"
+      "source": "/orders/assigned",
+      "destination": "/assigned-orders.html"
     },
     {
-      "source": "/create-order-details",
-      "destination": "/public/create-order-details.html"
+      "source": "/orders/new",
+      "destination": "/create-order-details.html"
     },
     {
-      "source": "/create-order-products",
-      "destination": "/public/create-order-products.html"
+      "source": "/orders/new/products",
+      "destination": "/create-order-products.html"
     },
     {
-      "source": "/create-order-review",
-      "destination": "/public/create-order-review.html"
+      "source": "/orders/new/review",
+      "destination": "/create-order-review.html"
     },
     {
-      "source": "/stocktaking",
-      "destination": "/public/stocktaking.html"
+      "source": "/stock",
+      "destination": "/stocktaking.html"
     },
     {
       "source": "/funds",
-      "destination": "/public/funds.html"
+      "destination": "/funds.html"
     },
     {
       "source": "/account",
-      "destination": "/public/account.html"
-    },
-    {
-      "source": "/js/(.*)",
-      "destination": "/public/js/$1"
-    },
-    {
-      "source": "/css/(.*)",
-      "destination": "/public/css/$1"
-    },
-    {
-      "source": "/images/(.*)",
-      "destination": "/public/images/$1"
+      "destination": "/account.html"
     }
   ],
   "headers": [
