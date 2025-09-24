@@ -1,41 +1,86 @@
-// public/js/common-ui.js
+// public/js/common-ui.js (Vercel-safe, supports .html links)
+// NOTE: This version understands both "pretty routes" (/orders, /stocktaking)
+// and direct file links inside /public (e.g., index.html, stocktaking.html).
+
 document.addEventListener('DOMContentLoaded', () => {
   const logoutBtn     = document.getElementById('logoutBtn');
-  const menuToggle    = document.getElementById('menu-toggle');   // قد لا يوجد
-  const sidebarToggle = document.getElementById('sidebar-toggle'); // موجود
+  const menuToggle    = document.getElementById('menu-toggle');   // may be absent
+  const sidebarToggle = document.getElementById('sidebar-toggle'); // usually present
 
-  const KEY_MINI = 'ui.sidebarMini';       // 1 = mini على الديسكتوب
+  const KEY_MINI = 'ui.sidebarMini';        // '1' = mini on desktop
   const CACHE_ALLOWED = 'allowedPages';     // sessionStorage key
   const isMobile = () => window.innerWidth <= 768;
 
   // ====== Access control (show/hide links) ======
-  // مفاتيح lowercase للمقارنة الثابتة
+  // We map Notion "Allowed Pages" names -> possible nav link selectors.
+  // Each value is an array of selector candidates to support both pretty routes
+  // and plain .html files under /public.
   const PAGE_SELECTORS = {
-    'current orders':            'a[href="/orders"]',
-    'create new order':          'a[href="/orders/new"]',
-    'stocktaking':               'a[href="/stocktaking"]',
-    'requested orders':          'a[href="/orders/requested"]',
-    'schools requested orders':  'a[href="/orders/requested"]',
-    'assigned schools requested orders': 'a[href="/orders/assigned"]',
-    'funds': 'a[href="/funds"]'
+    'current orders': [
+      'a[href="/orders"]', 'a[href="/dashboard"]', 'a[href="/"]',
+      'a[href$="/index.html"]', 'a[href$="index.html"]', 'a[href*="current"]'
+    ],
+    'create new order': [
+      'a[href="/orders/new"]',
+      'a[href$="create-order-details.html"]',
+      'a[href$="create-order-products.html"]',
+      'a[href$="create-order-review.html"]'
+    ],
+    'stocktaking': [
+      'a[href="/stocktaking"]', 'a[href$="stocktaking.html"]'
+    ],
+    'requested orders': [
+      'a[href="/orders/requested"]', 'a[href$="requested-orders.html"]', 'a[href*="requested-orders"]'
+    ],
+    'schools requested orders': [
+      'a[href="/orders/requested"]', 'a[href$="requested-orders.html"]', 'a[href*="requested-orders"]'
+    ],
+    'assigned schools requested orders': [
+      'a[href="/orders/assigned"]', 'a[href$="assigned-orders.html"]', 'a[href*="assigned-orders"]'
+    ],
+    'funds': [
+      'a[href="/funds"]', 'a[href$="funds.html"]'
+    ],
   };
   const toKey = (s) => String(s || '').trim().toLowerCase();
 
   function hideEl(el){ if (el){ el.style.display = 'none'; el.setAttribute('aria-hidden','true'); } }
   function showEl(el){ if (el){ el.style.display = ''; el.removeAttribute('aria-hidden'); } }
 
-  // أظهر المسموح وأخفِ غير المسموح (حتمي)
+  function firstExistingSelector(selectors) {
+    if (!selectors) return null;
+    const arr = Array.isArray(selectors) ? selectors : [selectors];
+    for (const sel of arr) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  // Show allowed links and hide the rest (deterministic)
   function applyAllowedPages(allowed){
     if (!Array.isArray(allowed) || allowed.length === 0) return;
     const set = new Set(allowed.map(toKey));
 
-    Object.entries(PAGE_SELECTORS).forEach(([key, selector]) => {
-      const link = document.querySelector(selector);
-      if (!link) return;
-      const li = link.closest('li') || link;
-      if (set.has(key)) showEl(li);
-      else hideEl(li);
+    // Build a set of all nav link elements mentioned in PAGE_SELECTORS
+    const allMentioned = new Set();
+    Object.values(PAGE_SELECTORS).forEach((sel) => {
+      const arr = Array.isArray(sel) ? sel : [sel];
+      arr.forEach(s => document.querySelectorAll(s).forEach(el => allMentioned.add(el)));
     });
+
+    // Iterate known page keys and toggle visibility for found links
+    Object.entries(PAGE_SELECTORS).forEach(([key, selectors]) => {
+      const link = firstExistingSelector(selectors);
+      if (!link) return; // nothing to toggle if not present
+      const li = link.closest('li') || link;
+      if (set.has(key)) showEl(li); else hideEl(li);
+      // mark as handled
+      if (allMentioned.has(link)) allMentioned.delete(link);
+    });
+
+    // For any nav links NOT covered by PAGE_SELECTORS, keep them visible by default.
+    // (No blind hiding so we don't accidentally hide custom links.)
   }
 
   function cacheAllowedPages(arr){ try { sessionStorage.setItem(CACHE_ALLOWED, JSON.stringify(arr || [])); } catch {} }
@@ -51,14 +96,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-username]').forEach(el => el.textContent = n || 'User');
   };
 
-  // لا نطبق الكاش القديم قبل جلب /api/account لتجنّب الإخفاء الخاطئ
-  // const early = getCachedAllowedPages(); if (early) applyAllowedPages(early);
-
   async function ensureGreetingAndPages(){
     const cached = getCachedName();
     if (cached) renderGreeting(cached);
 
     try {
+      // GET /api/account returns { name, username, allowedPages: [] }
       const res = await fetch('/api/account', { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
@@ -73,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (Array.isArray(data.allowedPages)) {
         cacheAllowedPages(data.allowedPages);
-        applyAllowedPages(data.allowedPages); // يُظهر/يخفي بشكل حتمي
+        applyAllowedPages(data.allowedPages); // show/hide deterministically
       }
     } catch {}
   }
@@ -114,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
   sidebarToggle && sidebarToggle.addEventListener('click', toggleSidebar);
   menuToggle    && menuToggle.addEventListener('click', toggleSidebar);
 
-  // إغلاق السايدبار بالضغط خارجها (موبايل)
+  // Close sidebar by clicking outside (mobile)
   document.addEventListener('click', (event) => {
     if (!isMobile()) return;
     const clickedInteractive = event.target.closest('button,[type="button"],[type="submit"],a,input,select,textarea,.choices,.form-actions');
