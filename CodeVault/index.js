@@ -106,10 +106,15 @@ function requirePage(_pageName) {
 }
 
 /* -------------------- Health & Session -------------------- */
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, route: "/api/health" });
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+app.post('/api/login', async (req, res) => {
+  // منطق اللوجين القديم كما هو
 });
 
+app.post('/api/logout', (req, res) => {
+  req.session?.destroy?.(() => res.json({ ok: true }));
+});
 app.get("/api/whoami", (req, res) => {
   res.json({
     loggedIn: Boolean(req.session?.username),

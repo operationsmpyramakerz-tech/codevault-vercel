@@ -1,13 +1,13 @@
 // CodeVault/api/[...all].js
-// يـforward أي مسار /api/* على سيرفر الـ Express (server.js)
-
-const app = require("../server.js");
-
-// ملاحظة: بنسيب prefix /api زي ما هو عشان الـ Express routes عندنا بتبدأ بـ /api/
+function loadApp() {
+  return require('../index.js'); // أو ../server.js لو هو اللي بيصدّر app
+}
 module.exports = (req, res) => {
-  // لو جالك على /api/index/* هنشيل /api/index بس، والباقي هنسيبه
-  if (req.url.startsWith("/api/index")) {
-    req.url = req.url.replace(/^\/api\/index/, "") || "/";
+  try {
+    const app = loadApp();
+    return app(req, res);
+  } catch (e) {
+    console.error('APP_LOAD_FAILED', e);
+    res.status(500).json({ ok: false, error: 'APP_LOAD_FAILED' });
   }
-  return app(req, res);
 };
