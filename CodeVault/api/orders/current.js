@@ -1,41 +1,20 @@
-// CodeVault/api/orders/current.js
-// Route: /api/orders/current
-const {
-  getNotionClient,
-  getDbId,
-  mapBasic,
-  safeQueryDatabase,
-} = require("../_lib/notion.js");
+
+const { getEnvIds, fetchDatabase } = require("../_lib/notion");
 
 module.exports = async (req, res) => {
-  // Handle preflight on Vercel quickly
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const ids = getEnvIds();
+    if (!ids.ordersDB) return res.status(500).json({ ok:false, success:false, error:"MISSING_DB_ID", which:"orders" });
+    const items = await fetchDatabase(ids.ordersDB, { pageSize: 50 });
+    return res.json({
+      ok: true,
+      success: true,
+      count: items.length,
+      items,
+      orders: items,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok:false, success:false, error: String((err && err.code) || (err && err.message) || err) });
   }
-
-  const { client, token } = getNotionClient();
-  if (!token || !client) {
-    res.status(200).json({ ok: false, error: "NO_NOTION_TOKEN" });
-    return;
-  }
-
-  const dbId = getDbId("orders");
-  if (!dbId) {
-    res.status(200).json({ ok: false, error: "MISSING_DB_ID", db: "orders" });
-    return;
-  }
-
-  // Keep it generic (no filter) to match any schema
-  const q = await safeQueryDatabase(client, dbId, {
-    page_size: 25,
-  });
-
-  if (!q.ok) {
-    res.status(200).json({ ok: false, error: q.error, db: "orders" });
-    return;
-  }
-
-  const items = q.results.map(mapBasic);
-  res.status(200).json({ ok: true, count: items.length, items });
 };
