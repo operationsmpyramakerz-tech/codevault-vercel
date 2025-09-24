@@ -9,12 +9,36 @@
       "destination": "/login.html"
     },
     {
+      "source": "/logout",
+      "destination": "/login.html"
+    },
+    {
       "source": "/dashboard",
       "destination": "/index.html"
     },
     {
+      "source": "/current-orders",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/orders",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/home",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/requested-orders",
+      "destination": "/requested-orders.html"
+    },
+    {
       "source": "/orders/requested",
       "destination": "/requested-orders.html"
+    },
+    {
+      "source": "/assigned-orders",
+      "destination": "/assigned-orders.html"
     },
     {
       "source": "/orders/assigned",
@@ -34,6 +58,10 @@
     },
     {
       "source": "/stock",
+      "destination": "/stocktaking.html"
+    },
+    {
+      "source": "/stocktaking",
       "destination": "/stocktaking.html"
     },
     {
