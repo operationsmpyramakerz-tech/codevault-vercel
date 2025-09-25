@@ -1,79 +1,47 @@
-document.addEventListener('DOMContentLoaded', function () {
-  const loginForm = document.getElementById('loginForm');
-  const errorMessage = document.getElementById('error-message');
-  const loginBtn = loginForm.querySelector('.login-btn');
+// CodeVault/public/js/login.js
+(function () {
+  const form = document.querySelector("form") || document.getElementById("login-form");
+  const userEl = document.getElementById("username");
+  const passEl = document.getElementById("password");
+  const btn = document.getElementById("signin-btn") || document.querySelector("button[type=submit]");
+  const toast = (msg, type) => {
+    const el = document.getElementById("toast") || document.createElement("div");
+    el.id = "toast";
+    el.textContent = msg;
+    el.style.cssText = "position:fixed;bottom:20px;right:20px;padding:10px 14px;border-radius:8px;background:" + (type === "error" ? "#d33" : "#2a2") + ";color:#fff;z-index:9999";
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  };
 
-  function showError(message) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-  }
-
-  function hideError() {
-    errorMessage.style.display = 'none';
-  }
-
-  function setLoading(loading) {
-    if (loading) {
-      loginBtn.classList.add('loading');
-      loginBtn.disabled = true;
-      loginBtn.textContent = 'Signing In...';
-    } else {
-      loginBtn.classList.remove('loading');
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Sign In';
-    }
-  }
-
-  loginForm.addEventListener('submit', async function (event) {
-    event.preventDefault();
-    hideError();
-    setLoading(true);
-
-    const formData = new FormData(loginForm);
-    const username = formData.get('username');
-    const password = formData.get('password');
+  async function submitLogin(e) {
+    e && e.preventDefault();
+    btn && (btn.disabled = true, btn.classList.add("loading"));
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 12000);
 
     try {
-      const response = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ username, password }),
+      const resp = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: userEl?.value || "", password: passEl?.value || "" }),
+        signal: controller.signal
       });
+      clearTimeout(to);
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        // Save username from login form for greetings
-        try { localStorage.setItem('username', String(username || '')); } catch {}
-
-        // Success - redirect to dashboard
-        window.location.href = '/dashboard';
-      } else {
-        showError(result.error || 'Login failed. Please try again.');
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        toast(data.error || resp.statusText || "Login failed", "error");
+        return;
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      showError('Network error. Please check your connection and try again.');
+      window.location.assign("/dashboard");
+    } catch (err) {
+      clearTimeout(to);
+      toast(err.name === "AbortError" ? "Login timed out" : "Network error", "error");
     } finally {
-      setLoading(false);
+      btn && (btn.disabled = false, btn.classList.remove("loading"));
     }
-  });
-
-  document.getElementById('username').addEventListener('input', hideError);
-  document.getElementById('password').addEventListener('input', hideError);
-  // Toggle show/hide password
-  const pwdInput = document.getElementById('password');
-  const toggleBtn = document.getElementById('togglePassword');
-  if (toggleBtn && pwdInput) {
-    const eye = toggleBtn.querySelector('.icon-eye');
-    const eyeOff = toggleBtn.querySelector('.icon-eye-off');
-    toggleBtn.addEventListener('click', () => {
-      const show = pwdInput.getAttribute('type') === 'password';
-      pwdInput.setAttribute('type', show ? 'text' : 'password');
-      toggleBtn.setAttribute('aria-pressed', String(show));
-      if (eye && eyeOff) {
-        eye.style.display = show ? 'none' : '';
-        eyeOff.style.display = show ? '' : 'none';
-      }
-    });
   }
 
-});
+  if (form) form.addEventListener("submit", submitLogin);
+  if (btn && !form) btn.addEventListener("click", submitLogin);
+})();
