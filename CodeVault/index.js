@@ -1523,4 +1523,4 @@ app.post("/api/funds", requireAuth, requirePage("Funds"), async (req, res) => {
 });
 
 /* -------------------- Export app -------------------- */
-module.exports = app;
+module.exports = app
