@@ -1,87 +1,23 @@
 {
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/login",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/logout",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/dashboard",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/current-orders",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/orders",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/home",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/requested-orders",
-      "destination": "/requested-orders.html"
-    },
-    {
-      "source": "/orders/requested",
-      "destination": "/requested-orders.html"
-    },
-    {
-      "source": "/assigned-orders",
-      "destination": "/assigned-orders.html"
-    },
-    {
-      "source": "/orders/assigned",
-      "destination": "/assigned-orders.html"
-    },
-    {
-      "source": "/orders/new",
-      "destination": "/create-order-details.html"
-    },
-    {
-      "source": "/orders/new/products",
-      "destination": "/create-order-products.html"
-    },
-    {
-      "source": "/orders/new/review",
-      "destination": "/create-order-review.html"
-    },
-    {
-      "source": "/stock",
-      "destination": "/stocktaking.html"
-    },
-    {
-      "source": "/stocktaking",
-      "destination": "/stocktaking.html"
-    },
-    {
-      "source": "/funds",
-      "destination": "/funds.html"
-    },
-    {
-      "source": "/account",
-      "destination": "/account.html"
+  "version": 2,
+  "functions": {
+    "api/index/[[...slug]].js": {
+      "runtime": "nodejs20.x"
     }
+  },
+  "routes": [
+    { "src": "^/api/(.*)$", "dest": "/api/index/$1" },
+
+    { "src": "^/$", "dest": "/public/login.html" },
+
+    { "src": "^/(login|logout|dashboard|requested-orders|assigned-orders|create-order-details|create-order-products|create-order-review|funds|stocktaking|account)$", "dest": "/public/$1.html" },
+
+    { "src": "^/(?:css|js|images)/(.*)$", "dest": "/public/$1" }
   ],
   "headers": [
     {
       "source": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     }
   ]
 }
