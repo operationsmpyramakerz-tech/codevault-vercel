@@ -1,87 +1,19 @@
 {
-  "rewrites": [
+  "version": 2,
+  "functions": {
+    "CodeVault/api/**/*.js": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "routes": [
     {
-      "source": "/",
-      "destination": "/login.html"
+      "src": "^/api/(.*)$",
+      "dest": "CodeVault/api/$1"
     },
     {
-      "source": "/login",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/logout",
-      "destination": "/login.html"
-    },
-    {
-      "source": "/dashboard",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/current-orders",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/orders",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/home",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/requested-orders",
-      "destination": "/requested-orders.html"
-    },
-    {
-      "source": "/orders/requested",
-      "destination": "/requested-orders.html"
-    },
-    {
-      "source": "/assigned-orders",
-      "destination": "/assigned-orders.html"
-    },
-    {
-      "source": "/orders/assigned",
-      "destination": "/assigned-orders.html"
-    },
-    {
-      "source": "/orders/new",
-      "destination": "/create-order-details.html"
-    },
-    {
-      "source": "/orders/new/products",
-      "destination": "/create-order-products.html"
-    },
-    {
-      "source": "/orders/new/review",
-      "destination": "/create-order-review.html"
-    },
-    {
-      "source": "/stock",
-      "destination": "/stocktaking.html"
-    },
-    {
-      "source": "/stocktaking",
-      "destination": "/stocktaking.html"
-    },
-    {
-      "source": "/funds",
-      "destination": "/funds.html"
-    },
-    {
-      "source": "/account",
-      "destination": "/account.html"
+      "src": "^(?!/api/).*",
+      "dest": "CodeVault/api/index/[[...slug]].js"
     }
   ],
-  "headers": [
-    {
-      "source": "/(.*)\\.(css|js|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ]
+  "installCommand": "npm ci --prefix CodeVault || npm install --prefix CodeVault"
 }
