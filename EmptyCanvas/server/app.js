@@ -195,9 +195,6 @@ function requirePage(pageName) {
 }
 
 // --- Page Serving Routes ---
-app.get("/health", (req, res) => {
-  res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
-});
 app.get("/login", (req, res) => {
   if (req.session.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
@@ -1934,3 +1931,13 @@ async function detectOrderIdPropName() {
     ]) || null
   );
 }
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
+});
+
+// ----------------------------------
+// باقي الراوتس موجودة فوق
+// ----------------------------------
+
+module.exports = app;
