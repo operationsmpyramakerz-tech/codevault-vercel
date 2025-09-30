@@ -4,7 +4,7 @@ const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
 
 const app = express();
-// Initialize Notion Client using Replit Secrets
+// Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
 const ordersDatabaseId = process.env.Products_list;
@@ -13,15 +13,20 @@ const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
 
 // Middleware
-app.use(express.json({ limit: '10mb' })); // Increase limit for file uploads
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
+// --- Health FIRST (before session) so it works even if env is missing ---
+app.get("/health", (req, res) => {
+  res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
+});
+
+// Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
 app.use(sessionMiddleware);
 
 // Helpers: Allowed pages control
-// نخزن داخليًا Requested Orders كموحّد للصفحة، ونضيف صفحة جديدة Assigned Schools Requested Orders
 const ALL_PAGES = [
   "Current Orders",
   "Requested Orders",
@@ -40,12 +45,10 @@ function normalizePages(names = []) {
   const out = [];
   if (set.has("current orders")) out.push("Current Orders");
 
-  // اعتبر الاسمين نفس الصفحة داخليًا
   if (set.has("requested orders") || set.has("schools requested orders")) {
     out.push("Requested Orders");
   }
 
-  // الصفحة الجديدة (بعض المرادفات الاختيارية)
   if (
     set.has("assigned schools requested orders") ||
     set.has("assigned requested orders") ||
@@ -82,7 +85,7 @@ function extractAllowedPages(props = {}) {
   let candidates =
     props.Pages?.multi_select ||
     props["Allowed Pages"]?.multi_select ||
-    props["Allowed pages"]?.multi_select || // support lowercase 'p'
+    props["Allowed pages"]?.multi_select ||
     props["Pages Allowed"]?.multi_select ||
     props["Access Pages"]?.multi_select ||
     [];
@@ -101,7 +104,7 @@ function extractAllowedPages(props = {}) {
     ? candidates.map((x) => x?.name).filter(Boolean)
     : [];
   const allowed = normalizePages(names);
-return allowed; // لو فاضي يبقى مفيش صفحات
+  return allowed;
 }
 
 function firstAllowedPath(allowed = []) {
@@ -196,13 +199,13 @@ function requirePage(pageName) {
 
 // --- Page Serving Routes ---
 app.get("/login", (req, res) => {
-  if (req.session.authenticated)
+  if (req.session?.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
 
 app.get("/", (req, res) => {
-  if (req.session.authenticated)
+  if (req.session?.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
@@ -686,7 +689,7 @@ app.post(
   async (req, res) => {
     try {
       let { orderIds, memberIds, memberId } = req.body || {};
-      if (!Array.isArray(orderIds) || !orderIds.length) {
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
         return res.status(400).json({ error: "orderIds required" });
       }
       if ((!Array.isArray(memberIds) || memberIds.length === 0) && !memberId)
@@ -1748,175 +1751,6 @@ app.patch("/api/account", requireAuth, async (req, res) => {
   }
 });
 
-// Funds database validation endpoint
-app.get("/api/funds/check", requireAuth, requirePage("Funds"), async (req, res) => {
-  try {
-    if (!fundsDatabaseId) {
-      return res.status(500).json({ 
-        error: "Funds database ID is not configured in environment variables",
-        configured: false
-      });
-    }
-
-    // Try to retrieve the database to verify it exists and is accessible
-    const database = await notion.databases.retrieve({ 
-      database_id: fundsDatabaseId 
-    });
-
-    res.json({ 
-      configured: true, 
-      title: database.title?.[0]?.plain_text || "Funds Database",
-      message: "Funds database is properly configured"
-    });
-  } catch (error) {
-    console.error("Funds database check error:", error.body || error);
-    res.status(500).json({ 
-      configured: false,
-      error: error.message || "Cannot access funds database. Check database ID and sharing permissions."
-    });
-  }
-});
-
-// Funds API - Submit mission expenses
-app.post("/api/funds", requireAuth, requirePage("Funds"), async (req, res) => {
-  if (!fundsDatabaseId || !teamMembersDatabaseId) {
-    return res
-      .status(500)
-      .json({ error: "Database IDs are not configured." });
-  }
-
-  try {
-    const { assignment, expenses } = req.body || {};
-
-    if (!assignment || !assignment.trim()) {
-      return res.status(400).json({ error: "Mission assignment is required" });
-    }
-
-    if (!Array.isArray(expenses) || expenses.length === 0) {
-      return res.status(400).json({ error: "At least one expense is required" });
-    }
-
-    // Get user information
-    const userQuery = await notion.databases.query({
-      database_id: teamMembersDatabaseId,
-      filter: { property: "Name", title: { equals: req.session.username } },
-    });
-
-    if (userQuery.results.length === 0) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    const userId = userQuery.results[0].id;
-
-    // Validate expenses data
-    for (const expense of expenses) {
-      const { fundsType, date, from, to, cost } = expense;
-
-      if (!fundsType || !date || !from || !to || typeof cost !== 'number' || cost <= 0) {
-        return res.status(400).json({ 
-          error: "All expense fields are required and cost must be a positive number" 
-        });
-      }
-    }
-
-    // Create expense entries in Notion database
-    const createdExpenses = await Promise.all(
-      expenses.map(async (expense) => {
-        const { fundsType, date, from, to, cost, screenshotName, screenshotType, screenshotSize } = expense;
-
-        // Prepare properties for Notion page
-        const properties = {
-          "Assignment": { 
-            title: [{ text: { content: assignment.trim() } }] 
-          },
-          "Funds Type": { 
-            select: { name: fundsType } 
-          },
-          "Date": { 
-            date: { start: date } 
-          },
-          "From": { 
-            rich_text: [{ text: { content: from } }] 
-          },
-          "To": { 
-            rich_text: [{ text: { content: to } }] 
-          },
-          "Cost": { 
-            number: cost 
-          },
-          "Team Members": { 
-            relation: [{ id: userId }] 
-          }
-        };
-
-        // Handle file upload if present
-        let children = [];
-        if (screenshotName) {
-          try {
-            // Add receipt info as a callout block
-            // Note: Full file upload functionality requires cloud storage integration
-            children = [
-              {
-                object: "block",
-                type: "callout",
-                callout: {
-                  rich_text: [
-                    {
-                      type: "text",
-                      text: {
-                        content: `Receipt file: ${screenshotName} (${screenshotType || 'unknown type'}${screenshotSize ? `, ${Math.round(screenshotSize/1024)}KB` : ''})`
-                      }
-                    }
-                  ],
-                  icon: {
-                    emoji: "📎"
-                  }
-                }
-              }
-            ];
-          } catch (error) {
-            console.warn("Error processing screenshot info:", error);
-          }
-        }
-
-        // Create the page in Notion
-        const created = await notion.pages.create({
-          parent: { database_id: fundsDatabaseId },
-          properties,
-          children: children.length > 0 ? children : undefined
-        });
-
-        return {
-          id: created.id,
-          assignment: assignment.trim(),
-          fundsType,
-          date,
-          from,
-          to,
-          cost,
-          createdTime: created.created_time
-        };
-      })
-    );
-
-    // Return success response
-    res.json({
-      success: true,
-      message: "Mission expenses submitted successfully",
-      data: {
-        assignment: assignment.trim(),
-        expensesCount: createdExpenses.length,
-        totalCost: expenses.reduce((sum, exp) => sum + exp.cost, 0),
-        createdExpenses
-      }
-    });
-
-  } catch (error) {
-    console.error("Error submitting funds:", error.body || error);
-    res.status(500).json({ error: "Failed to submit mission expenses" });
-  }
-});
-
 // بعد pickPropName() والدوال المشابهة
 async function detectOrderIdPropName() {
   const props = await getOrdersDBProps();
@@ -1931,13 +1765,6 @@ async function detectOrderIdPropName() {
     ]) || null
   );
 }
-// Health check
-app.get("/health", (req, res) => {
-  res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
-});
 
-// ----------------------------------
-// باقي الراوتس موجودة فوق
-// ----------------------------------
-
+// Export Express app for Vercel
 module.exports = app;
