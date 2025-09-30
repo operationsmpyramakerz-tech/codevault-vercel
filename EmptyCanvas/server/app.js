@@ -304,10 +304,14 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid username or password" });
     }
     const user = response.results[0];
-    const storedPassword = user.properties.Password?.number;
+    const storedPassword =
+  user.properties.Password?.rich_text?.[0]?.plain_text ||
+  user.properties.Password?.title?.[0]?.plain_text ||
+  user.properties.Password?.number;
 
-    if (storedPassword && storedPassword.toString() === password) {
+    if (storedPassword && storedPassword.toString().trim() === password.trim()) {
       const allowedNormalized = extractAllowedPages(user.properties);
+      //login success
       req.session.authenticated = true;
       req.session.username = username;
       req.session.allowedPages = allowedNormalized;
