@@ -20,15 +20,6 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 const { sessionMiddleware } = require("./session-redis");
 app.use(sessionMiddleware);
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "a-very-secret-key-for-development",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false },
-  }),
-);
-
 // Helpers: Allowed pages control
 // نخزن داخليًا Requested Orders كموحّد للصفحة، ونضيف صفحة جديدة Assigned Schools Requested Orders
 const ALL_PAGES = [
@@ -204,6 +195,9 @@ function requirePage(pageName) {
 }
 
 // --- Page Serving Routes ---
+app.get("/health", (req, res) => {
+  res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
+});
 app.get("/login", (req, res) => {
   if (req.session.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
