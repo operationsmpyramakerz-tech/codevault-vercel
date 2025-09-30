@@ -1920,7 +1920,6 @@ app.post("/api/funds", requireAuth, requirePage("Funds"), async (req, res) => {
   }
 });
 
-});
 // بعد pickPropName() والدوال المشابهة
 async function detectOrderIdPropName() {
   const props = await getOrdersDBProps();
