@@ -118,7 +118,7 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Create New Order")) return "/orders/new";
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
-  return "/login";
+  return "/account";
 }
 
 // Helpers — Notion
@@ -209,77 +209,15 @@ app.get("/login", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  if (req.session?.authenticated)
-    return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
+  if (req.session?.authenticated) return res.redirect("/account");
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
 
-app.get("/dashboard", requireAuth, (req, res) => {
-  res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
-});
+app.get("/dashboard", requireAuth, (req, res) => { res.redirect("/account"); });
 
-app.get("/orders", requireAuth, requirePage("Current Orders"), (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "login.html"));
-});
+app.get("/orders", requireAuth, requirePage("Current Orders"), (req, res) => { res.sendFile(path.join(__dirname, "..", "public", "index.html")); });
 
-app.get(
-  "/orders/requested",
-  requireAuth,
-  requirePage("Requested Orders"),
-  (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "public", "requested-orders.html"));
-  },
-);
-
-// صفحة جديدة: الطلبات المُسندة للمستخدم الحالي فقط
-app.get(
-  "/orders/assigned",
-  requireAuth,
-  requirePage("Assigned Schools Requested Orders"),
-  (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "public", "assigned-orders.html"));
-  },
-);
-
-// 3-step order pages
-app.get(
-  "/orders/new",
-  requireAuth,
-  requirePage("Create New Order"),
-  (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "public", "create-order-details.html"));
-  },
-);
-
-app.get(
-  "/orders/new/products",
-  requireAuth,
-  requirePage("Create New Order"),
-  (req, res) => {
-    if (!req.session.orderDraft || !req.session.orderDraft.reason) {
-      return res.redirect("/orders/new");
-    }
-    res.sendFile(path.join(__dirname, "..", "public", "create-order-products.html"));
-  },
-);
-
-app.get(
-  "/orders/new/review",
-  requireAuth,
-  requirePage("Create New Order"),
-  (req, res) => {
-    const d = req.session.orderDraft || {};
-    if (!d.reason) return res.redirect("/orders/new");
-    if (!Array.isArray(d.products) || d.products.length === 0) {
-      return res.redirect("/orders/new/products");
-    }
-    res.sendFile(path.join(__dirname, "..", "public", "create-order-review.html"));
-  },
-);
-
-app.get("/stocktaking", requireAuth, requirePage("Stocktaking"), (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "stocktaking.html"));
-});
+app.get("/orders/requested", requireAuth, requirePage("Requested Orders"), (req, res) => { res.sendFile(path.join(__dirname, "..", "public", "requested-orders.html")); });
 
 // Account page
 app.get("/account", requireAuth, (req, res) => {
