@@ -43,11 +43,24 @@ document.addEventListener('DOMContentLoaded', function () {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        // Save username from login form for greetings
+        // Save username locally
         try { localStorage.setItem('username', String(username || '')); } catch {}
 
-        // Success - redirect to dashboard
-        window.location.href = '/dashboard';
+        // اختار أول صفحة مسموح بيها من السيرفر
+        let redirectUrl = '/account';
+        if (Array.isArray(result.allowedPages) && result.allowedPages.length > 0) {
+          const first = result.allowedPages[0];
+          if (first === 'Current Orders') redirectUrl = '/orders';
+          else if (first === 'Requested Orders') redirectUrl = '/orders/requested';
+          else if (first === 'Assigned Schools Requested Orders') redirectUrl = '/orders/assigned';
+          else if (first === 'Create New Order') redirectUrl = '/orders/new';
+          else if (first === 'Stocktaking') redirectUrl = '/stocktaking';
+          else if (first === 'Funds') redirectUrl = '/funds';
+        }
+
+        // ✅ Redirect
+        window.location.href = redirectUrl;
+
       } else {
         showError(result.error || 'Login failed. Please try again.');
       }
@@ -61,12 +74,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('username').addEventListener('input', hideError);
   document.getElementById('password').addEventListener('input', hideError);
+
   // Toggle show/hide password
   const pwdInput = document.getElementById('password');
   const toggleBtn = document.getElementById('togglePassword');
   if (toggleBtn && pwdInput) {
     const eye = toggleBtn.querySelector('.icon-eye');
     const eyeOff = toggleBtn.querySelector('.icon-eye-off');
+
     toggleBtn.addEventListener('click', () => {
       const show = pwdInput.getAttribute('type') === 'password';
       pwdInput.setAttribute('type', show ? 'text' : 'password');
@@ -77,5 +92,4 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   }
-
 });

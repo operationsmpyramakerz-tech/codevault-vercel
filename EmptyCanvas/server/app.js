@@ -331,14 +331,9 @@ app.post("/api/login", async (req, res) => {
 
       // تأكد من حفظ الجلسة قبل الرد
       req.session.save((err) => {
-        if (err)
-          return res.status(500).json({ error: "Session could not be saved." });
-        res.json({
-          success: true,
-          message: "Login successful",
-          allowedPages: allowedUI,
-        });
-      });
+  if (err) return res.status(500).send("Session could not be saved.");
+  res.redirect("/account");  // إعادة توجيه مباشرة
+});
     } else {
       res.status(401).json({ error: "Invalid username or password" });
     }
@@ -1780,7 +1775,7 @@ async function detectOrderIdPropName() {
       "Order Code",
       "Order Group",
       "Batch ID",
-      "OrderId",
+      "OrderId", 
       "Order_Code"
     ]) || null
   );
