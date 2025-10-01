@@ -4,10 +4,6 @@ const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
 
 const app = express();
-
-// مهم جدًا على Vercel: لازم قبل تفعيل الـ session
-app.set('trust proxy', 1);
-
 // Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
@@ -118,7 +114,7 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Create New Order")) return "/orders/new";
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
-  return "/account";
+  return "/login";
 }
 
 // Helpers — Notion
@@ -209,15 +205,75 @@ app.get("/login", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  if (req.session?.authenticated) return res.redirect("/account");
+  if (req.session?.authenticated)
+    return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
 
-app.get("/dashboard", requireAuth, (req, res) => { res.redirect("/account"); });
+app.get("/dashboard", requireAuth, (req, res) => {
+  res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
+});
 
-app.get("/orders", requireAuth, requirePage("Current Orders"), (req, res) => { res.sendFile(path.join(__dirname, "..", "public", "index.html")); });
+app.get("/orders", requireAuth, requirePage("Current Orders"), (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+});
 
-app.get("/orders/requested", requireAuth, requirePage("Requested Orders"), (req, res) => { res.sendFile(path.join(__dirname, "..", "public", "requested-orders.html")); });
+app.get(
+  "/orders/requested",
+  requireAuth,
+  requirePage("Requested Orders"),
+  (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "requested-orders.html"));
+  },
+);
+
+// صفحة جديدة: الطلبات المُسندة للمستخدم الحالي فقط
+app.get(
+  "/orders/assigned",
+  requireAuth,
+  requirePage("Assigned Schools Requested Orders"),
+  (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "assigned-orders.html"));
+  },
+);
+
+// 3-step order pages
+app.get(
+  "/orders/new",
+  requireAuth,
+  requirePage("Create New Order"),
+  (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "create-order-details.html"));
+  },
+);
+app.get(
+  "/orders/new/products",
+  requireAuth,
+  requirePage("Create New Order"),
+  (req, res) => {
+    if (!req.session.orderDraft || !req.session.orderDraft.reason) {
+      return res.redirect("/orders/new");
+    }
+    res.sendFile(path.join(__dirname, "..", "public", "create-order-products.html"));
+  },
+);
+app.get(
+  "/orders/new/review",
+  requireAuth,
+  requirePage("Create New Order"),
+  (req, res) => {
+    const d = req.session.orderDraft || {};
+    if (!d.reason) return res.redirect("/orders/new");
+    if (!Array.isArray(d.products) || d.products.length === 0) {
+      return res.redirect("/orders/new/products");
+    }
+    res.sendFile(path.join(__dirname, "..", "public", "create-order-review.html"));
+  },
+);
+
+app.get("/stocktaking", requireAuth, requirePage("Stocktaking"), (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "stocktaking.html"));
+});
 
 // Account page
 app.get("/account", requireAuth, (req, res) => {
@@ -242,36 +298,31 @@ app.post("/api/login", async (req, res) => {
   try {
     const response = await notion.databases.query({
       database_id: teamMembersDatabaseId,
-      filter: { property: "Name", title: { equals: String(username || "").trim() } },
+      filter: { property: "Name", title: { equals: username } },
     });
-
     if (response.results.length === 0) {
       return res.status(401).json({ error: "Invalid username or password" });
     }
-
     const user = response.results[0];
+    const storedPassword = user.properties.Password?.number;
 
-    // يدعم Rich Text أو Title أو Number
-    const storedPassword =
-      user.properties.Password?.rich_text?.[0]?.plain_text ||
-      user.properties.Password?.title?.[0]?.plain_text ||
-      user.properties.Password?.number;
-
-    if (storedPassword && storedPassword.toString().trim() === String(password || "").trim()) {
+    if (storedPassword && storedPassword.toString() === password) {
       const allowedNormalized = extractAllowedPages(user.properties);
-
-      // login success
       req.session.authenticated = true;
-      req.session.username = String(username || "").trim();
+      req.session.username = username;
       req.session.allowedPages = allowedNormalized;
 
       const allowedUI = expandAllowedForUI(allowedNormalized);
 
-      // تأكد من حفظ الجلسة قبل الرد
       req.session.save((err) => {
-  if (err) return res.status(500).send("Session could not be saved.");
-  res.redirect("/account");  // إعادة توجيه مباشرة
-});
+        if (err)
+          return res.status(500).json({ error: "Session could not be saved." });
+        res.json({
+          success: true,
+          message: "Login successful",
+          allowedPages: allowedUI,
+        });
+      });
     } else {
       res.status(401).json({ error: "Invalid username or password" });
     }
@@ -325,7 +376,6 @@ app.get("/api/account", requireAuth, async (req, res) => {
       phone: p?.Phone?.phone_number || "",
       email: p?.Email?.email || "",
       employeeCode: p?.["Employee Code"]?.number ?? null,
-      // ملاحظة: تركت password كما هو عندك (number) لو عايز تشيله من الـ API قلّي
       password: p?.Password?.number ?? null,
       allowedPages: allowedUI,
     };
@@ -347,7 +397,6 @@ app.get(
     res.json(req.session.orderDraft || {});
   },
 );
-
 app.post(
   "/api/order-draft/details",
   requireAuth,
@@ -362,7 +411,6 @@ app.post(
     return res.json({ ok: true });
   },
 );
-
 app.post(
   "/api/order-draft/products",
   requireAuth,
@@ -389,7 +437,6 @@ app.post(
     return res.json({ ok: true, count: clean.length });
   },
 );
-
 app.delete(
   "/api/order-draft",
   requireAuth,
@@ -526,7 +573,6 @@ app.get(
   async (req, res) => {
     if (!ordersDatabaseId)
       return res.status(500).json({ error: "Orders DB not configured" });
-
     try {
       const all = [];
       let hasMore = true,
@@ -686,6 +732,7 @@ app.post(
 );
 
 // ========== Assigned: APIs ==========
+// 1) جلب الطلبات المسندة للمستخدم الحالي — مع reason + status
 app.get(
   "/api/orders/assigned",
   requireAuth,
@@ -761,7 +808,7 @@ app.get(
   },
 );
 
-// 2) تعليم عنصر أنه "متوفر بالكامل"
+// 2) تعليم عنصر أنه "متوفر بالكامل" (تجعل المتاح = المطلوب)
 app.post(
   "/api/orders/assigned/mark-in-stock",
   requireAuth,
@@ -840,7 +887,7 @@ app.post(
   },
 );
 
-// 3-b) تحويل حالة مجموعة عناصر طلب إلى Prepared
+// 3-b) تحويل حالة مجموعة عناصر طلب إلى Prepared (زر في الكارت)
 app.post(
   "/api/orders/assigned/mark-prepared",
   requireAuth,
@@ -873,7 +920,7 @@ app.post(
   },
 );
 
-// 4) PDF بالنواقص فقط (remaining > 0)
+// 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
@@ -1713,7 +1760,7 @@ async function detectOrderIdPropName() {
       "Order Code",
       "Order Group",
       "Batch ID",
-      "OrderId", 
+      "OrderId",
       "Order_Code"
     ]) || null
   );
