@@ -4,6 +4,10 @@ const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
 
 const app = express();
+
+// مهم جدًا على Vercel: لازم قبل تفعيل الـ session
+app.set('trust proxy', 1);
+
 // Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
@@ -246,6 +250,7 @@ app.get(
     res.sendFile(path.join(__dirname, "..", "public", "create-order-details.html"));
   },
 );
+
 app.get(
   "/orders/new/products",
   requireAuth,
@@ -257,6 +262,7 @@ app.get(
     res.sendFile(path.join(__dirname, "..", "public", "create-order-products.html"));
   },
 );
+
 app.get(
   "/orders/new/review",
   requireAuth,
@@ -298,22 +304,32 @@ app.post("/api/login", async (req, res) => {
   try {
     const response = await notion.databases.query({
       database_id: teamMembersDatabaseId,
-      filter: { property: "Name", title: { equals: username } },
+      filter: { property: "Name", title: { equals: String(username || "").trim() } },
     });
+
     if (response.results.length === 0) {
       return res.status(401).json({ error: "Invalid username or password" });
     }
-    const user = response.results[0];
-    const storedPassword = user.properties.Password?.number;
 
-    if (storedPassword && storedPassword.toString() === password) {
+    const user = response.results[0];
+
+    // يدعم Rich Text أو Title أو Number
+    const storedPassword =
+      user.properties.Password?.rich_text?.[0]?.plain_text ||
+      user.properties.Password?.title?.[0]?.plain_text ||
+      user.properties.Password?.number;
+
+    if (storedPassword && storedPassword.toString().trim() === String(password || "").trim()) {
       const allowedNormalized = extractAllowedPages(user.properties);
+
+      // login success
       req.session.authenticated = true;
-      req.session.username = username;
+      req.session.username = String(username || "").trim();
       req.session.allowedPages = allowedNormalized;
 
       const allowedUI = expandAllowedForUI(allowedNormalized);
 
+      // تأكد من حفظ الجلسة قبل الرد
       req.session.save((err) => {
         if (err)
           return res.status(500).json({ error: "Session could not be saved." });
@@ -376,6 +392,7 @@ app.get("/api/account", requireAuth, async (req, res) => {
       phone: p?.Phone?.phone_number || "",
       email: p?.Email?.email || "",
       employeeCode: p?.["Employee Code"]?.number ?? null,
+      // ملاحظة: تركت password كما هو عندك (number) لو عايز تشيله من الـ API قلّي
       password: p?.Password?.number ?? null,
       allowedPages: allowedUI,
     };
@@ -397,6 +414,7 @@ app.get(
     res.json(req.session.orderDraft || {});
   },
 );
+
 app.post(
   "/api/order-draft/details",
   requireAuth,
@@ -411,6 +429,7 @@ app.post(
     return res.json({ ok: true });
   },
 );
+
 app.post(
   "/api/order-draft/products",
   requireAuth,
@@ -437,6 +456,7 @@ app.post(
     return res.json({ ok: true, count: clean.length });
   },
 );
+
 app.delete(
   "/api/order-draft",
   requireAuth,
@@ -573,6 +593,7 @@ app.get(
   async (req, res) => {
     if (!ordersDatabaseId)
       return res.status(500).json({ error: "Orders DB not configured" });
+
     try {
       const all = [];
       let hasMore = true,
@@ -732,7 +753,6 @@ app.post(
 );
 
 // ========== Assigned: APIs ==========
-// 1) جلب الطلبات المسندة للمستخدم الحالي — مع reason + status
 app.get(
   "/api/orders/assigned",
   requireAuth,
@@ -808,7 +828,7 @@ app.get(
   },
 );
 
-// 2) تعليم عنصر أنه "متوفر بالكامل" (تجعل المتاح = المطلوب)
+// 2) تعليم عنصر أنه "متوفر بالكامل"
 app.post(
   "/api/orders/assigned/mark-in-stock",
   requireAuth,
@@ -887,7 +907,7 @@ app.post(
   },
 );
 
-// 3-b) تحويل حالة مجموعة عناصر طلب إلى Prepared (زر في الكارت)
+// 3-b) تحويل حالة مجموعة عناصر طلب إلى Prepared
 app.post(
   "/api/orders/assigned/mark-prepared",
   requireAuth,
@@ -920,7 +940,7 @@ app.post(
   },
 );
 
-// 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
+// 4) PDF بالنواقص فقط (remaining > 0)
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
