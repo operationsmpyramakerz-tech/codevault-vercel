@@ -208,10 +208,13 @@ app.get("/login", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
 
+// الصفحة الأساسية → login
 app.get("/", (req, res) => {
+  if (req.session?.authenticated) {
+    return res.redirect("/account");
+  }
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
-
 app.get("/dashboard", requireAuth, (req, res) => {
   res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
 });
