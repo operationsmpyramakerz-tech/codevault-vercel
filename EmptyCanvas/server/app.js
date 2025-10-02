@@ -209,8 +209,6 @@ app.get("/login", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  if (req.session?.authenticated)
-    return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
 
