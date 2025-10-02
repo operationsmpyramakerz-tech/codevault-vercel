@@ -17,7 +17,6 @@
       } catch(e) {}
     })();
   </script>
-
   <div class="app-container">
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -26,7 +25,6 @@
           <i data-feather="chevrons-left"></i>
         </button>
       </div>
-
       <nav class="sidebar-nav">
         <ul class="nav-list">
           <li>
@@ -67,12 +65,12 @@
           </li>
         </ul>
       </nav>
-
       <div class="sidebar-footer">
-        <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
+        <button id="logoutBtn" class="btn btn-outline logout-btn">
+          <i data-feather="log-out"></i> Logout
+        </button>
       </div>
     </aside>
-
     <div class="main-content">
       <header class="main-header">
         <div class="header-row1">
@@ -86,13 +84,11 @@
                 <div class="greet-sub">Your assigned items overview</div>
               </div>
             </div>
-
             <div class="searchbar" id="assigned-searchbar" role="search">
               <i data-feather="search"></i>
               <input id="assignedSearch" type="search" placeholder="Search assigned items..." aria-label="Search assigned items" />
             </div>
           </div>
-
           <div class="right topbar-right">
             <a href="/account" class="account-mini" aria-label="My account" title="My account">
               <span class="ico-circle"><img src="/images/logo.png" alt="Logo" /></span>
@@ -100,17 +96,13 @@
             </a>
           </div>
         </div>
-
         <div class="header-row2">
           <h1 class="page-title">
             Assigned Schools Requested Orders
           </h1>
         </div>
       </header>
-
       <main class="container-full-width">
-        <!-- Actions -->
-
         <!-- Stats -->
         <div class="stats">
           <div class="stat">
@@ -126,14 +118,12 @@
             <div class="stat__value stat__value--warn" id="st-missing">0</div>
           </div>
         </div>
-
         <!-- Cards grid -->
         <div id="assigned-empty" class="muted" style="display:none;">لا يوجد طلبات مُسندة لك.</div>
         <div id="assigned-grid" class="assigned-grid"></div>
       </main>
     </div>
   </div>
-
   <!-- Small popover for partial quantity -->
   <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-labelledby="partial-popover-title">
     <div class="popover__body">
@@ -145,12 +135,15 @@
       <input type="number" id="popover-input" class="input" min="0" step="1" />
       <small id="popover-hint" class="hint"></small>
       <div class="popover__actions">
-        <button class="btn btn-outline" data-pop="cancel">Cancel</button>
-        <button class="btn btn-primary" data-pop="save">Save</button>
+        <button class="btn btn-outline" data-pop="cancel">
+          <i data-feather="x-circle"></i> Cancel
+        </button>
+        <button class="btn btn-primary" data-pop="save">
+          <i data-feather="save"></i> Save
+        </button>
       </div>
     </div>
   </div>
-
   <script>feather.replace();</script>
   <script src="/js/common-ui.js"></script>
   <script src="/js/assigned-orders.js"></script>
