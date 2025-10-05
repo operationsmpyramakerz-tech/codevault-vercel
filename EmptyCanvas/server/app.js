@@ -4,6 +4,8 @@ const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
 
 const app = express();
+// IMPORTANT for Vercel reverse proxy so secure cookies are honored
+app.set("trust proxy", 1);
 // Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
@@ -25,6 +27,19 @@ app.get("/health", (req, res) => {
 // Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
 app.use(sessionMiddleware);
+// Small trace to debug redirect loop
+app.use((req, res, next) => {
+  if (["/login", "/dashboard", "/api/login", "/api/account"].includes(req.path)) {
+    console.log(
+      "[trace]",
+      req.method,
+      req.path,
+      "sid=" + (req.sessionID || "-"),
+      "auth=" + (!!req.session?.authenticated)
+    );
+  }
+  next();
+});
 
 // Helpers: Allowed pages control
 const ALL_PAGES = [
@@ -41,23 +56,21 @@ const normKey = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/gi, "");
 
 // توحيد الأسماء القادمة من Notion
 function normalizePages(names = []) {
-  const set = new Set(names.map((n) => norm(n)));
+  const set = new Set(names.map((n) => String(n || "").trim().toLowerCase()));
   const out = [];
   if (set.has("current orders")) out.push("Current Orders");
-
   if (set.has("requested orders") || set.has("schools requested orders")) {
     out.push("Requested Orders");
   }
-
   if (
     set.has("assigned schools requested orders") ||
     set.has("assigned requested orders") ||
     set.has("assigned orders") ||
-    set.has("my assigned orders")
+    set.has("my assigned orders") ||
+    set.has("storage") // alias: Storage
   ) {
     out.push("Assigned Schools Requested Orders");
   }
-
   if (set.has("create new order")) out.push("Create New Order");
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
@@ -73,6 +86,7 @@ function expandAllowedForUI(list = []) {
   }
   if (set.has("Assigned Schools Requested Orders")) {
     set.add("Assigned Schools Requested Orders");
+    set.add("Storage"); // الواجهة تعرض Storage
   }
   if (set.has("Funds")) {
     set.add("Funds");
