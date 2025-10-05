@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Assigned Schools Requested Orders</title>
+  <title>Storage</title>
   <link rel="stylesheet" href="/css/style.css" />
   <script src="https://unpkg.com/feather-icons"></script>
 </head>
@@ -44,7 +44,7 @@
           <li>
             <a class="nav-link active" href="/orders/assigned">
               <i data-feather="user-check"></i>
-              <span class="nav-label">Assigned Schools Requested Orders</span>
+              <span class="nav-label">Storage</span>
             </a>
           </li>
           <li>
@@ -83,13 +83,13 @@
               </span>
               <div class="greet-text">
                 <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
-                <div class="greet-sub">Your assigned items overview</div>
+                <div class="greet-sub">Your storage overview</div>
               </div>
             </div>
 
             <div class="searchbar" id="assigned-searchbar" role="search">
               <i data-feather="search"></i>
-              <input id="assignedSearch" type="search" placeholder="Search assigned items..." aria-label="Search assigned items" />
+              <input id="assignedSearch" type="search" placeholder="Search items in storage..." aria-label="Search assigned items" />
             </div>
           </div>
 
@@ -102,16 +102,11 @@
         </div>
 
         <div class="header-row2">
-          <h1 class="page-title">
-            Assigned Schools Requested Orders
-          </h1>
+          <h1 class="page-title">Storage</h1>
         </div>
       </header>
 
       <main class="container-full-width">
-        <!-- Actions -->
-
-        <!-- Stats -->
         <div class="stats">
           <div class="stat">
             <div class="stat__label">Total assigned</div>
@@ -127,14 +122,12 @@
           </div>
         </div>
 
-        <!-- Cards grid -->
-        <div id="assigned-empty" class="muted" style="display:none;">لا يوجد طلبات مُسندة لك.</div>
+        <div id="assigned-empty" class="muted" style="display:none;">لا يوجد عناصر حالياً في التخزين.</div>
         <div id="assigned-grid" class="assigned-grid"></div>
       </main>
     </div>
   </div>
 
-  <!-- Small popover for partial quantity -->
   <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-labelledby="partial-popover-title">
     <div class="popover__body">
       <div class="popover__title" id="partial-popover-title">
