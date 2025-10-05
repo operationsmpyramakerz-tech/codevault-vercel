@@ -2,8 +2,8 @@ const express = require("express");
 const path = require("path");
 const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
-
 const app = express();
+app.set("trust proxy", 1); // Needed for secure cookies behind Vercel proxy
 // Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
@@ -11,22 +11,17 @@ const ordersDatabaseId = process.env.Products_list;
 const teamMembersDatabaseId = process.env.Team_Members;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
-
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "public")));
-
 // --- Health FIRST (before session) so it works even if env is missing ---
 app.get("/health", (req, res) => {
   res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
 });
-
 // Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
-app.set("trust proxy", 1); // ✅ Needed for secure cookies behind Vercel proxy
 app.use(sessionMiddleware);
-
 // Helpers: Allowed pages control
 const ALL_PAGES = [
   "Current Orders",
@@ -36,20 +31,17 @@ const ALL_PAGES = [
   "Stocktaking",
   "Funds",
 ];
-
 const norm = (s) => String(s || "").trim().toLowerCase();
 const normKey = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/gi, "");
-
 // توحيد الأسماء القادمة من Notion
 function normalizePages(names = []) {
   const set = new Set(names.map((n) => norm(n)));
   const out = [];
+  if (set.has("storage")) out.push("Assigned Schools Requested Orders");
   if (set.has("current orders")) out.push("Current Orders");
-
   if (set.has("requested orders") || set.has("schools requested orders")) {
     out.push("Requested Orders");
   }
-
   if (
     set.has("assigned schools requested orders") ||
     set.has("assigned requested orders") ||
@@ -58,13 +50,11 @@ function normalizePages(names = []) {
   ) {
     out.push("Assigned Schools Requested Orders");
   }
-
   if (set.has("create new order")) out.push("Create New Order");
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
   return out;
 }
-
 // توسيع الأسماء للواجهة حتى لا يحصل تضارب aliases
 function expandAllowedForUI(list = []) {
   const set = new Set((list || []).map((s) => String(s)));
@@ -74,13 +64,13 @@ function expandAllowedForUI(list = []) {
   }
   if (set.has("Assigned Schools Requested Orders")) {
     set.add("Assigned Schools Requested Orders");
+    set.add("Storage");
   }
   if (set.has("Funds")) {
     set.add("Funds");
   }
   return Array.from(set);
 }
-
 function extractAllowedPages(props = {}) {
   // Try known property names first (case-sensitive)
   let candidates =
@@ -90,7 +80,6 @@ function extractAllowedPages(props = {}) {
     props["Pages Allowed"]?.multi_select ||
     props["Access Pages"]?.multi_select ||
     [];
-
   // If still empty, look for any multi_select prop whose name matches /allowed.*pages|pages.*allowed/i
   if (!Array.isArray(candidates) || candidates.length === 0) {
     for (const [key, val] of Object.entries(props || {})) {
@@ -100,14 +89,12 @@ function extractAllowedPages(props = {}) {
       }
     }
   }
-
   const names = Array.isArray(candidates)
     ? candidates.map((x) => x?.name).filter(Boolean)
     : [];
   const allowed = normalizePages(names);
   return allowed;
 }
-
 function firstAllowedPath(allowed = []) {
   if (allowed.includes("Current Orders")) return "/orders";
   if (allowed.includes("Requested Orders")) return "/orders/requested";
@@ -117,7 +104,6 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Funds")) return "/funds";
   return "/login";
 }
-
 // Helpers — Notion
 async function getCurrentUserPageId(username) {
   const userQuery = await notion.databases.query({
@@ -127,12 +113,10 @@ async function getCurrentUserPageId(username) {
   if (userQuery.results.length === 0) return null;
   return userQuery.results[0].id;
 }
-
 async function getOrdersDBProps() {
   const db = await notion.databases.retrieve({ database_id: ordersDatabaseId });
   return db.properties || {};
 }
-
 function pickPropName(propsObj, aliases = []) {
   const keys = Object.keys(propsObj || {});
   for (const k of keys) {
@@ -140,7 +124,6 @@ function pickPropName(propsObj, aliases = []) {
   }
   return null;
 }
-
 // نلقى اسم خاصية Assigned To من الـ DB Properties
 async function detectAssignedPropName() {
   const props = await getOrdersDBProps();
@@ -154,7 +137,6 @@ async function detectAssignedPropName() {
     ]) || "Assigned To"
   );
 }
-
 // خاصية الكمية المتاحة في المخزن
 async function detectAvailableQtyPropName() {
   const props = await getOrdersDBProps();
@@ -168,7 +150,6 @@ async function detectAvailableQtyPropName() {
     ]) || null
   );
 }
-
 // خاصية Status (select) — لاستخدام زر Mark prepared
 async function detectStatusPropName() {
   const props = await getOrdersDBProps();
@@ -182,13 +163,11 @@ async function detectStatusPropName() {
     ]) || "Status"
   );
 }
-
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
   return res.redirect("/login");
 }
-
 // Page-Access middleware
 function requirePage(pageName) {
   return (req, res, next) => {
@@ -197,28 +176,23 @@ function requirePage(pageName) {
     return res.redirect(firstAllowedPath(allowed));
   };
 }
-
 // --- Page Serving Routes ---
 app.get("/login", (req, res) => {
   if (req.session?.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
-
 app.get("/", (req, res) => {
   if (req.session?.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
   res.sendFile(path.join(__dirname, "..", "public", "login.html"));
 });
-
 app.get("/dashboard", requireAuth, (req, res) => {
   res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
 });
-
 app.get("/orders", requireAuth, requirePage("Current Orders"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
-
 app.get(
   "/orders/requested",
   requireAuth,
@@ -227,7 +201,6 @@ app.get(
     res.sendFile(path.join(__dirname, "..", "public", "requested-orders.html"));
   },
 );
-
 // صفحة جديدة: الطلبات المُسندة للمستخدم الحالي فقط
 app.get(
   "/orders/assigned",
@@ -237,7 +210,6 @@ app.get(
     res.sendFile(path.join(__dirname, "..", "public", "assigned-orders.html"));
   },
 );
-
 // 3-step order pages
 app.get(
   "/orders/new",
@@ -271,23 +243,18 @@ app.get(
     res.sendFile(path.join(__dirname, "..", "public", "create-order-review.html"));
   },
 );
-
 app.get("/stocktaking", requireAuth, requirePage("Stocktaking"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "stocktaking.html"));
 });
-
 // Account page
 app.get("/account", requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "account.html"));
 });
-
 // Funds page
 app.get("/funds", requireAuth, requirePage("Funds"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "funds.html"));
 });
-
 // --- API Routes ---
-
 // Login
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
@@ -306,19 +273,16 @@ app.post("/api/login", async (req, res) => {
     }
     const user = response.results[0];
     const storedPassword = user.properties.Password?.number;
-
     if (storedPassword && storedPassword.toString() === password) {
       const allowedNormalized = extractAllowedPages(user.properties);
       req.session.authenticated = true;
       req.session.username = username;
       req.session.allowedPages = allowedNormalized;
-
       const allowedUI = expandAllowedForUI(allowedNormalized);
-
       req.session.save((err) => {
         if (err)
           return res.status(500).json({ error: "Session could not be saved." });
-        console.log("[Login] Session created for:", username, "Allowed pages:", allowedNormalized);
+        console.log("[Login] Session created for:", username, "Allowed pages:", allowedNormalized, "SID:", req.sessionID);
         res.json({
           success: true,
           message: "Login successful",
@@ -333,7 +297,6 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ error: "Login failed" });
   }
 });
-
 // Logout
 app.post("/api/logout", (req, res) => {
   req.session.destroy((err) => {
@@ -345,7 +308,6 @@ app.post("/api/logout", (req, res) => {
     res.json({ success: true });
   });
 });
-
 // Account info (returns fresh allowedPages)
 app.get("/api/account", requireAuth, async (req, res) => {
   if (!teamMembersDatabaseId) {
@@ -358,18 +320,14 @@ app.get("/api/account", requireAuth, async (req, res) => {
       database_id: teamMembersDatabaseId,
       filter: { property: "Name", title: { equals: req.session.username } },
     });
-
     if (response.results.length === 0) {
       return res.status(404).json({ error: "User not found." });
     }
-
     const user = response.results[0];
     const p = user.properties;
-
     const freshAllowed = extractAllowedPages(p);
     req.session.allowedPages = freshAllowed;
     const allowedUI = expandAllowedForUI(freshAllowed);
-
     const data = {
       name: p?.Name?.title?.[0]?.plain_text || "",
       username: req.session.username || "",
@@ -381,7 +339,6 @@ app.get("/api/account", requireAuth, async (req, res) => {
       password: p?.Password?.number ?? null,
       allowedPages: allowedUI,
     };
-
     res.set("Cache-Control", "no-store");
     res.json(data);
   } catch (error) {
@@ -389,7 +346,6 @@ app.get("/api/account", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch account info." });
   }
 });
-
 // Order Draft APIs — require Create New Order
 app.get(
   "/api/order-draft",
@@ -428,7 +384,6 @@ app.post(
         quantity: Number(p.quantity) || 0,
       }))
       .filter((p) => p.id && p.quantity > 0);
-
     if (clean.length === 0) {
       return res
         .status(400)
@@ -448,7 +403,6 @@ app.delete(
     return res.json({ ok: true });
   },
 );
-
 // Orders listing (Current Orders)
 app.get(
   "/api/orders",
@@ -460,9 +414,7 @@ app.get(
         .status(500)
         .json({ error: "Database IDs are not configured." });
     }
-
     res.set("Cache-Control", "no-store");
-
     try {
       const userQuery = await notion.databases.query({
         database_id: teamMembersDatabaseId,
@@ -472,11 +424,9 @@ app.get(
         return res.status(404).json({ error: "User not found." });
       }
       const userId = userQuery.results[0].id;
-
       const allOrders = [];
       let hasMore = true;
       let startCursor = undefined;
-
       while (hasMore) {
         const response = await notion.databases.query({
           database_id: ordersDatabaseId,
@@ -484,7 +434,6 @@ app.get(
           filter: { property: "Teams Members", relation: { contains: userId } },
           sorts: [{ timestamp: "created_time", direction: "descending" }],
         });
-
         for (const page of response.results) {
           const productRelation = page.properties.Product?.relation;
           let productName = "Unknown Product";
@@ -503,7 +452,6 @@ app.get(
               );
             }
           }
-
           allOrders.push({
             id: page.id,
             reason:
@@ -515,11 +463,9 @@ app.get(
             createdTime: page.created_time,
           });
         }
-
         hasMore = response.has_more;
         startCursor = response.next_cursor;
       }
-
       const TTL_MS = 10 * 60 * 1000;
       let recent = Array.isArray(req.session.recentOrders)
         ? req.session.recentOrders
@@ -527,15 +473,12 @@ app.get(
       recent = recent.filter(
         (r) => Date.now() - new Date(r.createdTime).getTime() < TTL_MS,
       );
-
       const ids = new Set(allOrders.map((o) => o.id));
       const extras = recent.filter((r) => !ids.has(r.id));
       const merged = allOrders
         .concat(extras)
         .sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
-
       req.session.recentOrders = recent;
-
       res.json(merged);
     } catch (error) {
       console.error("Error fetching orders from Notion:", error.body || error);
@@ -543,7 +486,6 @@ app.get(
     }
   },
 );
-
 // Team members (for assignment) — requires Requested Orders
 app.get(
   "/api/team-members",
@@ -566,7 +508,6 @@ app.get(
     }
   },
 );
-
 // Requested orders for all users — requires Requested Orders
 app.get(
   "/api/orders/requested",
@@ -579,7 +520,6 @@ app.get(
       const all = [];
       let hasMore = true,
         startCursor;
-
       const nameCache = new Map();
       async function memberName(id) {
         if (!id) return "";
@@ -593,7 +533,6 @@ app.get(
           return "";
         }
       }
-
       const findAssignedProp = (props) => {
         const cand = [
           "Assigned To",
@@ -608,17 +547,14 @@ app.get(
         }
         return "Assigned To";
       };
-
       while (hasMore) {
         const resp = await notion.databases.query({
           database_id: ordersDatabaseId,
           start_cursor: startCursor,
           sorts: [{ timestamp: "created_time", direction: "descending" }],
         });
-
         for (const page of resp.results) {
           const props = page.properties || {};
-
           // Product name
           let productName = "Unknown Product";
           const productRel = props.Product?.relation;
@@ -632,12 +568,10 @@ app.get(
                 productName;
             } catch {}
           }
-
           const reason = props.Reason?.title?.[0]?.plain_text || "No Reason";
           const qty = props["Quantity Requested"]?.number || 0;
           const status = props["Status"]?.select?.name || "Pending";
           const createdTime = page.created_time;
-
           // Created by (Teams Members relation)
           let createdById = "";
           let createdByName = "";
@@ -646,7 +580,6 @@ app.get(
             createdById = teamRel[0].id;
             createdByName = await memberName(createdById);
           }
-
           // Assigned To
           const assignedKey = findAssignedProp(props);
           let assignedToId = "";
@@ -656,7 +589,6 @@ app.get(
             assignedToId = assignedRel[0].id;
             assignedToName = await memberName(assignedToId);
           }
-
           all.push({
             id: page.id,
             reason,
@@ -670,11 +602,9 @@ app.get(
             assignedToName,
           });
         }
-
         hasMore = resp.has_more;
         startCursor = resp.next_cursor;
       }
-
       res.json(all);
     } catch (e) {
       console.error(e);
@@ -682,7 +612,6 @@ app.get(
     }
   },
 );
-
 // Assign member to multiple order items — requires Requested Orders
 app.post(
   "/api/orders/assign",
@@ -697,7 +626,6 @@ app.post(
       if ((!Array.isArray(memberIds) || memberIds.length === 0) && !memberId)
         return res.status(400).json({ error: "memberIds or memberId required" });
       if (!Array.isArray(memberIds) || memberIds.length === 0) memberIds = memberId ? [memberId] : [];
-
       // Detect property name "Assigned To"
       const sample = await notion.pages.retrieve({ page_id: orderIds[0] });
       const props = sample.properties || {};
@@ -715,7 +643,6 @@ app.post(
           break;
         }
       }
-
       await Promise.all(
         orderIds.map((id) =>
           notion.pages.update({
@@ -724,7 +651,6 @@ app.post(
           }),
         ),
       );
-
       res.json({ success: true });
     } catch (e) {
       console.error("Assign error:", e.body || e);
@@ -732,7 +658,6 @@ app.post(
     }
   },
 );
-
 // ========== Assigned: APIs ==========
 // 1) جلب الطلبات المسندة للمستخدم الحالي — مع reason + status
 app.get(
@@ -743,15 +668,12 @@ app.get(
     try {
       const userId = await getCurrentUserPageId(req.session.username);
       if (!userId) return res.status(404).json({ error: "User not found." });
-
       const assignedProp = await detectAssignedPropName();
       const availableProp = await detectAvailableQtyPropName(); // قد يكون null
       const statusProp   = await detectStatusPropName();        // غالبًا "Status"
-
       const items = [];
       let hasMore = true;
       let startCursor = undefined;
-
       while (hasMore) {
         const resp = await notion.databases.query({
           database_id: ordersDatabaseId,
@@ -759,10 +681,8 @@ app.get(
           filter: { property: assignedProp, relation: { contains: userId } },
           sorts: [{ timestamp: "created_time", direction: "descending" }],
         });
-
         for (const page of resp.results) {
           const props = page.properties || {};
-
           // Product name
           let productName = "Unknown Product";
           const productRel = props.Product?.relation;
@@ -776,7 +696,6 @@ app.get(
                 productName;
             } catch {}
           }
-
           const requested = Number(props["Quantity Requested"]?.number || 0);
           const available = availableProp
             ? Number(props[availableProp]?.number || 0)
@@ -784,7 +703,6 @@ app.get(
           const remaining = Math.max(0, requested - available);
           const reason = props.Reason?.title?.[0]?.plain_text || "No Reason";
           const status = statusProp ? (props[statusProp]?.select?.name || "") : "";
-
           items.push({
             id: page.id,
             productName,
@@ -796,11 +714,9 @@ app.get(
             status,
           });
         }
-
         hasMore = resp.has_more;
         startCursor = resp.next_cursor;
       }
-
       res.set("Cache-Control", "no-store");
       res.json(items);
     } catch (e) {
@@ -809,7 +725,6 @@ app.get(
     }
   },
 );
-
 // 2) تعليم عنصر أنه "متوفر بالكامل" (تجعل المتاح = المطلوب)
 app.post(
   "/api/orders/assigned/mark-in-stock",
@@ -819,7 +734,6 @@ app.post(
     try {
       const { orderPageId } = req.body || {};
       if (!orderPageId) return res.status(400).json({ error: "orderPageId required" });
-
       const availableProp = await detectAvailableQtyPropName();
       if (!availableProp) {
         return res.status(400).json({
@@ -827,16 +741,13 @@ app.post(
             'Please add a Number property "Available Quantity" (or alias) to the Orders database.',
         });
       }
-
       const page = await notion.pages.retrieve({ page_id: orderPageId });
       const requested = Number(page.properties?.["Quantity Requested"]?.number || 0);
       const newAvailable = requested;
-
       await notion.pages.update({
         page_id: orderPageId,
         properties: { [availableProp]: { number: newAvailable } },
       });
-
       res.json({
         success: true,
         available: newAvailable,
@@ -848,7 +759,6 @@ app.post(
     }
   },
 );
-
 // 3) إدخال كمية متاحة جزئيًا
 app.post(
   "/api/orders/assigned/available",
@@ -862,7 +772,6 @@ app.post(
       if (Number.isNaN(availNum) || availNum < 0) {
         return res.status(400).json({ error: "available must be a non-negative number" });
       }
-
       const availableProp = await detectAvailableQtyPropName();
       if (!availableProp) {
         return res.status(400).json({
@@ -870,17 +779,14 @@ app.post(
             'Please add a Number property "Available Quantity" (or alias) to the Orders database.',
         });
       }
-
       const page = await notion.pages.retrieve({ page_id: orderPageId });
       const requested = Number(page.properties?.["Quantity Requested"]?.number || 0);
       const newAvailable = Math.min(requested, Math.max(0, Math.floor(availNum)));
       const remaining = Math.max(0, requested - newAvailable);
-
       await notion.pages.update({
         page_id: orderPageId,
         properties: { [availableProp]: { number: newAvailable } },
       });
-
       res.json({ success: true, available: newAvailable, remaining });
     } catch (e) {
       console.error(e.body || e);
@@ -888,7 +794,6 @@ app.post(
     }
   },
 );
-
 // 3-b) تحويل حالة مجموعة عناصر طلب إلى Prepared (زر في الكارت)
 app.post(
   "/api/orders/assigned/mark-prepared",
@@ -904,7 +809,6 @@ app.post(
       if (!statusProp) {
         return res.status(400).json({ error: 'Please add a Select property "Status" to the Orders database.' });
       }
-
       await Promise.all(
         orderIds.map((id) =>
           notion.pages.update({
@@ -913,7 +817,6 @@ app.post(
           }),
         ),
       );
-
       res.json({ success: true, updated: orderIds.length });
     } catch (e) {
       console.error(e);
@@ -921,7 +824,6 @@ app.post(
     }
   },
 );
-
 // 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
 app.get(
   "/api/orders/assigned/pdf",
@@ -931,24 +833,19 @@ app.get(
     try {
       const userId = await getCurrentUserPageId(req.session.username);
       if (!userId) return res.status(404).json({ error: "User not found." });
-
       const assignedProp  = await detectAssignedPropName();
       const availableProp = await detectAvailableQtyPropName();
-
       const idsStr = String(req.query.ids || "").trim();
       const items = [];
-
       if (idsStr) {
         const ids = idsStr.split(",").map((s) => s.trim()).filter(Boolean);
         for (const id of ids) {
           try {
             const page = await notion.pages.retrieve({ page_id: id });
             const props = page.properties || {};
-
             const rel = props[assignedProp]?.relation || [];
             const isMine = Array.isArray(rel) && rel.some((r) => r.id === userId);
             if (!isMine) continue;
-
             let productName = "Unknown Product";
             const productRel = props.Product?.relation;
             if (Array.isArray(productRel) && productRel.length) {
@@ -957,7 +854,6 @@ app.get(
                 productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
               } catch {}
             }
-
             const requested = Number(props["Quantity Requested"]?.number || 0);
             const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
             const remaining = Math.max(0, requested - available);
@@ -973,7 +869,6 @@ app.get(
             filter: { property: assignedProp, relation: { contains: userId } },
             sorts: [{ timestamp: "created_time", direction: "descending" }],
           });
-
           for (const page of resp.results) {
             const props = page.properties || {};
             let productName = "Unknown Product";
@@ -989,31 +884,25 @@ app.get(
             const remaining = Math.max(0, requested - available);
             if (remaining > 0) items.push({ productName, requested, available, remaining });
           }
-
           hasMore = resp.has_more;
           startCursor = resp.next_cursor;
         }
       }
-
       // PDF
       const fname = `Assigned-Shortage-${new Date().toISOString().slice(0, 10)}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
-
       const doc = new PDFDocument({ size: "A4", margin: 36 });
       doc.pipe(res);
-
       doc.font("Helvetica-Bold").fontSize(16).text("Assigned Orders — Shortage List", { align: "left" });
       doc.moveDown(0.2);
       doc.font("Helvetica").fontSize(10).fillColor("#555").text(`Generated: ${new Date().toLocaleString()}`);
       doc.moveDown(0.6);
-
       const pageInnerWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const colNameW = Math.floor(pageInnerWidth * 0.5);
       const colReqW  = Math.floor(pageInnerWidth * 0.15);
       const colAvailW= Math.floor(pageInnerWidth * 0.15);
       const colRemW  = pageInnerWidth - colNameW - colReqW - colAvailW;
-
       const drawHead = () => {
         const y = doc.y;
         const h = 20;
@@ -1032,7 +921,6 @@ app.get(
         if (doc.y + need > bottom) { doc.addPage(); drawHead(); }
       };
       drawHead();
-
       doc.font("Helvetica").fontSize(11).fillColor("#111");
       items.forEach((it) => {
         ensureSpace(22);
@@ -1045,7 +933,6 @@ app.get(
         doc.moveTo(doc.page.margins.left, y + h).lineTo(doc.page.margins.left + pageInnerWidth, y + h).strokeColor("#EEE").lineWidth(1).stroke();
         doc.y = y + h + 2;
       });
-
       doc.end();
     } catch (e) {
       console.error(e);
@@ -1053,7 +940,6 @@ app.get(
     }
   },
 );
-
 // Components list — requires Create New Order
 app.get(
   "/api/components",
@@ -1100,7 +986,6 @@ app.get(
     }
   },
 );
-
 // Submit Order — requires Create New Order
 app.post(
   "/api/submit-order",
@@ -1112,7 +997,6 @@ app.post(
         .status(500)
         .json({ success: false, message: "Database IDs are not configured." });
     }
-
     let { reason, products } = req.body || {};
     if (!reason || !Array.isArray(products) || products.length === 0) {
       const d = req.session.orderDraft;
@@ -1121,24 +1005,20 @@ app.post(
         products = d.products;
       }
     }
-
     if (!reason || !Array.isArray(products) || products.length === 0) {
       return res
         .status(400)
         .json({ success: false, message: "Missing reason or products." });
     }
-
     try {
       const userQuery = await notion.databases.query({
         database_id: teamMembersDatabaseId,
         filter: { property: "Name", title: { equals: req.session.username } },
       });
-
       if (userQuery.results.length === 0) {
         return res.status(404).json({ error: "User not found." });
       }
       const userId = userQuery.results[0].id;
-
       const creations = await Promise.all(
         products.map(async (product) => {
           const created = await notion.pages.create({
@@ -1151,7 +1031,6 @@ app.post(
               "Teams Members": { relation: [{ id: userId }] },
             },
           });
-
           let productName = "Unknown Product";
           try {
             const productPage = await notion.pages.retrieve({
@@ -1161,7 +1040,6 @@ app.post(
               productPage.properties?.Name?.title?.[0]?.plain_text ||
               productName;
           } catch {}
-
           return {
             orderPageId: created.id,
             productId: product.id,
@@ -1171,7 +1049,6 @@ app.post(
           };
         }),
       );
-
       const recentOrders = creations.map((c) => ({
         id: c.orderPageId,
         reason,
@@ -1186,9 +1063,7 @@ app.post(
       if (req.session.recentOrders.length > 50) {
         req.session.recentOrders = req.session.recentOrders.slice(-50);
       }
-
       delete req.session.orderDraft;
-
       res.json({
         success: true,
         message: "Order submitted and saved to Notion successfully!",
@@ -1205,7 +1080,6 @@ app.post(
     }
   },
 );
-
 // Update Status — requires Current Orders
 app.post(
   "/api/update-received",
@@ -1235,7 +1109,6 @@ app.post(
     }
   },
 );
-
 // ===== Stocktaking data (JSON) — requires Stocktaking =====
 app.get(
   "/api/stock",
@@ -1254,7 +1127,6 @@ app.get(
       });
       if (userResponse.results.length === 0)
         return res.status(404).json({ error: "User not found." });
-
       const user = userResponse.results[0];
       const schoolProp = user.properties.School || {};
       const schoolName =
@@ -1263,20 +1135,17 @@ app.get(
           schoolProp.rich_text[0]?.plain_text) ||
         (Array.isArray(schoolProp?.title) && schoolProp.title[0]?.plain_text) ||
         null;
-
       if (!schoolName)
         return res
           .status(404)
           .json({ error: "Could not determine school name for the user." });
-
       const allStock = [];
       let hasMore = true;
       let startCursor = undefined;
-
       const numberFrom = (prop) => {
         if (!prop) return undefined;
         if (typeof prop.number === "number") return prop.number;
-        if (prop.formula && typeof prop.formula.number === "number")
+        if (prop.formula and typeof prop.formula.number === "number")
           return prop.formula.number;
         return undefined;
       };
@@ -1287,14 +1156,12 @@ app.get(
         }
         return 0;
       };
-
       while (hasMore) {
         const stockResponse = await notion.databases.query({
           database_id: stocktakingDatabaseId,
           start_cursor: startCursor,
           sorts: [{ property: "Name", direction: "ascending" }],
         });
-
         const stockFromPage = stockResponse.results
           .map((page) => {
             const props = page.properties || {};
@@ -1302,7 +1169,6 @@ app.get(
               props.Name?.title?.[0]?.plain_text ||
               props.Component?.title?.[0]?.plain_text ||
               "Untitled";
-
             const quantity = firstDefinedNumber(props[schoolName]);
             const oneKitQuantity = firstDefinedNumber(
               props["One Kit Quantity"],
@@ -1311,7 +1177,6 @@ app.get(
               props["Kit Qty"],
               props["OneKitQuantity"],
             );
-
             let tag = null;
             if (props.Tag?.select) {
               tag = {
@@ -1323,7 +1188,7 @@ app.get(
               props.Tag.multi_select.length > 0
             ) {
               const t = props.Tag.multi_select[0];
-              tag = { name: t.name, color: t.color || "default" };
+              tag = { name: t.name, color: t.color or "default" };
             } else if (
               Array.isArray(props.Tags?.multi_select) &&
               props.Tags.multi_select.length > 0
@@ -1331,7 +1196,6 @@ app.get(
               const t = props.Tags.multi_select[0];
               tag = { name: t.name, color: t.color || "default" };
             }
-
             return {
               id: page.id,
               name: componentName,
@@ -1341,12 +1205,10 @@ app.get(
             };
           })
           .filter(Boolean);
-
         allStock.push(...stockFromPage);
         hasMore = stockResponse.has_more;
         startCursor = stockResponse.next_cursor;
       }
-
       res.json(allStock);
     } catch (error) {
       console.error("Error fetching stock data:", error.body || error);
@@ -1356,7 +1218,6 @@ app.get(
     }
   },
 );
-
 // ===== Stocktaking PDF download — requires Stocktaking =====
 app.get(
   "/api/stock/pdf",
@@ -1370,7 +1231,6 @@ app.get(
       });
       if (userResponse.results.length === 0)
         return res.status(404).json({ error: "User not found." });
-
       const user = userResponse.results[0];
       const schoolProp = user.properties.School || {};
       const schoolName =
@@ -1379,16 +1239,13 @@ app.get(
           schoolProp.rich_text[0]?.plain_text) ||
         (Array.isArray(schoolProp?.title) && schoolProp.title[0]?.plain_text) ||
         null;
-
       if (!schoolName)
         return res
           .status(404)
           .json({ error: "Could not determine school name for the user." });
-
       const allStock = [];
       let hasMore = true;
       let startCursor = undefined;
-
       const numberFrom = (prop) => {
         if (!prop) return undefined;
         if (typeof prop.number === "number") return prop.number;
@@ -1403,14 +1260,12 @@ app.get(
         }
         return 0;
       };
-
       while (hasMore) {
         const stockResponse = await notion.databases.query({
           database_id: stocktakingDatabaseId,
           start_cursor: startCursor,
           sorts: [{ property: "Name", direction: "ascending" }],
         });
-
         const stockFromPage = stockResponse.results
           .map((page) => {
             const props = page.properties || {};
@@ -1418,7 +1273,6 @@ app.get(
               props.Name?.title?.[0]?.plain_text ||
               props.Component?.title?.[0]?.plain_text ||
               "Untitled";
-
             const quantity = firstDefinedNumber(props[schoolName]);
             const oneKitQuantity = firstDefinedNumber(
               props["One Kit Quantity"],
@@ -1427,7 +1281,6 @@ app.get(
               props["Kit Qty"],
               props["OneKitQuantity"],
             );
-
             let tag = null;
             if (props.Tag?.select) {
               tag = {
@@ -1447,7 +1300,6 @@ app.get(
               const t = props.Tags.multi_select[0];
               tag = { name: t.name, color: t.color || "default" };
             }
-
             return {
               id: page.id,
               name: componentName,
@@ -1457,15 +1309,13 @@ app.get(
             };
           })
           .filter(Boolean);
-
         allStock.push(...stockFromPage);
         hasMore = stockResponse.has_more;
         startCursor = stockResponse.next_cursor;
       }
-
       // Grouping + PDF layout (كما هو)
       const groupsMap = new Map();
-      (allStock || []).forEach((it) => {
+      (allStock or []).forEach((it) => {
         const name = it?.tag?.name || "Untagged";
         const color = it?.tag?.color || "default";
         const key = `${String(name).toLowerCase()}|${color}`;
@@ -1484,14 +1334,11 @@ app.get(
             !(String(g.name).toLowerCase() === "untagged" || g.name === "-"),
         )
         .concat(untagged);
-
       const fname = `Stocktaking-${new Date().toISOString().slice(0, 10)}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
-
       const doc = new PDFDocument({ size: "A4", margin: 36 });
       doc.pipe(res);
-
       const palette = {
         default: { fill: "#F3F4F6", border: "#E5E7EB", text: "#111827" },
         gray: { fill: "#F3F4F6", border: "#E5E7EB", text: "#374151" },
@@ -1505,7 +1352,6 @@ app.get(
         red: { fill: "#FEF2F2", border: "#FECACA", text: "#991B1B" },
       };
       const getPal = (c = "default") => palette[c] || palette.default;
-
       doc
         .font("Helvetica-Bold")
         .fontSize(18)
@@ -1519,14 +1365,12 @@ app.get(
         .text(`School: ${schoolName}`, { continued: true })
         .text(`   •   Generated: ${new Date().toLocaleString()}`);
       doc.moveDown(0.6);
-
       const pageInnerWidth =
         doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const gap = 10;
       const colKitW = 120;
       const colQtyW = 90;
       const colNameW = pageInnerWidth - colKitW - colQtyW - gap * 2;
-
       const drawGroupHeader = (gName, pal, count, cont = false) => {
         const y = doc.y + 2;
         const h = 22;
@@ -1574,7 +1418,6 @@ app.get(
         doc.restore();
         doc.moveDown(1.4);
       };
-
       const drawTableHead = (pal) => {
         const y = doc.y;
         const h = 20;
@@ -1586,7 +1429,6 @@ app.get(
           .lineWidth(1)
           .fillAndStroke();
         doc.fillColor(pal.text).font("Helvetica-Bold").fontSize(10);
-
         doc.text("Component", doc.page.margins.left + 10, y + 5, {
           width: colNameW,
         });
@@ -1601,11 +1443,9 @@ app.get(
           width: colQtyW - 10,
           align: "right",
         });
-
         doc.restore();
         doc.moveDown(1.2);
       };
-
       const ensureSpace = (needH, onNewPage) => {
         const bottom = doc.page.height - doc.page.margins.bottom;
         if (doc.y + needH > bottom) {
@@ -1613,20 +1453,17 @@ app.get(
           onNewPage?.();
         }
       };
-
       const drawRow = (item, pal) => {
         const y = doc.y;
-        const nameHeight = doc.heightOfString(item.name || "-", {
+        const nameHeight = doc.heightOfString(item.name or "-", {
           width: colNameW,
         });
         const rowH = Math.max(18, nameHeight);
         ensureSpace(rowH + 8);
-
         doc.font("Helvetica").fontSize(11).fillColor("#111827");
-        doc.text(item.name || "-", doc.page.margins.left + 2, doc.y, {
+        doc.text(item.name or "-", doc.page.margins.left + 2, doc.y, {
           width: colNameW,
         });
-
         const text = String(Number(item.oneKitQuantity ?? 0));
         const pillPadX = 8,
           pillH = 16;
@@ -1649,7 +1486,6 @@ app.get(
           .font("Helvetica-Bold")
           .fontSize(10)
           .text(text, pillX + pillPadX, pillY + 3);
-
         const lastX = doc.page.margins.left + colNameW + gap + colKitW + gap;
         doc
           .fillColor("#111827")
@@ -1659,26 +1495,20 @@ app.get(
             width: colQtyW - 10,
             align: "right",
           });
-
         doc
           .moveTo(doc.page.margins.left, y + rowH + 4)
           .lineTo(doc.page.margins.left + pageInnerWidth, y + rowH + 4)
           .strokeColor("#F3F4F6")
           .lineWidth(1)
           .stroke();
-
         doc.y = y + rowH + 6;
       };
-
       const ensureGroupStartSpace = () => ensureSpace(22 + 20 + 18);
-
       for (const g of groups) {
         const pal = getPal(g.color);
-
         ensureGroupStartSpace();
         drawGroupHeader(g.name, pal, g.items.length, false);
         drawTableHead(pal);
-
         g.items.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         for (const item of g.items) {
           ensureSpace(40, () => {
@@ -1688,7 +1518,6 @@ app.get(
           drawRow(item, pal);
         }
       }
-
       doc.end();
     } catch (e) {
       console.error("PDF generation error:", e);
@@ -1696,7 +1525,6 @@ app.get(
     }
   },
 );
-
 // Update account info (PATCH) — اختيارى
 app.patch("/api/account", requireAuth, async (req, res) => {
   if (!teamMembersDatabaseId) {
@@ -1720,13 +1548,12 @@ app.patch("/api/account", requireAuth, async (req, res) => {
       }
       updateProps["Password"] = { number: n };
     }
-    if (typeof name !== "undefined" && name.trim()) {
+    if (typeof name !== "undefined" and name.trim()) {
       updateProps["Name"] = { title: [{ text: { content: name.trim() } }] };
     }
     if (Object.keys(updateProps).length === 0) {
       return res.status(400).json({ error: "No valid fields to update." });
     }
-
     const response = await notion.databases.query({
       database_id: teamMembersDatabaseId,
       filter: { property: "Name", title: { equals: req.session.username } },
@@ -1734,25 +1561,20 @@ app.patch("/api/account", requireAuth, async (req, res) => {
     if (response.results.length === 0) {
       return res.status(404).json({ error: "User not found." });
     }
-
     const userPageId = response.results[0].id;
-
     await notion.pages.update({
       page_id: userPageId,
       properties: updateProps,
     });
-
     if (updateProps["Name"]) {
       req.session.username = name.trim();
     }
-
     res.json({ success: true });
   } catch (error) {
     console.error("Error updating account:", error.body || error);
     res.status(500).json({ error: "Failed to update account." });
   }
 });
-
 // بعد pickPropName() والدوال المشابهة
 async function detectOrderIdPropName() {
   const props = await getOrdersDBProps();
@@ -1767,6 +1589,5 @@ async function detectOrderIdPropName() {
     ]) || null
   );
 }
-
 // Export Express app for Vercel
 module.exports = app;
