@@ -1853,3 +1853,97 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 .btn-3d-blue:hover {
   background: #1d4ed8;
 }
+/* === Actions & 3D Buttons – v2 === */
+
+/* الحاوية اللي على يمين الكارت للبادچات + الأزرار */
+.actions,
+.actions-right,
+.order-actions,
+.card-actions,
+.assigned-actions {
+  display: flex;
+  flex-wrap: wrap;           /* المهم: لفّ لو العناصر كتيرة */
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* على الموبايل: خَلّيها تبدأ من الشمال علشان متتزحلقش برا */
+@media (max-width: 640px) {
+  .actions,
+  .actions-right,
+  .order-actions,
+  .card-actions,
+  .assigned-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* زرار 3D عام */
+.btn-3d,
+.btn-3d-blue,
+.btn-3d-indigo,
+.btn-3d-orange,
+.btn-3d-green,
+.btn-3d-gray {
+  display: inline-flex;      /* ياخد مساحة على قد المحتوى */
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 0;
+  font-weight: 600;
+  line-height: 1.2;
+  width: auto;               /* مهم */
+  min-width: fit-content;    /* مهم */
+  max-width: none;           /* ألغي أي حدود قديمة */
+  white-space: nowrap;       /* متقسّمش السطر جوا الزرار */
+  overflow: visible;
+  box-shadow: 0 2px 0 rgba(0,0,0,.15), 0 6px 12px rgba(0,0,0,.06); /* 3D */
+  transform: translateY(0);
+  transition: transform .12s ease, box-shadow .12s ease, background .2s ease, color .2s ease;
+  cursor: pointer;
+}
+
+/* ألوان الأزرار */
+.btn-3d-blue   { background: linear-gradient(#3b82f6, #2563eb); color: #fff; }
+.btn-3d-indigo { background: linear-gradient(#6366f1, #4f46e5); color: #fff; }
+.btn-3d-orange { background: linear-gradient(#f59e0b, #d97706); color: #111; }
+.btn-3d-green  { background: linear-gradient(#22c55e, #16a34a); color: #fff; }
+.btn-3d-gray   { background: linear-gradient(#e5e7eb, #d1d5db); color: #111; }
+
+.btn-3d:hover  { transform: translateY(-1px); box-shadow: 0 3px 0 rgba(0,0,0,.18), 0 10px 18px rgba(0,0,0,.08); }
+.btn-3d:active { transform: translateY(1px);  box-shadow: 0 1px 0 rgba(0,0,0,.18), 0 4px 10px rgba(0,0,0,.08); }
+
+/* بادچات الحالة (In Stock / Partial / ... ) كأقراص مرنة */
+.pill,
+.status-pill,
+.badge,
+.stock-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.1;
+  width: auto;               /* مهم */
+  min-width: fit-content;    /* مهم */
+  white-space: nowrap;       /* تبقى على سطر واحد وتوسع */
+  max-width: none;
+}
+
+/* ألوان للبادچات */
+.pill-green  { background: #dcfce7; color: #065f46; }
+.pill-amber  { background: #fef3c7; color: #92400e; }
+.pill-red    { background: #fee2e2; color: #991b1b; }
+.pill-gray   { background: #f3f4f6; color: #374151; }
+
+/* لو كان في ستايل قديم بيحدد عرض ثابت، نلغيه */
+.btn,
+.btn-sm,
+.btn-small {
+  width: auto !important;
+  min-width: fit-content !important;
+  max-width: none !important;
+}
