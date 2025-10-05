@@ -31,16 +31,17 @@ if (!hasSecret || !hasUrl) {
   sessionMiddleware = session({
     store: new RedisStore({ client: redisClient, prefix: 'op:' }),
     secret: process.env.SESSION_SECRET,
+    proxy: true,                // trust reverse proxy for secure cookies
     resave: false,
     saveUninitialized: false,
-    proxy: true,
     rolling: true,
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      secure: 'auto',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 30 // 30 days
+      secure: 'auto',           // secure if HTTPS (Vercel), http if local
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      path: '/'
+      // domain: undefined       // keep undefined so it matches current host (vercel previews/custom domains)
     }
   });
 }

@@ -3,7 +3,7 @@ const path = require("path");
 const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
 const app = express();
-app.set("trust proxy", 1); // Needed for secure cookies behind Vercel proxy
+app.set("trust proxy", 1); // Needed for Vercel secure cookies
 // Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
@@ -269,7 +269,7 @@ app.post("/api/login", async (req, res) => {
       filter: { property: "Name", title: { equals: username } },
     });
     if (response.results.length === 0) {
-      return res.status(401).json({ error: "Invalid username or password" });
+      return res.status(401).json({ error: "Invalid username || password" });
     }
     const user = response.results[0];
     const storedPassword = user.properties.Password?.number;
@@ -290,7 +290,7 @@ app.post("/api/login", async (req, res) => {
         });
       });
     } else {
-      res.status(401).json({ error: "Invalid username or password" });
+      res.status(401).json({ error: "Invalid username || password" });
     }
   } catch (error) {
     console.error("Login error:", error);
@@ -624,7 +624,7 @@ app.post(
         return res.status(400).json({ error: "orderIds required" });
       }
       if ((!Array.isArray(memberIds) || memberIds.length === 0) && !memberId)
-        return res.status(400).json({ error: "memberIds or memberId required" });
+        return res.status(400).json({ error: "memberIds || memberId required" });
       if (!Array.isArray(memberIds) || memberIds.length === 0) memberIds = memberId ? [memberId] : [];
       // Detect property name "Assigned To"
       const sample = await notion.pages.retrieve({ page_id: orderIds[0] });
@@ -1008,7 +1008,7 @@ app.post(
     if (!reason || !Array.isArray(products) || products.length === 0) {
       return res
         .status(400)
-        .json({ success: false, message: "Missing reason or products." });
+        .json({ success: false, message: "Missing reason || products." });
     }
     try {
       const userQuery = await notion.databases.query({
@@ -1066,7 +1066,7 @@ app.post(
       delete req.session.orderDraft;
       res.json({
         success: true,
-        message: "Order submitted and saved to Notion successfully!",
+        message: "Order submitted && saved to Notion successfully!",
         orderItems: creations.map((c) => ({
           orderPageId: c.orderPageId,
           productId: c.productId,
@@ -1145,7 +1145,7 @@ app.get(
       const numberFrom = (prop) => {
         if (!prop) return undefined;
         if (typeof prop.number === "number") return prop.number;
-        if (prop.formula and typeof prop.formula.number === "number")
+        if (prop.formula && typeof prop.formula.number === "number")
           return prop.formula.number;
         return undefined;
       };
@@ -1188,7 +1188,7 @@ app.get(
               props.Tag.multi_select.length > 0
             ) {
               const t = props.Tag.multi_select[0];
-              tag = { name: t.name, color: t.color or "default" };
+              tag = { name: t.name, color: t.color || "default" };
             } else if (
               Array.isArray(props.Tags?.multi_select) &&
               props.Tags.multi_select.length > 0
@@ -1315,7 +1315,7 @@ app.get(
       }
       // Grouping + PDF layout (كما هو)
       const groupsMap = new Map();
-      (allStock or []).forEach((it) => {
+      (allStock || []).forEach((it) => {
         const name = it?.tag?.name || "Untagged";
         const color = it?.tag?.color || "default";
         const key = `${String(name).toLowerCase()}|${color}`;
@@ -1455,13 +1455,13 @@ app.get(
       };
       const drawRow = (item, pal) => {
         const y = doc.y;
-        const nameHeight = doc.heightOfString(item.name or "-", {
+        const nameHeight = doc.heightOfString(item.name || "-", {
           width: colNameW,
         });
         const rowH = Math.max(18, nameHeight);
         ensureSpace(rowH + 8);
         doc.font("Helvetica").fontSize(11).fillColor("#111827");
-        doc.text(item.name or "-", doc.page.margins.left + 2, doc.y, {
+        doc.text(item.name || "-", doc.page.margins.left + 2, doc.y, {
           width: colNameW,
         });
         const text = String(Number(item.oneKitQuantity ?? 0));
@@ -1548,7 +1548,7 @@ app.patch("/api/account", requireAuth, async (req, res) => {
       }
       updateProps["Password"] = { number: n };
     }
-    if (typeof name !== "undefined" and name.trim()) {
+    if (typeof name !== "undefined" && name.trim()) {
       updateProps["Name"] = { title: [{ text: { content: name.trim() } }] };
     }
     if (Object.keys(updateProps).length === 0) {
