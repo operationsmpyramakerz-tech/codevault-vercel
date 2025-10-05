@@ -24,6 +24,7 @@ app.get("/health", (req, res) => {
 
 // Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
+app.set("trust proxy", 1); // ✅ Needed for secure cookies behind Vercel proxy
 app.use(sessionMiddleware);
 
 // Helpers: Allowed pages control
@@ -317,6 +318,7 @@ app.post("/api/login", async (req, res) => {
       req.session.save((err) => {
         if (err)
           return res.status(500).json({ error: "Session could not be saved." });
+        console.log("[Login] Session created for:", username, "Allowed pages:", allowedNormalized);
         res.json({
           success: true,
           message: "Login successful",
