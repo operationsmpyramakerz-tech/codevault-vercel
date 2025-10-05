@@ -8,33 +8,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const stFull  = document.getElementById('st-full');
   const stMiss  = document.getElementById('st-missing');
 
-  // Rename labels to match your request
-  const statLabels = document.querySelectorAll('.stats .stat .stat__label');
-  if (statLabels[0]) statLabels[0].textContent = 'Total assigned (orders)';
-  if (statLabels[1]) statLabels[1].textContent = 'Total prepared';
-  if (statLabels[2]) statLabels[2].textContent = 'Not completed';
-
-  // Popover (partial)
   const popover      = document.getElementById('partial-popover');
   const popInput     = document.getElementById('popover-input');
   const popHint      = document.getElementById('popover-hint');
   const popBtnSave   = popover.querySelector('[data-pop="save"]');
   const popBtnCancel = popover.querySelector('[data-pop="cancel"]');
 
-  // State
-  let items = [];           // flat items
-  let groups = [];          // grouped by order
+  let items = [];
+  let groups = [];
   const itemById = new Map();
-  let currentEdit = null;   // { id, requested, available, anchor }
+  let currentEdit = null;
 
   const fmt = (n) => String(Number(n || 0));
   const escapeHTML = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   const groupKeyOf = (it) => {
-    // لو عندك orderCode مستقبلًا
-    // if (it.orderCode && String(it.orderCode).trim()) return `oid:${String(it.orderCode).trim()}`;
     const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
-    const bucket = (it.createdTime || '').slice(0, 10); // day bucket
+    const bucket = (it.createdTime || '').slice(0, 10);
     return `grp:${reason}|${bucket}`;
   };
 
@@ -60,8 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
     g.total = total;
-    g.miss  = total - full; // عناصر بها نقص (لعرض البادج فقط)
-    // prepared order = كل عناصره Status === Prepared
+    g.miss  = total - full;
     g.prepared = g.items.length > 0 && g.items.every(x => String(x.status || '') === 'Prepared');
   }
 
@@ -118,10 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <button class="btn btn-success btn-icon" data-action="prepared-order" data-ids="${idsAttr}">
-              <i data-feather="check-square"></i><span>Mark prepared</span>
+            <button class="btn btn-3d btn-3d-blue btn-icon" data-action="prepared-order" data-ids="${idsAttr}">
+              <i data-feather="check-square"></i><span>Mark Prepared</span>
             </button>
-            <button class="btn btn-primary btn-icon" data-action="pdf" data-ids="${idsAttr}">
+            <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
               <i data-feather="download-cloud"></i><span>Download</span>
             </button>
           </div>
@@ -141,25 +130,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
               </div>
               <div class="item-actions">
-                <button class="btn btn-success btn-icon btn-sm" data-action="mark" data-id="${it.id}">
-                  <i data-feather="check-circle"></i><span>In stock</span>
+                <button class="btn btn-3d btn-3d-green btn-icon btn-sm" data-action="mark" data-id="${it.id}">
+                  <i data-feather="check-circle"></i><span>In Stock</span>
                 </button>
-                <button class="btn btn-warning btn-outline btn-icon btn-sm" data-action="partial" data-id="${it.id}">
-                  <i data-feather="edit-3"></i><span>Partial / Not in stock</span>
+                <button class="btn btn-3d btn-3d-orange btn-icon btn-sm" data-action="partial" data-id="${it.id}">
+                  <i data-feather="edit-3"></i><span>Partial / Not In Stock</span>
                 </button>
               </div>
             </div>
           `).join('')}
         </div>
       `;
-
       grid.appendChild(card);
     }
-
     if (window.feather) feather.replace({ 'stroke-width': 2 });
   }
 
-  // Events (delegate on grid)
   grid.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
@@ -197,16 +183,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
-
-      // Update local statuses
       ids.forEach((id) => {
         const it = itemById.get(id);
         if (it) it.status = 'Prepared';
       });
-
       groups.forEach(recomputeGroupStats);
       updatePageStats();
-
       UI?.toast?.({ type: 'success', message: 'Order marked as Prepared' });
     } catch (e) {
       console.error(e);
@@ -228,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       applyRowUpdate(id, data.available, data.remaining);
-      UI?.toast?.({ type: 'success', message: 'Marked as in stock' });
+      UI?.toast?.({ type: 'success', message: 'Marked as In Stock' });
     } catch (e) {
       console.error(e);
       UI?.toast?.({ type: 'error', message: e.message || 'Error' });
@@ -244,7 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
       available: Number(item.available),
       anchor: anchorBtn
     };
-
     popInput.value = String(currentEdit.available ?? 0);
     popInput.setAttribute('max', String(currentEdit.requested));
     popHint.textContent = `Requested: ${currentEdit.requested}`;
@@ -262,16 +243,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function positionPopover(anchorBtn) {
     const r = anchorBtn.getBoundingClientRect();
     const pad = 8;
-    const pw = 260; // approximate popover width
-    const ph = 130; // approximate popover height
+    const pw = 260;
+    const ph = 130;
     let top = r.bottom + pad;
-    let left = r.left + (r.width/2) - (pw/2);
-
+    let left = r.left + (r.width / 2) - (pw / 2);
     const vw = window.innerWidth, vh = window.innerHeight;
     if (left + pw > vw - 8) left = vw - pw - 8;
     if (left < 8) left = 8;
     if (top + ph > vh - 8) top = r.top - ph - pad;
-
     popover.style.position = 'fixed';
     popover.style.top  = `${top}px`;
     popover.style.left = `${left}px`;
@@ -283,13 +262,13 @@ document.addEventListener('DOMContentLoaded', () => {
     hidePopover();
   });
   window.addEventListener('resize', () => { if (currentEdit) positionPopover(currentEdit.anchor); });
-
   popBtnCancel.addEventListener('click', hidePopover);
+
   popBtnSave.addEventListener('click', async () => {
     if (!currentEdit) return;
     const val = Number(popInput.value);
     if (Number.isNaN(val) || val < 0) {
-      UI?.toast?.({ type: 'warning', message: 'Please enter a valid non-negative number' });
+      UI?.toast?.({ type: 'warning', message: 'Please enter a valid number' });
       return;
     }
     try {
@@ -314,18 +293,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function applyRowUpdate(id, available, remaining) {
-    // update local
     const it = itemById.get(id);
     if (it) {
       it.available = Number(available);
       it.remaining = Number(remaining);
     }
-
-    // update DOM
     const row = document.getElementById(`row-${id}`);
     if (row) {
-      const tdA = row.querySelector('[data-col="available"]');
-      const tdR = row.querySelector('[data-col="remaining"]');
+      const tdA = row.querySelector('[data-col=\"available\"]');
+      const tdR = row.querySelector('[data-col=\"remaining\"]');
       if (tdA) tdA.textContent = fmt(available);
       if (tdR) {
         tdR.textContent = fmt(remaining);
@@ -333,13 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
         tdR.classList.toggle('pill--success', Number(remaining) === 0);
       }
     }
-
-    // recompute groups stats (for prepared detection)
     groups.forEach(recomputeGroupStats);
     updatePageStats();
   }
 
-  // تعديل: فتح الـ PDF بعمل GET مع ids في URL
   async function downloadOrderPDF(ids, btn) {
     try {
       setBusy(btn, true);
@@ -356,6 +329,5 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.classList.toggle('is-busy', !!busy);
   }
 
-  // Init
   load();
 });

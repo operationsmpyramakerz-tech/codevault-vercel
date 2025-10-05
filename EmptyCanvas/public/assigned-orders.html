@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Assigned Schools Requested Orders</title>
+  <title>Storage</title>
   <link rel="stylesheet" href="/css/style.css" />
   <script src="https://unpkg.com/feather-icons"></script>
 </head>
@@ -17,6 +17,7 @@
       } catch(e) {}
     })();
   </script>
+
   <div class="app-container">
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -25,6 +26,7 @@
           <i data-feather="chevrons-left"></i>
         </button>
       </div>
+
       <nav class="sidebar-nav">
         <ul class="nav-list">
           <li>
@@ -42,7 +44,7 @@
           <li>
             <a class="nav-link active" href="/orders/assigned">
               <i data-feather="user-check"></i>
-              <span class="nav-label">Assigned Schools Requested Orders</span>
+              <span class="nav-label">Storage</span>
             </a>
           </li>
           <li>
@@ -65,12 +67,12 @@
           </li>
         </ul>
       </nav>
+
       <div class="sidebar-footer">
-        <button id="logoutBtn" class="btn btn-outline logout-btn">
-          <i data-feather="log-out"></i> Logout
-        </button>
+        <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
       </div>
     </aside>
+
     <div class="main-content">
       <header class="main-header">
         <div class="header-row1">
@@ -81,14 +83,16 @@
               </span>
               <div class="greet-text">
                 <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
-                <div class="greet-sub">Your assigned items overview</div>
+                <div class="greet-sub">Your storage overview</div>
               </div>
             </div>
+
             <div class="searchbar" id="assigned-searchbar" role="search">
               <i data-feather="search"></i>
-              <input id="assignedSearch" type="search" placeholder="Search assigned items..." aria-label="Search assigned items" />
+              <input id="assignedSearch" type="search" placeholder="Search items in storage..." aria-label="Search assigned items" />
             </div>
           </div>
+
           <div class="right topbar-right">
             <a href="/account" class="account-mini" aria-label="My account" title="My account">
               <span class="ico-circle"><img src="/images/logo.png" alt="Logo" /></span>
@@ -96,14 +100,13 @@
             </a>
           </div>
         </div>
+
         <div class="header-row2">
-          <h1 class="page-title">
-            Assigned Schools Requested Orders
-          </h1>
+          <h1 class="page-title">Storage</h1>
         </div>
       </header>
+
       <main class="container-full-width">
-        <!-- Stats -->
         <div class="stats">
           <div class="stat">
             <div class="stat__label">Total assigned</div>
@@ -118,13 +121,13 @@
             <div class="stat__value stat__value--warn" id="st-missing">0</div>
           </div>
         </div>
-        <!-- Cards grid -->
-        <div id="assigned-empty" class="muted" style="display:none;">لا يوجد طلبات مُسندة لك.</div>
+
+        <div id="assigned-empty" class="muted" style="display:none;">لا يوجد عناصر حالياً في التخزين.</div>
         <div id="assigned-grid" class="assigned-grid"></div>
       </main>
     </div>
   </div>
-  <!-- Small popover for partial quantity -->
+
   <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-labelledby="partial-popover-title">
     <div class="popover__body">
       <div class="popover__title" id="partial-popover-title">
@@ -135,15 +138,12 @@
       <input type="number" id="popover-input" class="input" min="0" step="1" />
       <small id="popover-hint" class="hint"></small>
       <div class="popover__actions">
-        <button class="btn btn-outline" data-pop="cancel">
-          <i data-feather="x-circle"></i> Cancel
-        </button>
-        <button class="btn btn-primary" data-pop="save">
-          <i data-feather="save"></i> Save
-        </button>
+        <button class="btn btn-outline" data-pop="cancel">Cancel</button>
+        <button class="btn btn-primary" data-pop="save">Save</button>
       </div>
     </div>
   </div>
+
   <script>feather.replace();</script>
   <script src="/js/common-ui.js"></script>
   <script src="/js/assigned-orders.js"></script>

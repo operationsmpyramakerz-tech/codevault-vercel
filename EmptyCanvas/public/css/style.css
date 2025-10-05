@@ -1843,3 +1843,64 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 .btn-primary:hover {
   background: linear-gradient(135deg, #1D4ED8, #2563EB);
 }
+/* === 3D Modern Buttons (with fade-in animation) === */
+.btn-3d {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 0.55rem 1rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transform: translateY(8px);
+  animation: btnFadeIn 0.6s ease forwards;
+}
+
+@keyframes btnFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.btn-3d:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+}
+
+/* Color Variants */
+.btn-3d-green {
+  background: #16a34a;
+  box-shadow: 0 4px 0 #0e7a35;
+}
+.btn-3d-green:hover {
+  background: #15803d;
+}
+
+.btn-3d-orange {
+  background: #f59e0b;
+  box-shadow: 0 4px 0 #b45309;
+  color: #111827;
+}
+.btn-3d-orange:hover {
+  background: #d97706;
+  color: #fff;
+}
+
+.btn-3d-blue {
+  background: #2563eb;
+  box-shadow: 0 4px 0 #1e40af;
+}
+.btn-3d-blue:hover {
+  background: #1d4ed8;
+}
