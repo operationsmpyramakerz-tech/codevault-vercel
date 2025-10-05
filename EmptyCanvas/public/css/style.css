@@ -1947,3 +1947,62 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   min-width: fit-content !important;
   max-width: none !important;
 }
+
+/* =======================================================
+   Calm Professional Buttons (override) – matches app tone
+   ======================================================= */
+.btn-3d,
+.btn-3d-blue,
+.btn-3d-indigo,
+.btn-3d-orange,
+.btn-3d-green,
+.btn-3d-gray {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 12px !important;
+  border-radius: 10px !important;
+  border: 1px solid #E5E7EB !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  width: auto !important;
+  min-width: fit-content !important;
+  white-space: nowrap !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06) !important;
+  transform: none !important;
+  opacity: 1 !important;
+  animation: none !important;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease !important;
+}
+
+.btn-3d:hover { background: #F9FAFB !important; box-shadow: 0 2px 6px rgba(0,0,0,.08) !important; }
+.btn-3d:active { transform: none !important; box-shadow: 0 1px 2px rgba(0,0,0,.06) !important; }
+
+/* Color variants (soft, flat, accessible) */
+.btn-3d-blue   { background: #EFF6FF !important; border-color: #BFDBFE !important; color: #1E40AF !important; }
+.btn-3d-blue:hover   { background: #DBEAFE !important; border-color: #93C5FD !important; }
+
+.btn-3d-indigo { background: #EEF2FF !important; border-color: #C7D2FE !important; color: #3730A3 !important; }
+.btn-3d-indigo:hover { background: #E0E7FF !important; border-color: #A5B4FC !important; }
+
+.btn-3d-green  { background: #ECFDF5 !important; border-color: #A7F3D0 !important; color: #065F46 !important; }
+.btn-3d-green:hover  { background: #D1FAE5 !important; border-color: #6EE7B7 !important; }
+
+.btn-3d-orange { background: #FFFBEB !important; border-color: #FCD34D !important; color: #92400E !important; }
+.btn-3d-orange:hover { background: #FEF3C7 !important; border-color: #FBBF24 !important; color: #7C2D12 !important; }
+
+.btn-3d-gray   { background: #F3F4F6 !important; border-color: #E5E7EB !important; color: #374151 !important; }
+.btn-3d-gray:hover   { background: #E5E7EB !important; }
+
+/* Keep pills consistent and calm (no change to your existing .pill-* colors)
+   but ensure they never truncate text */
+.pill,
+.status-pill,
+.badge,
+.stock-badge {
+  width: auto !important;
+  min-width: fit-content !important;
+  white-space: nowrap !important;
+}
