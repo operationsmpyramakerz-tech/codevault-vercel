@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logistics</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Dashboard</h2>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
+          <i data-feather="chevrons-left"></i>
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <ul class="nav-list">
+          <li><a href="/orders" class="nav-link"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
+          <li><a href="/orders/requested" class="nav-link"><i data-feather="users"></i><span class="nav-label">Schools Requested Orders</span></a></li>
+          <li><a href="/orders/assigned" class="nav-link"><i data-feather="user-check"></i><span class="nav-label">Storage</span></a></li>
+          <li><a href="/orders/new" class="nav-link"><i data-feather="plus-circle"></i><span class="nav-label">Create New Order</span></a></li>
+          <li><a href="/stocktaking" class="nav-link"><i data-feather="archive"></i><span class="nav-label">Stocktaking</span></a></li>
+          <li><a href="/funds" class="nav-link"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
+          <li><a href="/logistics" class="nav-link active"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-row2">
+          <h1 class="page-title">Logistics</h1>
+        </div>
+      </header>
+
+      <main class="container-full-width">
+        <section class="stats-cards three" id="logi-pills">
+          <button class="stat-card" data-tab="Prepared" id="pill-prepared">
+            <div class="stat-title">Prepared</div>
+            <div class="stat-value" id="prepared-count">0</div>
+          </button>
+          <button class="stat-card" data-tab="Received" id="pill-received">
+            <div class="stat-title">Received</div>
+            <div class="stat-value" id="received-count">0</div>
+          </button>
+          <button class="stat-card" data-tab="Delivered" id="pill-delivered">
+            <div class="stat-title">Delivered</div>
+            <div class="stat-value" id="delivered-count">0</div>
+          </button>
+        </section>
+
+        <section class="card" id="logi-list">
+          <div id="logi-items"><p><i data-feather="loader" class="loading-icon"></i> Loading...</p></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="logiModal" class="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true">
+      <button class="close-btn" id="logiModalClose" aria-label="Close"><i data-feather="x"></i></button>
+      <div id="logiModalBody"></div>
+    </div>
+  </div>
+
+  <script>feather.replace();</script>
+  <script src="/js/logistics.js"></script>
+</body>
+</html>
