@@ -88,7 +88,7 @@
       const url = urlById.get(String(select.value));
       if (url) {
         link.href = url;
-        link.style.display = 'inline';
+        link.style.display = 'inline-flex';
       } else {
         link.removeAttribute('href');
         link.style.display = 'none';
@@ -126,21 +126,36 @@
     qtyInput.className = 'qty-input';
     qtyCell.appendChild(qtyInput);
 
-    // Actions cell (link + remove)
+    // Actions cell (icon link + remove)
     const actionsCell = document.createElement('div');
     actionsCell.className = 'field actions-cell';
 
-    // Small link-like button (hidden until a product with URL is selected)
+    // --- Link icon (hidden until URL exists) ---
     const linkEl = document.createElement('a');
     linkEl.className = 'product-url-link';
-    linkEl.textContent = 'Open product page ↗';
+    linkEl.setAttribute('aria-label', 'Open product page');
     linkEl.target = '_blank';
     linkEl.rel = 'noopener';
-    linkEl.style.display = 'none';
-    linkEl.style.fontSize = '12px';
+    linkEl.href = '#';
+    linkEl.style.display = 'none'; // will show when URL available
     linkEl.style.marginRight = '8px';
-    linkEl.style.textDecoration = 'underline';
+    linkEl.style.textDecoration = 'none';
+    linkEl.style.alignItems = 'center';
+    linkEl.style.justifyContent = 'center';
+    linkEl.style.width = '28px';
+    linkEl.style.height = '28px';
+    linkEl.style.borderRadius = '6px';
     linkEl.style.color = '#2563eb';
+
+    // Feather icon
+    const icon = document.createElement('i');
+    icon.setAttribute('data-feather', 'link-2');
+    linkEl.appendChild(icon);
+
+    // small hover affordance without extra CSS
+    linkEl.addEventListener('mouseenter', () => { linkEl.style.background = '#EFF6FF'; });
+    linkEl.addEventListener('mouseleave', () => { linkEl.style.background = 'transparent'; });
+
     actionsCell.appendChild(linkEl);
 
     // Remove X red
@@ -161,12 +176,15 @@
     // Activate Choices
     enhanceWithChoices(select, defaultId);
 
+    // Render feather icon for the new link
+    if (window.feather) feather.replace();
+
     // Update link on change
     select.addEventListener('change', () => {
       const url = urlById.get(String(select.value));
       if (url) {
         linkEl.href = url;
-        linkEl.style.display = 'inline';
+        linkEl.style.display = 'inline-flex';
       } else {
         linkEl.removeAttribute('href');
         linkEl.style.display = 'none';
