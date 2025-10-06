@@ -3,6 +3,7 @@
   let components = [];
   let isComponentsLoaded = false;
   const toHydrate = []; // { inst, container, defaultId }
+  let urlById = new Map(); // id -> URL from Products_Database
 
   const rowsContainer = document.getElementById('products-container');
   const addBtn = document.getElementById('addProductBtn');
@@ -40,13 +41,10 @@
       allowHTML: false,
       position: 'bottom',
       searchResultLimit: 500,
-      // ### START: MODIFICATION ###
-      // This tells the search how to filter properly
       fuseOptions: {
-        keys: ['label'], // Search within the product's name
-        threshold: 0.3   // Adjust how "fuzzy" the search is (0=exact, 1=anything)
+        keys: ['label'],
+        threshold: 0.3
       }
-      // ### END: MODIFICATION ###
     });
 
     const container =
@@ -56,7 +54,7 @@
 
     if (!isComponentsLoaded) {
       container?.classList.add('is-loading');
-      inst.disable(); // لغاية ما الداتا تيجي
+      inst.disable(); // until data arrives
       toHydrate.push({ inst, container, defaultId });
     } else {
       inst.clearChoices();
@@ -81,6 +79,23 @@
     toHydrate.length = 0;
   }
 
+  function updateAllLinks() {
+    const rows = [...rowsContainer.querySelectorAll('.product-row')];
+    rows.forEach(r => {
+      const select = r.querySelector('select.product-select');
+      const link = r.querySelector('a.product-url-link');
+      if (!select || !link) return;
+      const url = urlById.get(String(select.value));
+      if (url) {
+        link.href = url;
+        link.style.display = 'inline';
+      } else {
+        link.removeAttribute('href');
+        link.style.display = 'none';
+      }
+    });
+  }
+
   function addRow(defaultId = '', defaultQty = 1) {
     const row = document.createElement('div');
     row.className = 'product-row';
@@ -90,7 +105,6 @@
     productCell.className = 'field';
     const select = document.createElement('select');
     select.className = 'product-select';
-    // placeholder (لو لسه بنحمّل، يبقى loading)
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.disabled = true;
@@ -112,9 +126,24 @@
     qtyInput.className = 'qty-input';
     qtyCell.appendChild(qtyInput);
 
-    // Remove X red
+    // Actions cell (link + remove)
     const actionsCell = document.createElement('div');
     actionsCell.className = 'field actions-cell';
+
+    // Small link-like button (hidden until a product with URL is selected)
+    const linkEl = document.createElement('a');
+    linkEl.className = 'product-url-link';
+    linkEl.textContent = 'Open product page ↗';
+    linkEl.target = '_blank';
+    linkEl.rel = 'noopener';
+    linkEl.style.display = 'none';
+    linkEl.style.fontSize = '12px';
+    linkEl.style.marginRight = '8px';
+    linkEl.style.textDecoration = 'underline';
+    linkEl.style.color = '#2563eb';
+    actionsCell.appendChild(linkEl);
+
+    // Remove X red
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'icon-btn icon-btn--danger icon-btn--x';
@@ -129,8 +158,20 @@
     row.appendChild(actionsCell);
     rowsContainer.appendChild(row);
 
-    // فعّل Choices فورًا علشان الشكل يبقى ثابت من أول لحظة
+    // Activate Choices
     enhanceWithChoices(select, defaultId);
+
+    // Update link on change
+    select.addEventListener('change', () => {
+      const url = urlById.get(String(select.value));
+      if (url) {
+        linkEl.href = url;
+        linkEl.style.display = 'inline';
+      } else {
+        linkEl.removeAttribute('href');
+        linkEl.style.display = 'none';
+      }
+    });
   }
 
   async function saveAndGoNext() {
@@ -170,22 +211,24 @@
       return;
     }
 
-    // زر الإضافة
+    // Add button
     if (addBtn && !addBtn.dataset.enhanced) {
       addBtn.dataset.enhanced = '1';
       addBtn.innerHTML = '<i data-feather="plus"></i><span>Add Another Product</span>';
       if (window.feather) feather.replace();
     }
 
-    // 1) اعرض صف افتراضي بشكل Choices من البداية
+    // 1) Default row
     addRow();
 
-    // 2) حمّل المنتجات ثم روّق الـ selects
+    // 2) Load components and hydrate selects
     components = await loadComponents();
     isComponentsLoaded = true;
+    urlById = new Map(components.map(c => [String(c.id), c.url || ""]));
     hydratePendingChoices();
+    updateAllLinks();
 
-    // 3) Hydrate من الـ draft (لو موجود) — نستبدل الصفوف الحالية
+    // 3) Draft hydration
     try {
       const res = await fetch('/api/order-draft');
       if (res.ok) {
@@ -195,6 +238,7 @@
           for (const p of draft.products) {
             addRow(String(p.id), Number(p.quantity) || 1);
           }
+          updateAllLinks();
         }
       }
     } catch { /* ignore */ }
