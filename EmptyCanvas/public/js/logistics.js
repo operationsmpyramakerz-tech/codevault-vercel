@@ -1,260 +1,152 @@
-// logistics.js — renders Logistics items in Storage-like cards (Prepared / Received / Delivered)
-
+// logistics.js — fixed selectors + robust fetch for both API variants (`/api/logistics/:state` or `/api/logistics?status=`)
+// Renders cards similar to Storage and supports Prepared / Received / Delivered tabs.
 (function () {
-  const qs = (s, el=document) => el.querySelector(s);
-  const qsa = (s, el=document) => Array.from(el.querySelectorAll(s));
-  const fmtDate = (iso) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleDateString() + ", " + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch { return ""; }
-  };
+  const qs = (s, el = document) => el.querySelector(s);
+  const qsa = (s, el = document) => Array.from(el.querySelectorAll(s));
+  const escapeHtml = (s) =>
+    String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
-  // --- DOM targets (keeps backward compatibility with older HTML) ---
-  const statePills = {
-    prepared: qs('[data-pill-prepared]') || qs('#pillPrepared'),
-    received: qs('[data-pill-received]') || qs('#pillReceived'),
-    delivered: qs('[data-pill-delivered]') || qs('#pillDelivered'),
-  };
+  // ----- DOM targets (matching the current logistics.html) -----
+  const pills = qsa("#logi-pills [data-tab]");
   const counters = {
-    prepared: qs('[data-count-prepared]') || qs('#countPrepared'),
-    received: qs('[data-count-received]') || qs('#countReceived'),
-    delivered: qs('[data-count-delivered]') || qs('#countDelivered'),
+    Prepared: qs("#prepared-count"),
+    Received: qs("#received-count"),
+    Delivered: qs("#delivered-count"),
   };
-  const searchInput = qs('[data-search-logistics]') || qs('#searchLogistics');
-  const listRoot = qs('[data-logistics-list]') || qs('#logisticsList') || qs('#orders-list') || qs('#items-container');
+  const searchInput = qs("#logiSearch");
+  const listRoot = qs("#logi-items");
 
-  const tabFromURL = () => (new URLSearchParams(location.search).get('tab') || 'Prepared');
-  let currentTab = tabFromURL(); // 'Prepared' | 'Received' | 'Delivered'
+  // ----- Tab state -----
+  const urlParams = new URLSearchParams(location.search);
+  let currentTab = urlParams.get("tab") || "Prepared";
+  if (!["Prepared", "Received", "Delivered"].includes(currentTab)) currentTab = "Prepared";
+
+  pills.forEach((btn) => {
+    btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+  });
 
   function setActiveTab(tab) {
     currentTab = tab;
-    // Visually activate pills if present
-    qsa('[data-logistics-tab]').forEach(el => {
-      el.classList.toggle('active', String(el.dataset.logisticsTab).toLowerCase() === tab.toLowerCase());
-    });
-    loadAndRender();
-    const url = new URL(location.href);
-    url.searchParams.set('tab', tab);
-    history.replaceState(null, '', url.toString());
+    pills.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tab));
+    urlParams.set("tab", tab);
+    history.replaceState(null, "", `${location.pathname}?${urlParams.toString()}`);
+    loadTab();
   }
 
-  // Attach tab clicks
-  qsa('[data-logistics-tab]').forEach(el => {
-    el.addEventListener('click', () => setActiveTab(el.dataset.logisticsTab));
-  });
-
-  if (!['Prepared', 'Received', 'Delivered'].includes(currentTab)) currentTab = 'Prepared';
-
+  // ----- Data fetching -----
   async function fetchList(tab) {
-    const state = String(tab || 'Prepared').toLowerCase();
-    const res = await fetch(`/api/logistics/${state}`, { headers: { 'Cache-Control': 'no-store' } });
-    if (!res.ok) throw new Error('Failed to load logistics list');
+    const state = String(tab || "Prepared");
+    // Try REST style: /api/logistics/:state
+    let res = await fetch(`/api/logistics/${state.toLowerCase()}`, {
+      headers: { "Cache-Control": "no-store" },
+    });
+    // Fallback to query style: /api/logistics?status=
+    if (!res.ok) {
+      res = await fetch(`/api/logistics?status=${encodeURIComponent(state)}`, {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    return json.items || [];
+    // Support both backends: either {items:[...]} or [...]
+    return Array.isArray(json) ? json : Array.isArray(json.items) ? json.items : [];
   }
 
-  function groupByReason(items) {
-    const groups = new Map();
-    for (const it of items) {
-      const key = (it.reason || '—') + '|' + (it.createdTime || '');
-      if (!groups.has(key)) groups.set(key, { reason: it.reason || '—', createdTime: it.createdTime, items: [] });
-      groups.get(key).items.push(it);
-    }
-    // Sort newest first
-    return Array.from(groups.values()).sort((a,b) => new Date(b.createdTime||0) - new Date(a.createdTime||0));
-  }
+  // ----- Rendering -----
+  function render(items) {
+    if (!listRoot) return;
 
-  function pill(text, tone) {
-    const span = document.createElement('span');
-    span.className = `pill pill-${tone||'muted'}`;
-    span.textContent = text;
-    return span;
-  }
-
-  function metricPill(label, value, tone) {
-    const w = document.createElement('div');
-    w.className = 'kv-pill';
-    const k = document.createElement('span'); k.className = 'kv-k'; k.textContent = label;
-    const v = document.createElement('span'); v.className = `kv-v ${tone?('tone-'+tone):''}`; v.textContent = value;
-    w.append(k, v);
-    return w;
-  }
-
-  function makeRow(item) {
-    const row = document.createElement('div');
-    row.className = 'storage-row';
-
-    const left = document.createElement('div');
-    left.className = 'sr-left';
-
-    const title = document.createElement('div');
-    title.className = 'sr-title';
-    title.textContent = `Product: ${item.productName || '-'}`;
-
-    const metrics = document.createElement('div');
-    metrics.className = 'sr-metrics';
-
-    const req = Number(item.quantity ?? item.requested ?? 0);
-    // try to read available & remaining if backend sends them, otherwise assume Prepared means all available
-    const avail = (item.available != null) ? Number(item.available) : (currentTab === 'Prepared' ? req : 0);
-    const rem = (item.remaining != null) ? Number(item.remaining) : Math.max(0, req - avail);
-
-    metrics.append(
-      metricPill('Req', req, ''),
-      metricPill('Avail', avail, avail >= req ? 'ok' : (avail > 0 ? 'warn' : 'bad')),
-      metricPill('Rem', rem, rem === 0 ? 'ok' : 'bad')
-    );
-
-    left.append(title, metrics);
-
-    const right = document.createElement('div');
-    right.className = 'sr-right';
-
-    // Status / action button depending on tab
-    if (currentTab === 'Prepared') {
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-primary btn-compact';
-      btn.textContent = 'Received';
-      btn.addEventListener('click', () => openUploadDialog('receive', [item.id]));
-      right.append(btn);
-    } else if (currentTab === 'Received') {
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-primary btn-compact';
-      btn.textContent = 'Delivered';
-      btn.addEventListener('click', () => openUploadDialog('deliver', [item.id]));
-      right.append(btn);
-    } else {
-      right.append(pill('Delivered', 'ok'));
+    const q = (searchInput?.value || "").trim().toLowerCase();
+    if (q) {
+      items = items.filter((it) =>
+        (it.productName || "").toLowerCase().includes(q) ||
+        (it.reason || "").toLowerCase().includes(q)
+      );
     }
 
-    row.append(left, right);
-    return row;
-  }
-
-  function makeCard(group) {
-    const card = document.createElement('div');
-    card.className = 'storage-card';
-
-    // Header
-    const head = document.createElement('div');
-    head.className = 'sc-head';
-
-    const headL = document.createElement('div');
-    headL.className = 'sc-head-left';
-    const icon = document.createElement('span'); icon.className = 'sc-icon'; icon.textContent = '🚚';
-    const dt = document.createElement('span'); dt.className = 'sc-dt'; dt.textContent = fmtDate(group.createdTime);
-    headL.append(icon, dt);
-
-    const headC = document.createElement('div');
-    headC.className = 'sc-head-center';
-    const hTitle = document.createElement('div'); hTitle.className = 'sc-title'; hTitle.textContent = group.reason || '—';
-    headC.append(hTitle);
-
-    const headR = document.createElement('div');
-    headR.className = 'sc-head-right';
-    const itemsPill = pill(`Items: ${group.items.length}`, 'muted');
-    headR.append(itemsPill);
-
-    head.append(headL, headC, headR);
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'sc-body';
-    group.items.forEach(it => body.appendChild(makeRow(it)));
-
-    card.append(head, body);
-    return card;
-  }
-
-  function render(groups) {
-    listRoot.innerHTML = '';
-    if (!groups.length) {
-      const empty = document.createElement('div');
-      empty.className = 'empty-hint';
-      empty.textContent = 'No items.';
-      listRoot.append(empty);
+    if (items.length === 0) {
+      listRoot.innerHTML = `<p>No items.</p>`;
       return;
     }
-    groups.forEach(g => listRoot.appendChild(makeCard(g)));
+
+    // Group by reason (like Storage grouping by order)
+    const groups = new Map();
+    for (const it of items) {
+      const key = it.reason || "—";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(it);
+    }
+
+    const cards = [];
+    for (const [reason, group] of groups.entries()) {
+      const rows = group
+        .map((it) => {
+          // Support fields from both API versions
+          const req = Number(it.requested ?? it.quantity ?? 0);
+          const avail = Number(it.available ?? 0);
+          const rem = Math.max(req - avail, 0);
+          return `
+            <div class="order-row">
+              <div class="order-row__title">Product: ${escapeHtml(it.productName || "—")}</div>
+              <div class="order-row__badges">
+                <span class="pill pill-muted">Req: ${req}</span>
+                <span class="pill pill-green">Avail: ${avail}</span>
+                <span class="pill pill-gray">Rem: ${rem}</span>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      cards.push(`
+        <article class="order-card">
+          <header class="order-header">
+            <div class="order-title">${escapeHtml(reason)}</div>
+          </header>
+          <div class="order-body">
+            ${rows}
+          </div>
+        </article>
+      `);
+    }
+
+    listRoot.innerHTML = cards.join("");
+    if (window.feather?.replace) window.feather.replace();
   }
 
-  function applySearch() {
-    const q = (searchInput?.value || '').trim().toLowerCase();
-    qsa('.storage-card', listRoot).forEach(card => {
-      const txt = card.textContent.toLowerCase();
-      card.style.display = txt.includes(q) ? '' : 'none';
-    });
-  }
-
-  async function loadAndRender() {
-    listRoot.classList.add('loading-skeleton');
-    try {
-      const items = await fetchList(currentTab);
-      (counters.prepared || {}).textContent = items.filter(i => (i.state||'').toLowerCase()==='prepared').length || '';
-      (counters.received || {}).textContent = items.filter(i => (i.state||'').toLowerCase()==='received').length || '';
-      (counters.delivered || {}).textContent = items.filter(i => (i.state||'').toLowerCase()==='delivered').length || '';
-      const groups = groupByReason(items);
-      render(groups);
-      applySearch();
-    } catch (e) {
-      console.error(e);
-      listRoot.innerHTML = '<div class="empty-hint">Failed to load data.</div>';
-    } finally {
-      listRoot.classList.remove('loading-skeleton');
+  async function updateCounters() {
+    for (const tab of ["Prepared", "Received", "Delivered"]) {
+      try {
+        const items = await fetchList(tab);
+        if (counters[tab]) counters[tab].textContent = String(items.length);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
-  // --- Upload dialog + actions ---
-  function openUploadDialog(kind, ids) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'modal-wrap';
-    wrapper.innerHTML = `
-      <div class="modal">
-        <div class="modal-head">
-          <div class="modal-title">${kind === 'receive' ? 'Confirm Receive' : 'Confirm Deliver'}</div>
-        </div>
-        <div class="modal-body">
-          <label class="form-label">Upload receipt image (optional)</label>
-          <input type="file" accept="image/*" class="form-input" id="lgxFile">
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-muted" id="lgxCancel">Cancel</button>
-          <button class="btn btn-primary" id="lgxOk">${kind === 'receive' ? 'Mark Received' : 'Mark Delivered'}</button>
-        </div>
-      </div>`;
-    document.body.appendChild(wrapper);
-    qs('#lgxCancel', wrapper).onclick = () => wrapper.remove();
-    qs('.modal-wrap', wrapper).addEventListener('click', (e) => {
-      if (e.target === wrapper) wrapper.remove();
-    });
-
-    qs('#lgxOk', wrapper).onclick = async () => {
-      const file = qs('#lgxFile', wrapper).files[0];
-      let url = null;
-      if (file) {
-        // In this simple version we use an object URL; in real use you may upload to cloud storage
-        url = URL.createObjectURL(file);
+  async function loadTab() {
+    if (listRoot) {
+      listRoot.innerHTML = `<p><i data-feather="loader" class="loading-icon"></i> Loading...</p>`;
+    }
+    try {
+      const items = await fetchList(currentTab);
+      render(items);
+    } catch (e) {
+      if (listRoot) {
+        listRoot.innerHTML = `<p class="error">Failed to load. ${escapeHtml(e.message || String(e))}</p>`;
       }
-      try {
-        const payload = kind === 'receive' ? { orderIds: ids, receiptUrl: url } : { orderIds: ids, deliveryUrl: url };
-        const endpoint = kind === 'receive' ? '/api/logistics/receive' : '/api/logistics/deliver';
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!res.ok) throw new Error('Action failed');
-        wrapper.remove();
-        await loadAndRender();
-      } catch (e) {
-        console.error(e);
-        alert('Action failed');
-      }
-    };
+    }
   }
 
-  // Search
-  if (searchInput) {
-    searchInput.addEventListener('input', applySearch);
-  }
+  searchInput?.addEventListener("input", () => loadTab());
 
-  // First render
+  // Init
+  updateCounters();
   setActiveTab(currentTab);
 })();
