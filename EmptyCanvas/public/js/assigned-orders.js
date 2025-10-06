@@ -111,7 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
       card.dataset.canPrepare = g.canPrepare ? '1' : '0';
 
       const idsAttr = g.items.map(x => x.id).join(',');
-      const disableAttr = g.canPrepare ? '' : 'disabled title="Cannot mark prepared while there are missing items"';
+      const disableClass = g.canPrepare ? '' : ' is-disabled';
+      const aria = g.canPrepare ? '' : 'aria-disabled="true"';
 
       card.innerHTML = `
         <div class="order-card__head">
@@ -125,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <button class="btn btn-3d btn-3d-blue btn-icon" data-action="prepared-order" data-ids="${idsAttr}" ${disableAttr}>
+            <button class="btn btn-3d btn-3d-blue btn-icon${disableClass}" data-action="prepared-order" data-ids="${idsAttr}" ${aria}>
               <i data-feather="check-square"></i><span>Mark Prepared</span>
             </button>
             <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
@@ -175,11 +176,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (action === 'prepared-order') {
-      // حراسة إضافية: لا تسمح بالتحضير لو فيه remaining
+      // حراسة: لا تسمح بالتحضير لو فيه remaining، واظهر توست بنفس نمط النجاح لكن Warning
       const card = btn.closest('.order-card');
       const canPrepare = card?.dataset?.canPrepare === '1';
       if (!canPrepare) {
-        UI?.toast?.({ type: 'warning', message: 'لا يمكن تعليم الطلب Prepared وهناك مكونات ناقصة (Remaining > 0).' });
+        UI?.toast?.({
+          type: 'warning',
+          title: 'Cannot mark as Prepared',
+          message: 'Some items are still missing in stock (Remaining > 0). Please update availability for all items first.'
+        });
         return;
       }
       const ids = (btn.getAttribute('data-ids') || '').split(',').filter(Boolean);
@@ -229,10 +234,10 @@ document.addEventListener('DOMContentLoaded', () => {
       groups.forEach(recomputeGroupStats);
       updatePageStats();
       applyFilterAndRender();
-      UI?.toast?.({ type: 'success', message: 'Order marked as Prepared' });
+      UI?.toast?.({ type: 'success', title: 'Order Prepared', message: 'The order has been marked as Prepared.' });
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', message: e.message || 'Error' });
+      UI?.toast?.({ type: 'error', title: 'Error', message: e.message || 'Error' });
     } finally {
       setBusy(btn, false);
     }
@@ -250,10 +255,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       applyRowUpdate(id, data.available, data.remaining);
-      UI?.toast?.({ type: 'success', message: 'Marked as In Stock' });
+      UI?.toast?.({ type: 'success', title: 'Updated', message: 'Marked as In Stock' });
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', message: e.message || 'Error' });
+      UI?.toast?.({ type: 'error', title: 'Error', message: e.message || 'Error' });
     } finally {
       setBusy(btn, false);
     }
@@ -308,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentEdit) return;
     const val = Number(popInput.value);
     if (Number.isNaN(val) || val < 0) {
-      UI?.toast?.({ type: 'warning', message: 'Please enter a valid number' });
+      UI?.toast?.({ type: 'warning', title: 'Invalid value', message: 'Please enter a valid number' });
       return;
     }
     try {
@@ -322,11 +327,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       applyRowUpdate(currentEdit.id, data.available, data.remaining);
-      UI?.toast?.({ type: 'success', message: 'Availability updated' });
+      UI?.toast?.({ type: 'success', title: 'Updated', message: 'Availability updated' });
       hidePopover();
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', message: e.message || 'Error' });
+      UI?.toast?.({ type: 'error', title: 'Error', message: e.message || 'Error' });
     } finally {
       popBtnSave.disabled = false;
     }
@@ -366,7 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setBusy(btn, busy) {
     if (!btn) return;
-    btn.disabled = !!busy || btn.hasAttribute('disabled'); // keep disabled if rule blocks it
     btn.classList.toggle('is-busy', !!busy);
   }
 
