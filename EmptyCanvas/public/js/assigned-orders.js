@@ -3,15 +3,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const grid   = document.getElementById('assigned-grid');
   const empty  = document.getElementById('assigned-empty');
 
-  // Stats values
   const stTotal = document.getElementById('st-total');
   const stFull  = document.getElementById('st-full');
   const stMiss  = document.getElementById('st-missing');
 
-  // Stat filter buttons
-  const btnAll     = document.getElementById('st-btn-total');
-  const btnPrepared= document.getElementById('st-btn-full');
-  const btnMissing = document.getElementById('st-btn-missing');
+  const btnAll      = document.getElementById('st-btn-total');
+  const btnPrepared = document.getElementById('st-btn-full');
+  const btnMissing  = document.getElementById('st-btn-missing');
 
   const popover      = document.getElementById('partial-popover');
   const popInput     = document.getElementById('popover-input');
@@ -26,7 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentEdit = null;
 
   const fmt = (n) => String(Number(n || 0));
-  const escapeHTML = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc = (s) =>
+    String(s || '').replace(/[&<>"']/g, (c) =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+    );
 
   const groupKeyOf = (it) => {
     const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
@@ -56,17 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
     g.total = total;
-    g.miss  = total - full;
-    // طلب جاهز (Prepared) لو كل العناصر حالتها Prepared
-    g.prepared = g.items.length > 0 && g.items.every(x => String(x.status || '') === 'Prepared');
-    // مسموح تعليم الطلب Prepared فقط لو كل العناصر Remaining=0
-    g.canPrepare = g.items.length > 0 && g.items.every(x => Number(x.remaining) === 0);
+    g.miss  = total - full; // عدد العناصر التي ما زالت ناقصة (Remaining>0)
+    g.prepared  = g.items.length > 0 && g.items.every(x => String(x.status || '') === 'Prepared');
   }
 
   function updatePageStats() {
-    const totalOrders = groups.length;
+    const totalOrders    = groups.length;
     const preparedOrders = groups.filter(g => g.prepared).length;
-    const notCompleted = totalOrders - preparedOrders;
+    const notCompleted   = totalOrders - preparedOrders;
     stTotal.textContent = fmt(totalOrders);
     stFull.textContent  = fmt(preparedOrders);
     stMiss.textContent  = fmt(notCompleted);
@@ -92,41 +90,38 @@ document.addEventListener('DOMContentLoaded', () => {
       applyFilterAndRender();
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', message: 'Failed to load assigned orders' });
+      toast({ type: 'error', title: 'Error', message: 'Failed to load assigned orders' });
     }
   }
 
   function renderGroups(list) {
     grid.innerHTML = '';
-    if (!list.length) {
-      empty.style.display = '';
-      return;
-    }
+    if (!list.length) { empty.style.display = ''; return; }
     empty.style.display = 'none';
 
     for (const g of list) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
-      card.dataset.canPrepare = g.canPrepare ? '1' : '0';
+      card.dataset.miss = String(g.miss);
 
       const idsAttr = g.items.map(x => x.id).join(',');
-      const disableClass = g.canPrepare ? '' : ' is-disabled';
-      const aria = g.canPrepare ? '' : 'aria-disabled="true"';
+      const softDisabled = g.miss > 0 ? ' is-disabled' : '';
+      const aria = g.miss > 0 ? 'aria-disabled="true"' : '';
 
       card.innerHTML = `
         <div class="order-card__head">
           <div class="order-card__title">
             <i data-feather="user-check"></i>
             <div class="order-card__title-text">
-              <div class="order-card__title-main">${escapeHTML(g.title)}</div>
-              <div class="order-card__subtitle">${escapeHTML(g.subtitle)}</div>
+              <div class="order-card__title-main">${esc(g.title)}</div>
+              <div class="order-card__subtitle">${esc(g.subtitle)}</div>
             </div>
           </div>
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <button class="btn btn-3d btn-3d-blue btn-icon${disableClass}" data-action="prepared-order" data-ids="${idsAttr}" ${aria}>
+            <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="prepared-order" data-ids="${idsAttr}" ${aria}>
               <i data-feather="check-square"></i><span>Mark Prepared</span>
             </button>
             <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
@@ -138,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${g.items.map(it => `
             <div class="order-item" id="row-${it.id}">
               <div class="item-left">
-                <div class="item-name">${escapeHTML(it.productName || '-')}</div>
+                <div class="item-name">${esc(it.productName || '-')}</div>
               </div>
               <div class="item-mid">
                 <div class="num">Req: <strong>${fmt(it.requested)}</strong></div>
@@ -175,19 +170,24 @@ document.addEventListener('DOMContentLoaded', () => {
       if (ids.length) downloadOrderPDF(ids, btn);
       return;
     }
+
     if (action === 'prepared-order') {
-      // حراسة: لا تسمح بالتحضير لو فيه remaining، واظهر توست بنفس نمط النجاح لكن Warning
       const card = btn.closest('.order-card');
-      const canPrepare = card?.dataset?.canPrepare === '1';
-      if (!canPrepare) {
-        UI?.toast?.({
+      const miss = Number(card?.dataset?.miss || '0');
+      const ids  = (btn.getAttribute('data-ids') || '').split(',').filter(Boolean);
+
+      if (miss > 0) {
+        // منع التحضير + رسالة بنفس ستايل النجاح وفيها أكشن
+        toast({
           type: 'warning',
-          title: 'Cannot mark as Prepared',
-          message: 'Some items are still missing in stock (Remaining > 0). Please update availability for all items first.'
+          title: 'Missing items',
+          message: `There are ${miss} missing item(s). You can mark all components as available and prepare the order.`,
+          actionText: 'Mark all available & prepare',
+          onAction: () => makeAllAvailableAndPrepare(card, ids)
         });
         return;
       }
-      const ids = (btn.getAttribute('data-ids') || '').split(',').filter(Boolean);
+
       if (ids.length) markOrderPrepared(ids, btn);
       return;
     }
@@ -202,7 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // === Stat buttons events ===
   function setFilter(f) {
     currentFilter = f;
     [btnAll, btnPrepared, btnMissing].forEach(b => {
@@ -216,9 +215,40 @@ document.addEventListener('DOMContentLoaded', () => {
   btnPrepared?.addEventListener('click', () => setFilter('prepared'));
   btnMissing?.addEventListener('click', () => setFilter('missing'));
 
-  async function markOrderPrepared(ids, btn) {
+  async function makeAllAvailableAndPrepare(cardEl, ids) {
     try {
-      setBusy(btn, true);
+      // 1) خلي كل عنصر Avail = Req
+      const rows = cardEl.querySelectorAll('.order-item');
+      const ops = [];
+      rows.forEach(row => {
+        const id = row.id.replace('row-', '');
+        const it = itemById.get(id);
+        if (!it) return;
+        const newAvail = Number(it.requested) || 0;
+        ops.push(fetch('/api/orders/assigned/available', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ orderPageId: id, available: newAvail })
+        }).then(r => r.json()).then(data => {
+          if (!data.success) throw new Error(data.error || 'Failed');
+          applyRowUpdate(id, data.available, data.remaining);
+        }));
+      });
+      await Promise.all(ops);
+
+      // 2) Mark Prepared للمجموعة كلها
+      await markOrderPrepared(ids, null, /*silent=*/true);
+      toast({ type: 'success', title: 'Order Prepared', message: 'All items set to available and order marked as Prepared.' });
+    } catch (e) {
+      console.error(e);
+      toast({ type: 'error', title: 'Error', message: e.message || 'Operation failed' });
+    }
+  }
+
+  async function markOrderPrepared(ids, btn, silent=false) {
+    try {
+      if (btn) setBusy(btn, true);
       const res = await fetch('/api/orders/assigned/mark-prepared', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -234,12 +264,13 @@ document.addEventListener('DOMContentLoaded', () => {
       groups.forEach(recomputeGroupStats);
       updatePageStats();
       applyFilterAndRender();
-      UI?.toast?.({ type: 'success', title: 'Order Prepared', message: 'The order has been marked as Prepared.' });
+      if (!silent) toast({ type: 'success', title: 'Order Prepared', message: 'The order has been marked as Prepared.' });
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', title: 'Error', message: e.message || 'Error' });
+      if (!silent) toast({ type: 'error', title: 'Error', message: e.message || 'Error' });
+      else toast({ type: 'error', title: 'Error', message: e.message || 'Failed to mark prepared' });
     } finally {
-      setBusy(btn, false);
+      if (btn) setBusy(btn, false);
     }
   }
 
@@ -255,10 +286,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       applyRowUpdate(id, data.available, data.remaining);
-      UI?.toast?.({ type: 'success', title: 'Updated', message: 'Marked as In Stock' });
+      toast({ type: 'success', title: 'Updated', message: 'Marked as In Stock' });
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', title: 'Error', message: e.message || 'Error' });
+      toast({ type: 'error', title: 'Error', message: e.message || 'Error' });
     } finally {
       setBusy(btn, false);
     }
@@ -279,43 +310,28 @@ document.addEventListener('DOMContentLoaded', () => {
     popInput.focus();
     popInput.select();
   }
-
-  function hidePopover() {
-    popover.classList.add('hidden');
-    currentEdit = null;
-  }
-
+  function hidePopover() { popover.classList.add('hidden'); currentEdit = null; }
   function positionPopover(anchorBtn) {
     const r = anchorBtn.getBoundingClientRect();
-    const pad = 8;
-    const pw = 260;
-    const ph = 130;
-    let top = r.bottom + pad;
-    let left = r.left + (r.width / 2) - (pw / 2);
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const pad = 8, pw = 260, ph = 130;
+    let top = r.bottom + pad, left = r.left + (r.width/2) - (pw/2);
+    const vw = innerWidth, vh = innerHeight;
     if (left + pw > vw - 8) left = vw - pw - 8;
     if (left < 8) left = 8;
     if (top + ph > vh - 8) top = r.top - ph - pad;
-    popover.style.position = 'fixed';
-    popover.style.top  = `${top}px`;
-    popover.style.left = `${left}px`;
+    Object.assign(popover.style, { position:'fixed', top:`${top}px`, left:`${left}px` });
   }
-
   document.addEventListener('click', (e) => {
     if (!currentEdit) return;
     if (popover.contains(e.target) || currentEdit.anchor.contains(e.target)) return;
     hidePopover();
   });
-  window.addEventListener('resize', () => { if (currentEdit) positionPopover(currentEdit.anchor); });
+  addEventListener('resize', () => { if (currentEdit) positionPopover(currentEdit.anchor); });
   popBtnCancel.addEventListener('click', hidePopover);
-
   popBtnSave.addEventListener('click', async () => {
     if (!currentEdit) return;
     const val = Number(popInput.value);
-    if (Number.isNaN(val) || val < 0) {
-      UI?.toast?.({ type: 'warning', title: 'Invalid value', message: 'Please enter a valid number' });
-      return;
-    }
+    if (Number.isNaN(val) || val < 0) { toast({ type:'warning', title:'Invalid value', message:'Please enter a valid number' }); return; }
     try {
       popBtnSave.disabled = true;
       const res = await fetch('/api/orders/assigned/available', {
@@ -327,11 +343,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed');
       applyRowUpdate(currentEdit.id, data.available, data.remaining);
-      UI?.toast?.({ type: 'success', title: 'Updated', message: 'Availability updated' });
+      toast({ type:'success', title:'Updated', message:'Availability updated' });
       hidePopover();
     } catch (e) {
       console.error(e);
-      UI?.toast?.({ type: 'error', title: 'Error', message: e.message || 'Error' });
+      toast({ type:'error', title:'Error', message:e.message || 'Error' });
     } finally {
       popBtnSave.disabled = false;
     }
@@ -339,10 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyRowUpdate(id, available, remaining) {
     const it = itemById.get(id);
-    if (it) {
-      it.available = Number(available);
-      it.remaining = Number(remaining);
-    }
+    if (it) { it.available = Number(available); it.remaining = Number(remaining); }
     const row = document.getElementById(`row-${id}`);
     if (row) {
       const tdA = row.querySelector('[data-col="available"]');
@@ -372,6 +385,45 @@ document.addEventListener('DOMContentLoaded', () => {
   function setBusy(btn, busy) {
     if (!btn) return;
     btn.classList.toggle('is-busy', !!busy);
+  }
+
+  // === Toast helper: يستخدم UI.toast إن وجد، وإلا يبني توست بسيط بنفس الشكل ومع زر أكشن ===
+  function toast({ type='info', title='', message='', actionText='', onAction=null, duration=6000 }) {
+    if (window.UI && typeof UI.toast === 'function') {
+      // نحاول استخدام نفس API إن كان يدعم الزرار
+      try {
+        const t = UI.toast({ type, title, message, actionText, onAction, duration });
+        if (t) return;
+      } catch(e) { /* fallback */ }
+    }
+    // Fallback: توست بسيط
+    let stack = document.getElementById('toast-stack');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.id = 'toast-stack';
+      document.body.appendChild(stack);
+    }
+    const el = document.createElement('div');
+    el.className = `toast-box toast-${type}`;
+    el.innerHTML = `
+      <div class="toast-icon">${type === 'success' ? '✓' : (type==='warning'?'!':'i')}</div>
+      <div class="toast-content">
+        ${title ? `<div class="toast-title">${esc(title)}</div>` : ''}
+        ${message ? `<div class="toast-msg">${esc(message)}</div>` : ''}
+      </div>
+      ${actionText ? `<button class="btn btn-primary btn-sm toast-action">${esc(actionText)}</button>` : ''}
+      <button class="toast-close" aria-label="Close">×</button>
+    `;
+    stack.appendChild(el);
+
+    const close = () => { el.classList.add('hide'); setTimeout(()=>el.remove(), 200); };
+    el.querySelector('.toast-close').addEventListener('click', close);
+    if (actionText && typeof onAction === 'function') {
+      el.querySelector('.toast-action').addEventListener('click', async () => {
+        try { await onAction(); } finally { close(); }
+      });
+    }
+    setTimeout(close, duration);
   }
 
   load();
