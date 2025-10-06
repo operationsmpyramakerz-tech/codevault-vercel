@@ -133,7 +133,6 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Create New Order")) return "/orders/new";
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
-  if (allowed.includes("Logistics")) return "/logistics";
   return "/login";
 }
 
@@ -200,55 +199,6 @@ async function detectStatusPropName() {
       "state",
     ]) || "Status"
   );
-}
-
-// خصائص لإثباتات الاستلام/التسليم (url أو files أو rich_text)
-async function detectReceivedProofPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, [
-      "Received Proof",
-      "Received Image",
-      "Receipt Image",
-      "Receipt URL",
-      "Received URL",
-      "Received Attachment",
-      "Logistics Received",
-    ]) || null
-  );
-}
-async function detectDeliveredProofPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, [
-      "Delivered Proof",
-      "Delivered Image",
-      "Delivery Image",
-      "Delivery URL",
-      "Delivered URL",
-      "Delivered Attachment",
-      "Logistics Delivered",
-    ]) || null
-  );
-}
-
-// بناء تحديث مناسب حسب نوع الخاصية (url / files / rich_text)
-async function buildImagePropertyUpdate(propName, url) {
-  if (!propName) return {};
-  const props = await getOrdersDBProps();
-  const p = props[propName];
-  if (!p) return {};
-  if (p.type === "url") {
-    return { [propName]: { url } };
-  }
-  if (p.type === "files") {
-    return { [propName]: { files: [{ name: "proof", external: { url } }] } };
-  }
-  if (p.type === "rich_text") {
-    return { [propName]: { rich_text: [{ text: { content: url } }] } };
-  }
-  // fallback do nothing
-  return {};
 }
 
 // Authentication middleware
@@ -353,8 +303,7 @@ app.get("/account", requireAuth, (req, res) => {
 app.get("/funds", requireAuth, requirePage("Funds"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "funds.html"));
 });
-
-// Logistics page (single file with tabs prepared/received/delivered)
+// Logistics page
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "logistics.html"));
 });
@@ -697,8 +646,8 @@ app.get(
           if (Array.isArray(productRel) && productRel.length) {
             try {
               const productPage = await notion.pages.retrieve({
-                page_id: productRel[0].id },
-              );
+                page_id: productRel[0].id,
+              });
               productName =
                 productPage.properties?.Name?.title?.[0]?.plain_text ||
                 productName;
@@ -994,139 +943,13 @@ app.post(
   },
 );
 
-// 4-a) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
+// 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
   requirePage("Assigned Schools Requested Orders"),
   async (req, res) => {
-    try {
-      const userId = await getCurrentUserPageId(req.session.username);
-      if (!userId) return res.status(404).json({ error: "User not found." });
-
-      const assignedProp  = await detectAssignedPropName();
-      const availableProp = await detectAvailableQtyPropName();
-
-      const idsStr = String(req.query.ids || "").trim();
-      const items = [];
-
-      if (idsStr) {
-        const ids = idsStr.split(",").map((s) => s.trim()).filter(Boolean);
-        for (const id of ids) {
-          try {
-            const page = await notion.pages.retrieve({ page_id: id });
-            const props = page.properties || {};
-
-            const rel = props[assignedProp]?.relation || [];
-            const isMine = Array.isArray(rel) && rel.some((r) => r.id === userId);
-            if (!isMine) continue;
-
-            let productName = "Unknown Product";
-            const productRel = props.Product?.relation;
-            if (Array.isArray(productRel) && productRel.length) {
-              try {
-                const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
-                productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-              } catch {}
-            }
-
-            const requested = Number(props["Quantity Requested"]?.number || 0);
-            const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
-            const remaining = Math.max(0, requested - available);
-            if (remaining > 0) items.push({ productName, requested, available, remaining });
-          } catch {}
-        }
-      } else {
-        let hasMore = true, startCursor;
-        while (hasMore) {
-          const resp = await notion.databases.query({
-            database_id: ordersDatabaseId,
-            start_cursor: startCursor,
-            filter: { property: assignedProp, relation: { contains: userId } },
-            sorts: [{ timestamp: "created_time", direction: "descending" }],
-          });
-
-          for (const page of resp.results) {
-            const props = page.properties || {};
-            let productName = "Unknown Product";
-            const productRel = props.Product?.relation;
-            if (Array.isArray(productRel) && productRel.length) {
-              try {
-                const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
-                productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-              } catch {}
-            }
-            const requested = Number(props["Quantity Requested"]?.number || 0);
-            const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
-            const remaining = Math.max(0, requested - available);
-            if (remaining > 0) items.push({ productName, requested, available, remaining });
-          }
-
-          hasMore = resp.has_more;
-          startCursor = resp.next_cursor;
-        }
-      }
-
-      // PDF
-      const fname = `Assigned-Shortage-${new Date().toISOString().slice(0, 10)}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
-
-      const doc = new PDFDocument({ size: "A4", margin: 36 });
-      doc.pipe(res);
-
-      doc.font("Helvetica-Bold").fontSize(16).text("Assigned Orders — Shortage List", { align: "left" });
-      doc.moveDown(0.2);
-      doc.font("Helvetica").fontSize(10).fillColor("#555").text(`Generated: ${new Date().toLocaleString()}`);
-      doc.moveDown(0.6);
-
-      const pageInnerWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const colNameW = Math.floor(pageInnerWidth * 0.5);
-      const colReqW  = Math.floor(pageInnerWidth * 0.15);
-      const colAvailW= Math.floor(pageInnerWidth * 0.15);
-      const colRemW  = pageInnerWidth - colNameW - colReqW - colAvailW;
-
-      const drawHead = () => {
-        const y = doc.y;
-        const h = 20;
-        doc.save();
-        doc.rect(doc.page.margins.left, y, pageInnerWidth, h).fill("#F3F4F6");
-        doc.fillColor("#111").font("Helvetica-Bold").fontSize(10);
-        doc.text("Component", doc.page.margins.left + 6, y + 5, { width: colNameW });
-        doc.text("Requested", doc.page.margins.left + 6 + colNameW, y + 5, { width: colReqW, align: "right" });
-        doc.text("Available", doc.page.margins.left + 6 + colNameW + colReqW, y + 5, { width: colAvailW, align: "right" });
-        doc.text("Missing", doc.page.margins.left + 6 + colNameW + colReqW + colAvailW, y + 5, { width: colRemW, align: "right" });
-        doc.restore();
-        doc.moveDown(1);
-      };
-      const ensureSpace = (need) => {
-        const bottom = doc.page.height - doc.page.margins.bottom;
-        if (doc.y + need > bottom) { doc.addPage(); drawHead(); }
-      };
-      drawHead();
-
-      doc.font("Helvetica").fontSize(11).fillColor("#111");
-      items.forEach((it) => {
-        ensureSpace(22);
-        const y = doc.y;
-        const h = 18;
-        doc.text(it.productName || "-", doc.page.margins.left + 2, y, { width: colNameW });
-        doc.text(String(it.requested || 0), doc.page.margins.left + colNameW, y, { width: colReqW, align: "right" });
-        doc.text(String(it.available || 0), doc.page.margins.left + colNameW + colReqW, y, { width: colAvailW, align: "right" });
-        doc.text(String(it.remaining || 0), doc.page.margins.left + colNameW + colReqW + colAvailW, y, { width: colRemW, align: "right" });
-        doc.moveTo(doc.page.margins.left, y + h).lineTo(doc.page.margins.left + pageInnerWidth, y + h).strokeColor("#EEE").lineWidth(1).stroke();
-        doc.y = y + h + 2;
-      });
-
-      doc.end();
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to generate PDF" });
-    }
-  },
-);
-
-// 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
+    // 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
 // يستخدم ids=pageId1,pageId2,...
 app.get(
   "/api/orders/assigned/receipt",
@@ -1282,6 +1105,131 @@ app.get(
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to generate receipt PDF" });
+    }
+  },
+);
+    try {
+      const userId = await getCurrentUserPageId(req.session.username);
+      if (!userId) return res.status(404).json({ error: "User not found." });
+
+      const assignedProp  = await detectAssignedPropName();
+      const availableProp = await detectAvailableQtyPropName();
+
+      const idsStr = String(req.query.ids || "").trim();
+      const items = [];
+
+      if (idsStr) {
+        const ids = idsStr.split(",").map((s) => s.trim()).filter(Boolean);
+        for (const id of ids) {
+          try {
+            const page = await notion.pages.retrieve({ page_id: id });
+            const props = page.properties || {};
+
+            const rel = props[assignedProp]?.relation || [];
+            const isMine = Array.isArray(rel) && rel.some((r) => r.id === userId);
+            if (!isMine) continue;
+
+            let productName = "Unknown Product";
+            const productRel = props.Product?.relation;
+            if (Array.isArray(productRel) && productRel.length) {
+              try {
+                const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+                productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+              } catch {}
+            }
+
+            const requested = Number(props["Quantity Requested"]?.number || 0);
+            const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
+            const remaining = Math.max(0, requested - available);
+            if (remaining > 0) items.push({ productName, requested, available, remaining });
+          } catch {}
+        }
+      } else {
+        let hasMore = true, startCursor;
+        while (hasMore) {
+          const resp = await notion.databases.query({
+            database_id: ordersDatabaseId,
+            start_cursor: startCursor,
+            filter: { property: assignedProp, relation: { contains: userId } },
+            sorts: [{ timestamp: "created_time", direction: "descending" }],
+          });
+
+          for (const page of resp.results) {
+            const props = page.properties || {};
+            let productName = "Unknown Product";
+            const productRel = props.Product?.relation;
+            if (Array.isArray(productRel) && productRel.length) {
+              try {
+                const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+                productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+              } catch {}
+            }
+            const requested = Number(props["Quantity Requested"]?.number || 0);
+            const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
+            const remaining = Math.max(0, requested - available);
+            if (remaining > 0) items.push({ productName, requested, available, remaining });
+          }
+
+          hasMore = resp.has_more;
+          startCursor = resp.next_cursor;
+        }
+      }
+
+      // PDF
+      const fname = `Assigned-Shortage-${new Date().toISOString().slice(0, 10)}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+
+      const doc = new PDFDocument({ size: "A4", margin: 36 });
+      doc.pipe(res);
+
+      doc.font("Helvetica-Bold").fontSize(16).text("Assigned Orders — Shortage List", { align: "left" });
+      doc.moveDown(0.2);
+      doc.font("Helvetica").fontSize(10).fillColor("#555").text(`Generated: ${new Date().toLocaleString()}`);
+      doc.moveDown(0.6);
+
+      const pageInnerWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const colNameW = Math.floor(pageInnerWidth * 0.5);
+      const colReqW  = Math.floor(pageInnerWidth * 0.15);
+      const colAvailW= Math.floor(pageInnerWidth * 0.15);
+      const colRemW  = pageInnerWidth - colNameW - colReqW - colAvailW;
+
+      const drawHead = () => {
+        const y = doc.y;
+        const h = 20;
+        doc.save();
+        doc.rect(doc.page.margins.left, y, pageInnerWidth, h).fill("#F3F4F6");
+        doc.fillColor("#111").font("Helvetica-Bold").fontSize(10);
+        doc.text("Component", doc.page.margins.left + 6, y + 5, { width: colNameW });
+        doc.text("Requested", doc.page.margins.left + 6 + colNameW, y + 5, { width: colReqW, align: "right" });
+        doc.text("Available", doc.page.margins.left + 6 + colNameW + colReqW, y + 5, { width: colAvailW, align: "right" });
+        doc.text("Missing", doc.page.margins.left + 6 + colNameW + colReqW + colAvailW, y + 5, { width: colRemW, align: "right" });
+        doc.restore();
+        doc.moveDown(1);
+      };
+      const ensureSpace = (need) => {
+        const bottom = doc.page.height - doc.page.margins.bottom;
+        if (doc.y + need > bottom) { doc.addPage(); drawHead(); }
+      };
+      drawHead();
+
+      doc.font("Helvetica").fontSize(11).fillColor("#111");
+      items.forEach((it) => {
+        ensureSpace(22);
+        const y = doc.y;
+        const h = 18;
+        doc.text(it.productName || "-", doc.page.margins.left + 2, y, { width: colNameW });
+        doc.text(String(it.requested || 0), doc.page.margins.left + colNameW, y, { width: colReqW, align: "right" });
+        doc.text(String(it.available || 0), doc.page.margins.left + colNameW + colReqW, y, { width: colAvailW, align: "right" });
+        doc.text(String(it.remaining || 0), doc.page.margins.left + colNameW + colReqW + colAvailW, y, { width: colRemW, align: "right" });
+        doc.moveTo(doc.page.margins.left, y + h).lineTo(doc.page.margins.left + pageInnerWidth, y + h).strokeColor("#EEE").lineWidth(1).stroke();
+        doc.y = y + h + 2;
+      });
+
+      doc.end();
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to generate PDF" });
     }
   },
 );
@@ -1695,7 +1643,7 @@ app.get(
         startCursor = stockResponse.next_cursor;
       }
 
-      // Grouping + PDF layout
+      // Grouping + PDF layout (كما هو)
       const groupsMap = new Map();
       (allStock || []).forEach((it) => {
         const name = it?.tag?.name || "Untagged";
@@ -1985,123 +1933,73 @@ app.patch("/api/account", requireAuth, async (req, res) => {
   }
 });
 
-// ===== Logistics APIs =====
+// بعد pickPropName() والدوال المشابهة
+async function detectOrderIdPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, [
+      "Order ID",
+      "Order Code",
+      "Order Group",
+      "Batch ID",
+      "OrderId",
+      "Order_Code"
+    ]) || null
+  );
+}
 
-// 1) قوائم اللوجستيات حسب الحالة
-app.get(
-  "/api/logistics/:state",
-  requireAuth,
-  requirePage("Logistics"),
-  async (req, res) => {
-    try {
-      const state = String(req.params.state || "").toLowerCase(); // prepared | received | delivered
-      const statusProp = await detectStatusPropName();
-      if (!statusProp) return res.status(400).json({ error: "Status property not found" });
-      const statusMap = { prepared: "Prepared", received: "Received", delivered: "Delivered" };
-      const wanted = statusMap[state];
-      if (!wanted) return res.status(400).json({ error: "Invalid state" });
 
-      const items = [];
-      let startCursor = undefined;
-      let hasMore = true;
+// ===== Logistics listing — requires Logistics =====
+app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res) => {
+  try {
+    const statusFilter = String(req.query.status || "Prepared");
+    const statusProp = await detectStatusPropName();
+    const availableProp = await detectAvailableQtyPropName();
+    const items = [];
+    let hasMore = true, cursor;
 
-      while (hasMore) {
-        const resp = await notion.databases.query({
-          database_id: ordersDatabaseId,
-          start_cursor: startCursor,
-          filter: { property: statusProp, select: { equals: wanted } },
-          sorts: [{ timestamp: "created_time", direction: "descending" }],
+    while (hasMore) {
+      const q = await notion.databases.query({
+        database_id: ordersDatabaseId,
+        start_cursor: cursor,
+        filter: { property: statusProp, select: { equals: statusFilter } },
+        sorts: [{ timestamp: "created_time", direction: "descending" }],
+      });
+
+      for (const page of q.results) {
+        const props = page.properties || {};
+        let productName = "Unknown Product";
+        const productRel = props.Product?.relation;
+        if (Array.isArray(productRel) && productRel.length) {
+          try {
+            const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+            productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+          } catch {}
+        }
+        const requested = Number(props["Quantity Requested"]?.number || 0);
+        const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
+        // For Prepared tab we only show fully available
+        if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
+
+        items.push({
+          id: page.id,
+          reason: props.Reason?.title?.[0]?.plain_text || "No Reason",
+          productName,
+          requested,
+          available,
+          status: props[statusProp]?.select?.name || statusFilter,
         });
-
-        for (const page of resp.results) {
-          const props = page.properties || {};
-          // product
-          let productName = "Unknown Product";
-          const productRel = props.Product?.relation;
-          if (Array.isArray(productRel) && productRel.length) {
-            try {
-              const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
-              productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-            } catch {}
-          }
-          const qty = Number(props["Quantity Requested"]?.number || 0);
-          const reason = props.Reason?.title?.[0]?.plain_text || "";
-          items.push({ id: page.id, productName, quantity: qty, reason, createdTime: page.created_time });
-        }
-
-        hasMore = resp.has_more;
-        startCursor = resp.next_cursor;
       }
-
-      res.json({ items });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to load logistics list" });
+      hasMore = q.has_more;
+      cursor = q.next_cursor;
     }
+    res.set("Cache-Control", "no-store");
+    res.json(items);
+  } catch (e) {
+    console.error("Logistics list error:", e.body || e);
+    res.status(500).json({ error: "Failed to fetch logistics list" });
   }
-);
-
-// 2) تأكيد الاستلام (تغيير الحالة + حفظ رابط صورة)
-app.post(
-  "/api/logistics/receive",
-  requireAuth,
-  requirePage("Logistics"),
-  async (req, res) => {
-    try {
-      const { orderIds, receiptUrl } = req.body || {};
-      if (!Array.isArray(orderIds) || orderIds.length === 0) {
-        return res.status(400).json({ error: "orderIds required" });
-      }
-      const statusProp = await detectStatusPropName();
-      const proofProp = await detectReceivedProofPropName();
-      const proofUpdate = receiptUrl ? await buildImagePropertyUpdate(proofProp, String(receiptUrl)) : {};
-
-      await Promise.all(orderIds.map(id => notion.pages.update({
-        page_id: id,
-        properties: {
-          [statusProp]: { select: { name: "Received" } },
-          ...proofUpdate
-        }
-      })));
-
-      res.json({ success: true, updated: orderIds.length });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to mark as received" });
-    }
-  }
-);
-
-// 3) تأكيد التسليم (تغيير الحالة + حفظ رابط صورة)
-app.post(
-  "/api/logistics/deliver",
-  requireAuth,
-  requirePage("Logistics"),
-  async (req, res) => {
-    try {
-      const { orderIds, deliveryUrl } = req.body || {};
-      if (!Array.isArray(orderIds) || orderIds.length === 0) {
-        return res.status(400).json({ error: "orderIds required" });
-      }
-      const statusProp = await detectStatusPropName();
-      const proofProp = await detectDeliveredProofPropName();
-      const proofUpdate = deliveryUrl ? await buildImagePropertyUpdate(proofProp, String(deliveryUrl)) : {};
-
-      await Promise.all(orderIds.map(id => notion.pages.update({
-        page_id: id,
-        properties: {
-          [statusProp]: { select: { name: "Delivered" } },
-          ...proofUpdate
-        }
-      })));
-
-      res.json({ success: true, updated: orderIds.length });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to mark as delivered" });
-    }
-  }
-);
+});
 
 // Export Express app for Vercel
 module.exports = app;
