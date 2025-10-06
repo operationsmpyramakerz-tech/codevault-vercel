@@ -53,12 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return arr;
   }
 
+  // === المهم هنا: prepared لازم يكون miss=0 وكمان كل الـstatus=Prepared
   function recomputeGroupStats(g) {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
     g.total = total;
-    g.miss  = total - full; // عدد العناصر التي ما زالت ناقصة (Remaining>0)
-    g.prepared  = g.items.length > 0 && g.items.every(x => String(x.status || '') === 'Prepared');
+    g.miss  = total - full;
+    const allPreparedStatus = g.items.every(x => String(x.status || '') === 'Prepared');
+    g.prepared  = (g.miss === 0) && allPreparedStatus;
   }
 
   function updatePageStats() {
@@ -177,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const ids  = (btn.getAttribute('data-ids') || '').split(',').filter(Boolean);
 
       if (miss > 0) {
-        // منع التحضير + رسالة بنفس ستايل النجاح وفيها أكشن
         toast({
           type: 'warning',
           title: 'Missing items',
@@ -217,7 +218,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function makeAllAvailableAndPrepare(cardEl, ids) {
     try {
-      // 1) خلي كل عنصر Avail = Req
       const rows = cardEl.querySelectorAll('.order-item');
       const ops = [];
       rows.forEach(row => {
@@ -237,7 +237,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       await Promise.all(ops);
 
-      // 2) Mark Prepared للمجموعة كلها
       await markOrderPrepared(ids, null, /*silent=*/true);
       toast({ type: 'success', title: 'Order Prepared', message: 'All items set to available and order marked as Prepared.' });
     } catch (e) {
@@ -353,6 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // النقطة التانية المهمة: لو كنت على prepared وحصل Missing > 0، نحول تلقائيًا لـ Missing
   function applyRowUpdate(id, available, remaining) {
     const it = itemById.get(id);
     if (it) { it.available = Number(available); it.remaining = Number(remaining); }
@@ -367,8 +367,19 @@ document.addEventListener('DOMContentLoaded', () => {
         tdR.classList.toggle('pill--success', Number(remaining) === 0);
       }
     }
+
     groups.forEach(recomputeGroupStats);
     updatePageStats();
+
+    if (currentFilter === 'prepared' && it) {
+      const key = groupKeyOf(it);
+      const g = groups.find(x => x.key === key);
+      if (g && g.miss > 0) {
+        setFilter('missing');
+        return;
+      }
+    }
+
     applyFilterAndRender();
   }
 
@@ -387,16 +398,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.classList.toggle('is-busy', !!busy);
   }
 
-  // === Toast helper: يستخدم UI.toast إن وجد، وإلا يبني توست بسيط بنفس الشكل ومع زر أكشن ===
   function toast({ type='info', title='', message='', actionText='', onAction=null, duration=6000 }) {
     if (window.UI && typeof UI.toast === 'function') {
-      // نحاول استخدام نفس API إن كان يدعم الزرار
       try {
         const t = UI.toast({ type, title, message, actionText, onAction, duration });
         if (t) return;
       } catch(e) { /* fallback */ }
     }
-    // Fallback: توست بسيط
     let stack = document.getElementById('toast-stack');
     if (!stack) {
       stack = document.createElement('div');
