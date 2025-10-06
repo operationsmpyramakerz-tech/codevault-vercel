@@ -57,8 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
     g.total = total;
     g.miss  = total - full;
-    // يعتبر الطلب "Prepared" لو كل العناصر حالتها Prepared
+    // طلب جاهز (Prepared) لو كل العناصر حالتها Prepared
     g.prepared = g.items.length > 0 && g.items.every(x => String(x.status || '') === 'Prepared');
+    // مسموح تعليم الطلب Prepared فقط لو كل العناصر Remaining=0
+    g.canPrepare = g.items.length > 0 && g.items.every(x => Number(x.remaining) === 0);
   }
 
   function updatePageStats() {
@@ -106,8 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
+      card.dataset.canPrepare = g.canPrepare ? '1' : '0';
 
       const idsAttr = g.items.map(x => x.id).join(',');
+      const disableAttr = g.canPrepare ? '' : 'disabled title="Cannot mark prepared while there are missing items"';
 
       card.innerHTML = `
         <div class="order-card__head">
@@ -121,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <button class="btn btn-3d btn-3d-blue btn-icon" data-action="prepared-order" data-ids="${idsAttr}">
+            <button class="btn btn-3d btn-3d-blue btn-icon" data-action="prepared-order" data-ids="${idsAttr}" ${disableAttr}>
               <i data-feather="check-square"></i><span>Mark Prepared</span>
             </button>
             <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
@@ -171,6 +175,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (action === 'prepared-order') {
+      // حراسة إضافية: لا تسمح بالتحضير لو فيه remaining
+      const card = btn.closest('.order-card');
+      const canPrepare = card?.dataset?.canPrepare === '1';
+      if (!canPrepare) {
+        UI?.toast?.({ type: 'warning', message: 'لا يمكن تعليم الطلب Prepared وهناك مكونات ناقصة (Remaining > 0).' });
+        return;
+      }
       const ids = (btn.getAttribute('data-ids') || '').split(',').filter(Boolean);
       if (ids.length) markOrderPrepared(ids, btn);
       return;
@@ -196,9 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     applyFilterAndRender();
   }
-  btnAll.addEventListener('click', () => setFilter('all'));
-  btnPrepared.addEventListener('click', () => setFilter('prepared'));
-  btnMissing.addEventListener('click', () => setFilter('missing'));
+  btnAll?.addEventListener('click', () => setFilter('all'));
+  btnPrepared?.addEventListener('click', () => setFilter('prepared'));
+  btnMissing?.addEventListener('click', () => setFilter('missing'));
 
   async function markOrderPrepared(ids, btn) {
     try {
@@ -355,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setBusy(btn, busy) {
     if (!btn) return;
-    btn.disabled = !!busy;
+    btn.disabled = !!busy || btn.hasAttribute('disabled'); // keep disabled if rule blocks it
     btn.classList.toggle('is-busy', !!busy);
   }
 
