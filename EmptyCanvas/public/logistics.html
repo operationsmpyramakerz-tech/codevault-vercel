@@ -34,30 +34,56 @@
 
     <div class="main-content">
       <header class="main-header">
+        <div class="header-row1">
+          <div class="left">
+            <div class="greeting-pill" aria-live="polite">
+              <span class="greeting-avatar">
+                <img src="/images/greeting-icon.png" alt="Hi icon" />
+              </span>
+              <div class="greet-text">
+                <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
+                <div class="greet-sub">Your logistics overview</div>
+              </div>
+            </div>
+
+            <div class="searchbar" id="logistics-searchbar" role="search">
+              <i data-feather="search"></i>
+              <input id="logiSearch" type="search" placeholder="Search items for logistics..." aria-label="Search assigned items" />
+            </div>
+          </div>
+
+          <div class="right topbar-right">
+            <a href="/account" class="account-mini" aria-label="My account" title="My account">
+              <span class="ico-circle"><img src="/images/logo.png" alt="Logo" /></span>
+              <span class="label">My account</span>
+            </a>
+          </div>
+        </div>
+
         <div class="header-row2">
           <h1 class="page-title">Logistics</h1>
         </div>
       </header>
 
       <main class="container-full-width">
-        <section class="stats-cards three" id="logi-pills">
-          <button class="stat-card" data-tab="Prepared" id="pill-prepared">
-            <div class="stat-title">Prepared</div>
-            <div class="stat-value" id="prepared-count">0</div>
+        <div class="stats" id="logi-pills">
+          <button class="stat stat--btn stat-card" data-tab="Prepared" id="pill-prepared">
+            <div class="stat-title stat__label">Prepared</div>
+            <div class="stat-value stat__value" id="prepared-count">0</div>
           </button>
-          <button class="stat-card" data-tab="Received" id="pill-received">
-            <div class="stat-title">Received</div>
-            <div class="stat-value" id="received-count">0</div>
+          <button class="stat stat--btn stat-card" data-tab="Received" id="pill-received">
+            <div class="stat-title stat__label">Received</div>
+            <div class="stat-value stat__value" id="received-count">0</div>
           </button>
-          <button class="stat-card" data-tab="Delivered" id="pill-delivered">
-            <div class="stat-title">Delivered</div>
-            <div class="stat-value" id="delivered-count">0</div>
+          <button class="stat stat--btn stat-card" data-tab="Delivered" id="pill-delivered">
+            <div class="stat-title stat__label">Delivered</div>
+            <div class="stat-value stat__value" id="delivered-count">0</div>
           </button>
-        </section>
+        </div>
 
         <section class="card" id="logi-list">
           <div id="logi-items"><p><i data-feather="loader" class="loading-icon"></i> Loading...</p></div>
-        </section>
+        </div>
       </main>
     </div>
   </div>

@@ -116,6 +116,19 @@
     openUploadModal(btn.dataset.action, btn.dataset.id);
   });
 
+  
+  function activeTab(){
+    const a = $('#logi-pills .stat-card.active');
+    return a ? (a.dataset.tab||'Prepared') : 'Prepared';
+  }
+  const searchEl = byId('logiSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', ()=>{
+      const tab = activeTab();
+      renderList(tab, cache[tab]||[]);
+    });
+  }
+
   (async function init(){
     await Promise.all(['Prepared','Received','Delivered'].map(t=>fetchTab(t)));
     const initTab = currentTab; setActivePill(initTab); renderList(initTab, cache[initTab]||[]);
