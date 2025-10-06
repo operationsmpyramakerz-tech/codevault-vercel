@@ -384,15 +384,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function downloadOrderPDF(ids, btn) {
-    try {
-      setBusy(btn, true);
-      const url = '/api/orders/assigned/pdf?ids=' + encodeURIComponent(ids.join(','));
-      window.open(url, '_blank');
-    } finally {
-      setTimeout(() => setBusy(btn, false), 500);
-    }
-  }
+  try {
+    setBusy(btn, true);
+    // لو المستخدم حالياً على تبويب Fully available نطلع "Receipt"
+    const endpoint = (currentFilter === 'prepared')
+      ? '/api/orders/assigned/receipt'
+      : '/api/orders/assigned/pdf'; // النواقص في باقي الحالات
 
+    const url = endpoint + '?ids=' + encodeURIComponent(ids.join(','));
+    window.open(url, '_blank');
+  } finally {
+    setTimeout(() => setBusy(btn, false), 500);
+  }
+}
   function setBusy(btn, busy) {
     if (!btn) return;
     btn.classList.toggle('is-busy', !!busy);

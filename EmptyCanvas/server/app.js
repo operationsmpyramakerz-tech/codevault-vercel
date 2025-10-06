@@ -940,6 +940,165 @@ app.get(
   requireAuth,
   requirePage("Assigned Schools Requested Orders"),
   async (req, res) => {
+    // 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
+// يستخدم ids=pageId1,pageId2,...
+app.get(
+  "/api/orders/assigned/receipt",
+  requireAuth,
+  requirePage("Assigned Schools Requested Orders"),
+  async (req, res) => {
+    try {
+      const userId = await getCurrentUserPageId(req.session.username);
+      if (!userId) return res.status(404).json({ error: "User not found." });
+
+      const assignedProp  = await detectAssignedPropName();
+      const availableProp = await detectAvailableQtyPropName();
+      const statusProp    = await detectStatusPropName();
+
+      const ids = String(req.query.ids || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      if (!ids.length) {
+        return res.status(400).json({ error: "ids query is required" });
+      }
+
+      // اجمع العناصر المطلوبة فقط (ولازم تكون مُسندة للمستخدم)
+      const items = [];
+      let reasonTitle = "";
+      let createdAt = null;
+
+      for (const id of ids) {
+        try {
+          const page = await notion.pages.retrieve({ page_id: id });
+          const props = page.properties || {};
+
+          // تأكد أنها مُسندة للمستخدم الحالي
+          const rel = props[assignedProp]?.relation || [];
+          const isMine = Array.isArray(rel) && rel.some(r => r.id === userId);
+          if (!isMine) continue;
+
+          // الاسم + الأرقام
+          let productName = "Unknown Product";
+          const relP = props.Product?.relation;
+          if (Array.isArray(relP) && relP.length) {
+            try {
+              const productPage = await notion.pages.retrieve({ page_id: relP[0].id });
+              productName =
+                productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+            } catch {}
+          }
+
+          const requested = Number(props["Quantity Requested"]?.number || 0);
+          const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
+          const status    = statusProp ? (props[statusProp]?.select?.name || "") : "";
+
+          items.push({
+            productName,
+            requested,
+            available,
+            status
+          });
+
+          // استخدم أول عنصر لمعلومات عامة للغلاف (السبب + التاريخ)
+          if (!reasonTitle) {
+            reasonTitle = props.Reason?.title?.[0]?.plain_text || "";
+            createdAt = page.created_time || null;
+          }
+        } catch {}
+      }
+
+      if (!items.length) {
+        return res.status(404).json({ error: "No items found for this receipt." });
+      }
+
+      // === PDF ===
+      const fname = `Receipt-${new Date().toISOString().slice(0, 10)}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+
+      const doc = new PDFDocument({ size: "A4", margin: 36 });
+      doc.pipe(res);
+
+      // Header
+      doc.font("Helvetica-Bold").fontSize(18).text("Components Receipt", { align: "left" });
+      doc.moveDown(0.3);
+      doc.font("Helvetica").fontSize(10).fillColor("#555")
+        .text(`Generated: ${new Date().toLocaleString()}`, { continued: true })
+        .text(`   •   User: ${req.session.username || "-"}`);
+
+      if (reasonTitle) {
+        doc.moveDown(0.3);
+        doc.font("Helvetica").fontSize(11).fillColor("#111")
+          .text(`Reason: ${reasonTitle}`);
+      }
+      if (createdAt) {
+        doc.font("Helvetica").fontSize(10).fillColor("#777")
+          .text(`Order created: ${new Date(createdAt).toLocaleString()}`);
+      }
+
+      doc.moveDown(0.8);
+      const pageInnerWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+      // Table columns
+      const colNameW = Math.floor(pageInnerWidth * 0.60);
+      const colReqW  = Math.floor(pageInnerWidth * 0.18);
+      const colAvailW= pageInnerWidth - colNameW - colReqW;
+
+      const drawHead = () => {
+        const y = doc.y, h = 22;
+        doc.save();
+        doc.roundedRect(doc.page.margins.left, y, pageInnerWidth, h, 6)
+          .fillColor("#F3F4F6").strokeColor("#E5E7EB").lineWidth(1).fillAndStroke();
+        doc.fillColor("#111").font("Helvetica-Bold").fontSize(10);
+        doc.text("Component", doc.page.margins.left + 10, y + 6, { width: colNameW });
+        doc.text("Quantity",  doc.page.margins.left + 10 + colNameW, y + 6, {
+          width: colReqW - 10, align: "right",
+        });
+        doc.text("Available", doc.page.margins.left + colNameW + colReqW, y + 6, {
+          width: colAvailW - 10, align: "right",
+        });
+        doc.restore();
+        doc.moveDown(1.2);
+      };
+
+      const ensureSpace = (need) => {
+        const bottom = doc.page.height - doc.page.margins.bottom;
+        if (doc.y + need > bottom) { doc.addPage(); drawHead(); }
+      };
+
+      drawHead();
+      doc.font("Helvetica").fontSize(11).fillColor("#111");
+
+      items.forEach((it) => {
+        ensureSpace(24);
+        const y = doc.y, h = 18;
+        doc.text(it.productName || "-", doc.page.margins.left + 2, y, { width: colNameW });
+        doc.text(String(it.requested || 0), doc.page.margins.left + colNameW, y, {
+          width: colReqW - 10, align: "right",
+        });
+        doc.text(String(it.available ?? ""), doc.page.margins.left + colNameW + colReqW, y, {
+          width: colAvailW - 10, align: "right",
+        });
+        doc.moveTo(doc.page.margins.left, y + h + 4)
+          .lineTo(doc.page.margins.left + pageInnerWidth, y + h + 4)
+          .strokeColor("#EEE").lineWidth(1).stroke();
+        doc.y = y + h + 6;
+      });
+
+      doc.moveDown(1.2);
+      doc.font("Helvetica").fontSize(10).fillColor("#555")
+        .text("Signature:", { continued: true })
+        .text(" _________________________________", { align: "left" });
+
+      doc.end();
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to generate receipt PDF" });
+    }
+  },
+);
     try {
       const userId = await getCurrentUserPageId(req.session.username);
       if (!userId) return res.status(404).json({ error: "User not found." });
