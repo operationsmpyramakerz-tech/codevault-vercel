@@ -3,10 +3,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const grid   = document.getElementById('assigned-grid');
   const empty  = document.getElementById('assigned-empty');
 
-  // Stats
+  // Stats values
   const stTotal = document.getElementById('st-total');
   const stFull  = document.getElementById('st-full');
   const stMiss  = document.getElementById('st-missing');
+
+  // Stat filter buttons
+  const btnAll     = document.getElementById('st-btn-total');
+  const btnPrepared= document.getElementById('st-btn-full');
+  const btnMissing = document.getElementById('st-btn-missing');
 
   const popover      = document.getElementById('partial-popover');
   const popInput     = document.getElementById('popover-input');
@@ -16,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let items = [];
   let groups = [];
+  let currentFilter = 'all';
   const itemById = new Map();
   let currentEdit = null;
 
@@ -51,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
     g.total = total;
     g.miss  = total - full;
+    // يعتبر الطلب "Prepared" لو كل العناصر حالتها Prepared
     g.prepared = g.items.length > 0 && g.items.every(x => String(x.status || '') === 'Prepared');
   }
 
@@ -63,6 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
     stMiss.textContent  = fmt(notCompleted);
   }
 
+  function applyFilterAndRender() {
+    let view = groups;
+    if (currentFilter === 'prepared') view = groups.filter(g => g.prepared);
+    else if (currentFilter === 'missing') view = groups.filter(g => !g.prepared);
+    renderGroups(view);
+  }
+
   async function load() {
     try {
       const res = await fetch('/api/orders/assigned', { cache: 'no-store', credentials: 'same-origin' });
@@ -72,23 +86,23 @@ document.addEventListener('DOMContentLoaded', () => {
       items.forEach(it => itemById.set(it.id, it));
 
       groups = buildGroups(items);
-      renderGroups(groups);
       updatePageStats();
+      applyFilterAndRender();
     } catch (e) {
       console.error(e);
       UI?.toast?.({ type: 'error', message: 'Failed to load assigned orders' });
     }
   }
 
-  function renderGroups(groups) {
+  function renderGroups(list) {
     grid.innerHTML = '';
-    if (!groups.length) {
+    if (!list.length) {
       empty.style.display = '';
       return;
     }
     empty.style.display = 'none';
 
-    for (const g of groups) {
+    for (const g of list) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
@@ -172,6 +186,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // === Stat buttons events ===
+  function setFilter(f) {
+    currentFilter = f;
+    [btnAll, btnPrepared, btnMissing].forEach(b => {
+      const active = b.dataset.filter === f;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    applyFilterAndRender();
+  }
+  btnAll.addEventListener('click', () => setFilter('all'));
+  btnPrepared.addEventListener('click', () => setFilter('prepared'));
+  btnMissing.addEventListener('click', () => setFilter('missing'));
+
   async function markOrderPrepared(ids, btn) {
     try {
       setBusy(btn, true);
@@ -189,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       groups.forEach(recomputeGroupStats);
       updatePageStats();
+      applyFilterAndRender();
       UI?.toast?.({ type: 'success', message: 'Order marked as Prepared' });
     } catch (e) {
       console.error(e);
@@ -300,8 +329,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const row = document.getElementById(`row-${id}`);
     if (row) {
-      const tdA = row.querySelector('[data-col=\"available\"]');
-      const tdR = row.querySelector('[data-col=\"remaining\"]');
+      const tdA = row.querySelector('[data-col="available"]');
+      const tdR = row.querySelector('[data-col="remaining"]');
       if (tdA) tdA.textContent = fmt(available);
       if (tdR) {
         tdR.textContent = fmt(remaining);
@@ -311,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     groups.forEach(recomputeGroupStats);
     updatePageStats();
+    applyFilterAndRender();
   }
 
   async function downloadOrderPDF(ids, btn) {

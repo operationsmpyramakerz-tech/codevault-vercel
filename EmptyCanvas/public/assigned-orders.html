@@ -113,19 +113,22 @@
       </header>
 
       <main class="container-full-width">
+        <!-- == STAT FILTERS AS BUTTONS == -->
         <div class="stats">
-          <div class="stat">
+          <button class="stat stat--btn active" id="st-btn-total" type="button" aria-pressed="true" data-filter="all">
             <div class="stat__label">Total assigned</div>
             <div class="stat__value" id="st-total">0</div>
-          </div>
-          <div class="stat">
+          </button>
+
+          <button class="stat stat--btn" id="st-btn-full" type="button" aria-pressed="false" data-filter="prepared">
             <div class="stat__label">Fully available</div>
             <div class="stat__value stat__value--ok" id="st-full">0</div>
-          </div>
-          <div class="stat">
+          </button>
+
+          <button class="stat stat--btn" id="st-btn-missing" type="button" aria-pressed="false" data-filter="missing">
             <div class="stat__label">Missing</div>
             <div class="stat__value stat__value--warn" id="st-missing">0</div>
-          </div>
+          </button>
         </div>
 
         <div id="assigned-empty" class="muted" style="display:none;">لا يوجد عناصر حالياً في التخزين.</div>
