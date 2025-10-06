@@ -2006,3 +2006,58 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   min-width: fit-content !important;
   white-space: nowrap !important;
 }
+/* ===== Create Order » Products row layout ===== */
+#products-container .product-row {
+  display: grid;                          /* 3 أعمدة: المنتج | الكمية | أكشنز */
+  grid-template-columns: 1fr 112px auto;  /* ثبّت عرض خانة الكمية */
+  column-gap: 12px;
+  align-items: center;
+}
+
+#products-container .product-row .field {
+  margin: 0;
+}
+
+#products-container .product-row .qty-input {
+  width: 100%;           /* تملا عمود الكمية */
+  max-width: none;
+}
+
+#products-container .product-row .actions-cell {
+  display: inline-flex;  /* أيقونة اللينك + زر الحذف */
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 52px;
+}
+
+/* أيقونة اللينك – نفس القيم اللي بيحطها الـ JS لكن هنا لضمان التخطيط */
+#products-container .product-row .product-url-link {
+  display: none;         /* هيظهرها الـ JS لما يكون في URL */
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #2563eb;
+  text-decoration: none;
+  align-items: center;
+  justify-content: center;
+}
+#products-container .product-row .product-url-link:hover {
+  background: #EFF6FF;
+}
+
+/* خلى زر الـ X نفس مقاسات الأيقونة لتوازن الشكل */
+#products-container .product-row .icon-btn--x {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  padding: 0;
+}
+
+/* موبايل: صغّر خانة الكمية شوية */
+@media (max-width: 640px) {
+  #products-container .product-row {
+    grid-template-columns: 1fr 90px 44px;
+    column-gap: 8px;
+  }
+}
