@@ -1203,7 +1203,7 @@ body.sidebar-collapsed .main-content { padding-left: 0 !important; }
 .sidebar .nav-group-list .nav-link .nav-label { white-space: normal; line-height: 1.15; }
 .sidebar .nav-group-list .nav-link { align-items: flex-start; }
 /* Sidebar: flat links (no parent group) */
-.sidebar-nav .nav-group { display: none !important; }
+.sidebar-nav .nav-group { display: block !important; }
 
 .sidebar-nav .nav-list {
   list-style: none;
@@ -2102,3 +2102,16 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 
 /* disabled look (نستخدم is-disabled بدون منع الضغط) */
 .btn.is-disabled{ opacity:.55; filter:saturate(.8); cursor:not-allowed; }
+
+/* ===== LOGISTICS: ensure the new sidebar link is visible ===== */
+.sidebar .sidebar-nav .nav-group,
+.sidebar .sidebar-nav .nav-list { display: block !important; visibility: visible !important; }
+
+/* In case any rule collapses the group children, keep them clickable */
+.sidebar .sidebar-nav .nav-group .nav-group-list { max-height: 800px; overflow: visible; }
+
+/* Make sure every nav-link is flexed & visible */
+.sidebar .sidebar-nav .nav-link { display: flex !important; }
+
+/* Optional: if you gave the link a class="logistics", make sure it's never hidden */
+.sidebar .sidebar-nav .nav-link.logistics { display: flex !important; }
