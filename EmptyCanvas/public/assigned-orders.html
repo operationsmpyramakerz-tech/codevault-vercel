@@ -176,5 +176,59 @@
     });
   })();
 </script>
+<!-- ===== Mark Received: Receipt Upload Modal (DROP-IN) ===== -->
+<div id="receipt-modal" class="modal-overlay" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 class="modal-title">Attach receipt image</h3>
+      <button type="button" class="modal-close" id="receipt-modal-close" aria-label="Close">×</button>
+    </div>
+
+    <form id="receipt-form">
+      <div class="modal-body">
+        <!-- Order info (filled by JS) -->
+        <input type="hidden" id="receipt-order-id" name="orderId" />
+        <p class="muted" id="receipt-order-title">Order: —</p>
+
+        <label for="receipt-file" class="form-label">Receipt Image (PNG/JPG)</label>
+        <input id="receipt-file" name="receiptFile" type="file" accept="image/*" required />
+
+        <div id="receipt-hint" class="hint">
+          Only one image is needed. Max ~5MB recommended.
+        </div>
+
+        <div id="receipt-alert" class="alert hidden"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" id="receipt-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="receipt-submit">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  /* Lightweight styles, لا تغيّر شكل الصفحة العام */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:9999}
+  .modal-overlay.show{display:flex}
+  .modal-card{width:min(520px,92vw);background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.15);overflow:hidden}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #eee}
+  .modal-title{margin:0;font-size:1.05rem;font-weight:700}
+  .modal-close{background:transparent;border:0;font-size:22px;line-height:1;cursor:pointer}
+  .modal-body{padding:16px 18px}
+  .modal-footer{display:flex;gap:.5rem;justify-content:flex-end;padding:12px 18px;border-top:1px solid #eee}
+  .form-label{display:block;font-weight:600;margin-bottom:6px}
+  #receipt-file{display:block;width:100%;padding:10px;border:1px solid #e0e0e0;border-radius:10px;background:#fafafa}
+  .hint{font-size:.85rem;color:#666;margin-top:8px}
+  .muted{color:#6b7280;margin:.25rem 0 .75rem}
+  .alert{margin-top:10px;border-radius:10px;padding:10px 12px;font-size:.92rem}
+  .alert.success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+  .alert.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+  .btn{border-radius:10px;padding:10px 14px;border:1px solid transparent;cursor:pointer;font-weight:600}
+  .btn-light{background:#f3f4f6;color:#111827;border-color:#e5e7eb}
+  .btn-primary{background:#e76f2c;color:#fff}
+</style>
+<!-- ===== /Mark Received Modal ===== -->
 </body>
 </html>
