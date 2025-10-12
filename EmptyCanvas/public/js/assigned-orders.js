@@ -497,3 +497,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
   load();
 });
+
+// --- Active stat helper (added) ---
+(function(){
+  function setActiveStatFromParam(){
+    var params = new URLSearchParams(location.search);
+    var tab = (params.get('tab')||'').toLowerCase();
+    var active =
+      tab.indexOf('fully')>-1 ? 'fully' :
+      tab.indexOf('missing')>-1 ? 'missing' : 'total';
+    try {
+      document.querySelectorAll('.stat.stat--btn, .stat--btn').forEach(function(el){
+        el.classList.remove('active');
+        el.setAttribute('aria-pressed','false');
+      });
+      var map = {
+        total: document.querySelector('.stat--btn[data-kind="total"]'),
+        fully: document.querySelector('.stat--btn[data-kind="fully"]'),
+        missing: document.querySelector('.stat--btn[data-kind="missing"]')
+      };
+      if(map[active]){
+        map[active].classList.add('active');
+        map[active].setAttribute('aria-pressed','true');
+      }
+    } catch(e){ /* no-op */ }
+  }
+  document.addEventListener('DOMContentLoaded', setActiveStatFromParam);
+  window.addEventListener('storage:stats:rerender', setActiveStatFromParam);
+})();
