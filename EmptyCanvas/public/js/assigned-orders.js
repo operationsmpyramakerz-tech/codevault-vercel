@@ -157,7 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!list.length) { empty.style.display = ''; return; }
     empty.style.display = 'none';
 
-    const isMissingTab = currentFilter === 'missing';
+    const isMissingTab  = currentFilter === 'missing';
+    const isPreparedTab = currentFilter === 'prepared';
+    const showRowActions = !isPreparedTab; // HIDE row actions in Prepared tab ONLY
 
     for (const g of list) {
       const card = document.createElement('div');
@@ -208,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span class="pill ${Number(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}" data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
+              ${ showRowActions ? `
               <div class="item-actions">
                 <button class="btn btn-3d btn-3d-green btn-icon btn-sm" data-action="mark" data-id="${it.id}">
                   <i data-feather="check-circle"></i><span>In Stock</span>
@@ -215,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button class="btn btn-3d btn-3d-orange btn-icon btn-sm" data-action="partial" data-id="${it.id}">
                   <i data-feather="edit-3"></i><span>Partial / Not In Stock</span>
                 </button>
-              </div>
+              </div>` : ``}
             </div>
           `).join('')}
         </div>
