@@ -1,3 +1,4 @@
+
 // === Mark Received flow with image upload -> server -> Blob -> Notion ===
 function openMarkReceivedModal(orderIds) {
   if (window.UI && typeof UI.modal === 'function') {
@@ -70,8 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const popover      = document.getElementById('partial-popover');
   const popInput     = document.getElementById('popover-input');
   const popHint      = document.getElementById('popover-hint');
-  const popBtnSave   = popover?.querySelector('[data-pop="save"]');
-  const popBtnCancel = popover?.querySelector('[data-pop="cancel"]');
+  const popBtnSave   = popover.querySelector('[data-pop="save"]');
+  const popBtnCancel = popover.querySelector('[data-pop="cancel"]');
 
   let items = [];
   let groups = [];
@@ -109,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return arr;
   }
 
-  // prepared = no missing AND all item.status === 'Prepared'
+  // === المهم هنا: prepared لازم يكون miss=0 وكمان كل الـstatus=Prepared
   function recomputeGroupStats(g) {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
@@ -123,9 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalOrders    = groups.length;
     const preparedOrders = groups.filter(g => g.prepared).length;
     const notCompleted   = totalOrders - preparedOrders;
-    if (stTotal) stTotal.textContent = fmt(totalOrders);
-    if (stFull)  stFull.textContent  = fmt(preparedOrders);
-    if (stMiss)  stMiss.textContent  = fmt(notCompleted);
+    stTotal.textContent = fmt(totalOrders);
+    stFull.textContent  = fmt(preparedOrders);
+    stMiss.textContent  = fmt(notCompleted);
   }
 
   function applyFilterAndRender() {
@@ -154,8 +155,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderGroups(list) {
     grid.innerHTML = '';
-    if (!list.length) { empty && (empty.style.display = ''); return; }
-    empty && (empty.style.display = 'none');
+    if (!list.length) { empty.style.display = ''; return; }
+    empty.style.display = 'none';
 
     for (const g of list) {
       const card = document.createElement('div');
@@ -262,8 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function setFilter(f) {
     currentFilter = f;
     [btnAll, btnPrepared, btnMissing].forEach(b => {
-      if (!b) return;
-      const active = b.dataset.filter === f || (b.dataset.filter === 'prepared' && f === 'prepared');
+      const active = b.dataset.filter === f;
       b.classList.toggle('active', active);
       b.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
@@ -352,26 +352,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showPopover(anchorBtn, item) {
-    if (!popover) return;
     currentEdit = {
       id: item.id,
       requested: Number(item.requested),
       available: Number(item.available),
       anchor: anchorBtn
     };
-    if (popInput) {
-      popInput.value = String(currentEdit.available ?? 0);
-      popInput.setAttribute('max', String(currentEdit.requested));
-    }
-    if (popHint) popHint.textContent = `Requested: ${currentEdit.requested}`;
+    popInput.value = String(currentEdit.available ?? 0);
+    popInput.setAttribute('max', String(currentEdit.requested));
+    popHint.textContent = `Requested: ${currentEdit.requested}`;
     positionPopover(anchorBtn);
     popover.classList.remove('hidden');
-    popInput && popInput.focus();
-    popInput && popInput.select();
+    popInput.focus();
+    popInput.select();
   }
-  function hidePopover() { if (popover) popover.classList.add('hidden'); currentEdit = null; }
+  function hidePopover() { popover.classList.add('hidden'); currentEdit = null; }
   function positionPopover(anchorBtn) {
-    if (!popover) return;
     const r = anchorBtn.getBoundingClientRect();
     const pad = 8, pw = 260, ph = 130;
     let top = r.bottom + pad, left = r.left + (r.width/2) - (pw/2);
@@ -382,18 +378,18 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.assign(popover.style, { position:'fixed', top:`${top}px`, left:`${left}px` });
   }
   document.addEventListener('click', (e) => {
-    if (!currentEdit || !popover) return;
+    if (!currentEdit) return;
     if (popover.contains(e.target) || currentEdit.anchor.contains(e.target)) return;
     hidePopover();
   });
   addEventListener('resize', () => { if (currentEdit) positionPopover(currentEdit.anchor); });
-  popBtnCancel && popBtnCancel.addEventListener('click', hidePopover);
-  popBtnSave && popBtnSave.addEventListener('click', async () => {
+  popBtnCancel.addEventListener('click', hidePopover);
+  popBtnSave.addEventListener('click', async () => {
     if (!currentEdit) return;
     const val = Number(popInput.value);
     if (Number.isNaN(val) || val < 0) { toast({ type:'warning', title:'Invalid value', message:'Please enter a valid number' }); return; }
     try {
-      popBtnSave.disabled = True
+      popBtnSave.disabled = true;
       const res = await fetch('/api/orders/assigned/available', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -413,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // auto switch away from Prepared if it becomes missing
+  // النقطة التانية المهمة: لو كنت على prepared وحصل Missing > 0، نحول تلقائيًا لـ Missing
   function applyRowUpdate(id, available, remaining) {
     const it = itemById.get(id);
     if (it) { it.available = Number(available); it.remaining = Number(remaining); }
@@ -445,18 +441,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function downloadOrderPDF(ids, btn) {
-    try {
-      setBusy(btn, true);
-      const endpoint = (currentFilter === 'prepared')
-        ? '/api/orders/assigned/receipt'
-        : '/api/orders/assigned/pdf';
-      const url = endpoint + '?ids=' + encodeURIComponent(ids.join(','));
-      window.open(url, '_blank');
-    } finally {
-      setTimeout(() => setBusy(btn, false), 500);
-    }
-  }
+  try {
+    setBusy(btn, true);
+    // لو المستخدم حالياً على تبويب Fully available نطلع "Receipt"
+    const endpoint = (currentFilter === 'prepared')
+      ? '/api/orders/assigned/receipt'
+      : '/api/orders/assigned/pdf'; // النواقص في باقي الحالات
 
+    const url = endpoint + '?ids=' + encodeURIComponent(ids.join(','));
+    window.open(url, '_blank');
+  } finally {
+    setTimeout(() => setBusy(btn, false), 500);
+  }
+}
   function setBusy(btn, busy) {
     if (!btn) return;
     btn.classList.toggle('is-busy', !!busy);
@@ -498,24 +495,5 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(close, duration);
   }
 
-  // === Active state handling for the top tabs ===
-  function initActiveTabs(){
-    const statsNavBtns = [btnAll, btnPrepared, btnMissing].filter(Boolean);
-    const urlTab = new URLSearchParams(location.search).get('tab');
-    let initial = 'all';
-    if (urlTab === 'prepared' || urlTab === 'full') initial = 'prepared';
-    else if (urlTab === 'missing') initial = 'missing';
-    setFilter(initial);
-    statsNavBtns.forEach(b => {
-      b.addEventListener('click', () => {
-        const p = new URLSearchParams(location.search);
-        const filter = b.dataset.filter;
-        p.set('tab', filter);
-        history.replaceState({}, '', `${location.pathname}?${p.toString()}`);
-      });
-    });
-  }
-
-  initActiveTabs();
   load();
 });
