@@ -959,24 +959,16 @@ app.post("/api/orders/assigned/mark-received", requireAuth, requirePage("Assigne
     try {
       publicUrl = await uploadToBlobFromBase64(dataUrl, filename || "receipt.jpg");
     } catch (e) {
-      console.error("Blob upload error:", e);
+      console.error("Blob upload error:", e?.message || e);
       return res.status(500).json({ error: "Upload failed. Configure BLOB_READ_WRITE_TOKEN in Vercel." });
     }
     const props = await getOrdersDBProps();
     const receiptProp = pickPropName(props, ["Receipt Image","Receipt","Image","ReceiptImage"]) || "Receipt Image";
-
     await Promise.all(orderIds.map((id) =>
       notion.pages.update({
         page_id: id,
         properties: {
-          [receiptProp]: {
-            files: [
-              {
-                name: filename || "receipt",
-                external: { url: publicUrl }
-              }
-            ]
-          }
+          [receiptProp]: { files: [{ name: filename || "receipt", external: { url: publicUrl } }] }
         }
       })
     ));
@@ -2054,33 +2046,23 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
 });
 
 
-// === Helper: upload base64 image to Vercel Blob (returns public URL) ===
-async function uploadToBlobFromBase64(dataUrl, filenameHint="receipt.jpg") {
+// === Helper: upload base64 image to Vercel Blob (SDK v2) and return a public URL ===
+async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
-    throw new Error("BLOB_TOKEN_MISSING");
-  }
-  const m = String(dataUrl||"").match(/^data:(.+?);base64,(.+)$/);
+  if (!token) throw new Error("BLOB_TOKEN_MISSING");
+  const m = String(dataUrl || "").match(/^data:(.+?);base64,(.+)$/);
   if (!m) throw new Error("INVALID_DATA_URL");
   const contentType = m[1];
   const b64 = m[2];
-  const buffer = Buffer.from(b64, 'base64');
-  const fetch = (await import('node-fetch')).default;
-  const resp = await fetch('https://blob.vercel-storage.com', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': contentType,
-      'x-vercel-filename': filenameHint
-    },
-    body: buffer
+  const buffer = Buffer.from(b64, "base64");
+  const { put } = await import("@vercel/blob");
+  const res = await put(filenameHint, buffer, {
+    access: "public",
+    token,
+    contentType,
   });
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error("BLOB_UPLOAD_FAILED: " + resp.status + " " + txt);
-  }
-  const json = await resp.json();
-  return json.url;
+  if (!res || !res.url) throw new Error("BLOB_PUT_FAILED");
+  return res.url;
 }
 
 // Export Express app for Vercel

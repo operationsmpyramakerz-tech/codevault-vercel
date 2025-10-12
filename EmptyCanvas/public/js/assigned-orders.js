@@ -1,5 +1,5 @@
 
-// === Mark Received flow with image upload (Base64 -> server -> Blob -> Notion Files) ===
+// === Mark Received flow with image upload -> server -> Blob -> Notion ===
 function openMarkReceivedModal(orderIds) {
   if (window.UI && typeof UI.modal === 'function') {
     const body = document.createElement('div');
@@ -13,7 +13,7 @@ function openMarkReceivedModal(orderIds) {
       body,
       primary: { label: "Save", action: async () => {
         const inp = body.querySelector('#mr-file');
-        const file = inp && inp.files && inp.files[0];
+        const file = inp?.files?.[0];
         if (!file) { UI.toast({ type:'error', title:'Missing image', message:'Please choose an image.' }); return; }
         const dataUrl = await new Promise((resolve, reject) => {
           const fr = new FileReader();
@@ -29,7 +29,7 @@ function openMarkReceivedModal(orderIds) {
           });
           const json = await resp.json();
           if (!resp.ok || !json.success) throw new Error(json.error || 'Failed');
-          UI.toast({ type:'success', title:'Saved', message:'Receipt stored and order marked as Received.' });
+          UI.toast({ type:'success', title:'Saved', message:'Receipt saved to Notion.' });
           modal.close();
           if (typeof reloadAssigned === 'function') reloadAssigned();
           else location.reload();
@@ -40,8 +40,6 @@ function openMarkReceivedModal(orderIds) {
       secondary: { label: "Cancel" }
     });
     return;
-  } else {
-    alert("Please choose an image to upload in the upcoming file dialog.");
   }
 }
 
