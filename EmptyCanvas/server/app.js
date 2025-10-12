@@ -944,6 +944,58 @@ app.post(
 );
 
 // 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
+
+// === Mark Received with image (store external URL into Notion Files & media "Receipt Image") ===
+app.post("/api/orders/assigned/mark-received", requireAuth, requirePage("Assigned Schools Requested Orders"), async (req, res) => {
+  try {
+    const { orderIds, filename, dataUrl } = req.body || {};
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ error: "orderIds required" });
+    }
+    if (!dataUrl) {
+      return res.status(400).json({ error: "image dataUrl required" });
+    }
+    let publicUrl;
+    try {
+      publicUrl = await uploadToBlobFromBase64(dataUrl, filename || "receipt.jpg");
+    } catch (e) {
+      console.error("Blob upload error:", e);
+      return res.status(500).json({ error: "Upload failed. Configure BLOB_READ_WRITE_TOKEN in Vercel." });
+    }
+    const props = await getOrdersDBProps();
+    const receiptProp = pickPropName(props, ["Receipt Image","Receipt","Image","ReceiptImage"]) || "Receipt Image";
+
+    await Promise.all(orderIds.map((id) =>
+      notion.pages.update({
+        page_id: id,
+        properties: {
+          [receiptProp]: {
+            files: [
+              {
+                name: filename || "receipt",
+                external: { url: publicUrl }
+              }
+            ]
+          }
+        }
+      })
+    ));
+    const statusProp = await detectStatusPropName();
+    if (statusProp) {
+      await Promise.all(orderIds.map((id) =>
+        notion.pages.update({
+          page_id: id,
+          properties: { [statusProp]: { select: { name: "Received" } } }
+        })
+      ));
+    }
+    res.json({ success: true, url: publicUrl });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to mark received with image." });
+  }
+});
+
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
@@ -2000,6 +2052,36 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     res.status(500).json({ error: "Failed to fetch logistics list" });
   }
 });
+
+
+// === Helper: upload base64 image to Vercel Blob (returns public URL) ===
+async function uploadToBlobFromBase64(dataUrl, filenameHint="receipt.jpg") {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    throw new Error("BLOB_TOKEN_MISSING");
+  }
+  const m = String(dataUrl||"").match(/^data:(.+?);base64,(.+)$/);
+  if (!m) throw new Error("INVALID_DATA_URL");
+  const contentType = m[1];
+  const b64 = m[2];
+  const buffer = Buffer.from(b64, 'base64');
+  const fetch = (await import('node-fetch')).default;
+  const resp = await fetch('https://blob.vercel-storage.com', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': contentType,
+      'x-vercel-filename': filenameHint
+    },
+    body: buffer
+  });
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error("BLOB_UPLOAD_FAILED: " + resp.status + " " + txt);
+  }
+  const json = await resp.json();
+  return json.url;
+}
 
 // Export Express app for Vercel
 module.exports = app;

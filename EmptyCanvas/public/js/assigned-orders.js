@@ -1,3 +1,62 @@
+
+// === Mark Received flow with image upload (Base64 -> server -> Blob -> Notion Files) ===
+function openMarkReceivedModal(orderIds) {
+  if (window.UI && typeof UI.modal === 'function') {
+    const body = document.createElement('div');
+    body.innerHTML = `
+      <div class="form-row">
+        <label class="form-label">Upload receipt image</label>
+        <input type="file" id="mr-file" accept="image/*" class="form-input" />
+      </div>`;
+    const modal = UI.modal({
+      title: "Mark Received",
+      body,
+      primary: { label: "Save", action: async () => {
+        const inp = body.querySelector('#mr-file');
+        const file = inp && inp.files && inp.files[0];
+        if (!file) { UI.toast({ type:'error', title:'Missing image', message:'Please choose an image.' }); return; }
+        const dataUrl = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.onerror = reject;
+          fr.readAsDataURL(file);
+        });
+        try {
+          const resp = await fetch('/api/orders/assigned/mark-received', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderIds, filename: file.name, dataUrl })
+          });
+          const json = await resp.json();
+          if (!resp.ok || !json.success) throw new Error(json.error || 'Failed');
+          UI.toast({ type:'success', title:'Saved', message:'Receipt stored and order marked as Received.' });
+          modal.close();
+          if (typeof reloadAssigned === 'function') reloadAssigned();
+          else location.reload();
+        } catch (e) {
+          UI.toast({ type:'error', title:'Error', message:String(e.message||e) });
+        }
+      }},
+      secondary: { label: "Cancel" }
+    });
+    return;
+  } else {
+    alert("Please choose an image to upload in the upcoming file dialog.");
+  }
+}
+
+// Delegate clicks for Mark Received
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action="mark-prepared"], [data-action="mark-received"]');
+  if (!btn) return;
+  const idsAttr = btn.getAttribute('data-ids') || btn.getAttribute('data-order-id');
+  if (!idsAttr) return;
+  const orderIds = idsAttr.split(',').map(s => s.trim()).filter(Boolean);
+  e.preventDefault();
+  openMarkReceivedModal(orderIds);
+});
+
+
 // public/js/assigned-orders.js
 document.addEventListener('DOMContentLoaded', () => {
   const grid   = document.getElementById('assigned-grid');
@@ -124,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
             <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="prepared-order" data-ids="${idsAttr}" ${aria}>
-              <i data-feather="check-square"></i><span>Mark Prepared</span>
+              <i data-feather="check-square"></i><span>Mark Received</span>
             </button>
             <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
               <i data-feather="download-cloud"></i><span>Download</span>
@@ -267,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       console.error(e);
       if (!silent) toast({ type: 'error', title: 'Error', message: e.message || 'Error' });
-      else toast({ type: 'error', title: 'Error', message: e.message || 'Failed to mark prepared' });
+      else toast({ type: 'error', title: 'Error', message: e.message || 'Failed to Mark Received' });
     } finally {
       if (btn) setBusy(btn, false);
     }
