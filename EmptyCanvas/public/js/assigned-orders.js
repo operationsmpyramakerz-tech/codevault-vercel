@@ -1,4 +1,4 @@
-// === Mark Received flow with image upload -> server -> Blob -> Notion ===
+// === Mark Received flow with image upload -> server -> Notion ===
 function openMarkReceivedModal(orderIds) {
   if (window.UI && typeof UI.modal === 'function') {
     const body = document.createElement('div');
@@ -42,7 +42,7 @@ function openMarkReceivedModal(orderIds) {
   }
 }
 
-// === Delegate clicks for Mark Received buttons (only outside the Missing tab) ===
+// === Delegate clicks for Mark Received buttons (only outside the Missing/Prepared rules) ===
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action="mark-prepared"], [data-action="mark-received"]');
   if (!btn) return;
@@ -157,9 +157,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!list.length) { empty.style.display = ''; return; }
     empty.style.display = 'none';
 
-    const isMissingTab  = currentFilter === 'missing';
-    const isPreparedTab = currentFilter === 'prepared';
-    const showRowActions = !isPreparedTab; // HIDE row actions in Prepared tab ONLY
+    const isMissingTab   = currentFilter === 'missing';
+    const isPreparedTab  = currentFilter === 'prepared';
+    const showRowActions = !isPreparedTab;          // إخفاء أزرار الصفوف داخل تبويب Prepared
+    const showHeadActions = !isPreparedTab;         // إخفاء زراري Mark Received & Download في Prepared فقط
 
     for (const g of list) {
       const card = document.createElement('div');
@@ -171,8 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const softDisabled = g.miss > 0 ? ' is-disabled' : '';
       const aria = g.miss > 0 ? 'aria-disabled="true"' : '';
 
-      // If we're in Missing tab: show "Mark Prepared" with data-action=prepared-order
-      // Else (Total/Prepared): show "Mark Received" with data-action=mark-received (opens upload modal)
+      // Missing tab -> "Mark Prepared" (بدون رفع صورة)
+      // غير ذلك -> Mark Received (مع نافذة رفع الصورة)
       const actionAttr = isMissingTab ? 'prepared-order' : 'mark-received';
       const btnLabel   = isMissingTab ? 'Mark Prepared' : 'Mark Received';
 
@@ -188,12 +189,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="${actionAttr}" data-ids="${idsAttr}" ${aria}>
-              <i data-feather="check-square"></i><span>${btnLabel}</span>
-            </button>
-            <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
-              <i data-feather="download-cloud"></i><span>Download</span>
-            </button>
+            ${ showHeadActions ? `
+              <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="${actionAttr}" data-ids="${idsAttr}" ${aria}>
+                <i data-feather="check-square"></i><span>${btnLabel}</span>
+              </button>
+              <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
+                <i data-feather="download-cloud"></i><span>Download</span>
+              </button>
+            ` : ``}
           </div>
         </div>
         <div class="order-card__items">
@@ -503,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(close, duration);
   }
 
-  // --- Active stat helper (keep URL sync if you use ?tab=...) ---
+  // --- Active stat helper (keeps URL ?tab= sync) ---
   (function(){
     function setActiveStatFromParam(){
       var params = new URLSearchParams(location.search);
