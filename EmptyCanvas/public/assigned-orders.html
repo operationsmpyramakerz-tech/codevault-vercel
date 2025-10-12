@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -7,6 +6,18 @@
 <title>Storage</title>
 <link href="/css/style.css" rel="stylesheet"/>
 <script src="https://unpkg.com/feather-icons"></script>
+<style>
+  /* Selected shadow for the top 3 stat buttons (matches app's soft card shadow) */
+  .stat.stat--btn.active {
+    box-shadow: 0 6px 18px rgba(2, 16, 28, 0.08), 0 2px 6px rgba(2, 16, 28, 0.06);
+    border-color: rgba(2, 16, 28, 0.08);
+  }
+  /* Keep keyboard focus visible too */
+  .stat.stat--btn:focus-visible {
+    outline: 3px solid rgba(2, 125, 255, 0.4);
+    outline-offset: 2px;
+  }
+</style>
 </head>
 <body>
 <script>
@@ -138,5 +149,32 @@
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/assigned-orders.js"></script>
+<script>
+  // Keep the selected shadow in sync with the current filter
+  (function () {
+    const bar = document.querySelector('.stats');
+    if (!bar) return;
+
+    function setActive(btn) {
+      // toggle aria-pressed and .active on the three buttons
+      bar.querySelectorAll('.stat--btn').forEach(b => {
+        const isActive = b === btn;
+        b.setAttribute('aria-pressed', String(isActive));
+        b.classList.toggle('active', isActive);
+      });
+    }
+
+    // initialize from any aria-pressed=true
+    const initiallyPressed = bar.querySelector('.stat--btn[aria-pressed="true"]');
+    if (initiallyPressed) setActive(initiallyPressed);
+
+    bar.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.stat--btn');
+      if (!btn) return;
+      setActive(btn);
+      // let assigned-orders.js handle the actual filtering logic
+    });
+  })();
+</script>
 </body>
 </html>
