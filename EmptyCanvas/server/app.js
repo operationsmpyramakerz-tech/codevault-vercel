@@ -977,7 +977,7 @@ app.post("/api/orders/assigned/mark-received", requireAuth, requirePage("Assigne
       await Promise.all(orderIds.map((id) =>
         notion.pages.update({
           page_id: id,
-          properties: { [statusProp]: { select: { name: "Received" } } }
+          properties: { [statusProp]: { select: { name: "Received by operations" } } }
         })
       ));
     }
