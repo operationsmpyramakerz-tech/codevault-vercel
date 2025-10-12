@@ -161,6 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const isPreparedTab = currentFilter === 'prepared';
     const showRowActions = !isPreparedTab; // HIDE row actions in Prepared tab ONLY
 
+    const isPreparedTab = currentFilter === 'prepared';
+    const showRowActions = !isPreparedTab; // HIDE row actions in Prepared tab ONLY
+
     for (const g of list) {
       const card = document.createElement('div');
       card.className = 'order-card';
@@ -188,12 +191,13 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
+            ${ !isPreparedTab ? `
             <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="${actionAttr}" data-ids="${idsAttr}" ${aria}>
               <i data-feather="check-square"></i><span>${btnLabel}</span>
             </button>
             <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
               <i data-feather="download-cloud"></i><span>Download</span>
-            </button>
+            </button>` : `` }
           </div>
         </div>
         <div class="order-card__items">
