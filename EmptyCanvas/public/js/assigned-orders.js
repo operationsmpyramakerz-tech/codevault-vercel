@@ -1,4 +1,3 @@
-
 // === Mark Received flow with image upload -> server -> Blob -> Notion ===
 function openMarkReceivedModal(orderIds) {
   if (window.UI && typeof UI.modal === 'function') {
@@ -43,7 +42,7 @@ function openMarkReceivedModal(orderIds) {
   }
 }
 
-// Delegate clicks for Mark Received
+// === Delegate clicks for Mark Received buttons (only outside the Missing tab) ===
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-action="mark-prepared"], [data-action="mark-received"]');
   if (!btn) return;
@@ -55,7 +54,7 @@ document.addEventListener('click', (e) => {
 });
 
 
-// public/js/assigned-orders.js
+// === public/js/assigned-orders.js ===
 document.addEventListener('DOMContentLoaded', () => {
   const grid   = document.getElementById('assigned-grid');
   const empty  = document.getElementById('assigned-empty');
@@ -110,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return arr;
   }
 
-  // === المهم هنا: prepared لازم يكون miss=0 وكمان كل الـstatus=Prepared
+  // prepared = (no missing) AND (every item.status === 'Prepared')
   function recomputeGroupStats(g) {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining) === 0).length;
@@ -158,6 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!list.length) { empty.style.display = ''; return; }
     empty.style.display = 'none';
 
+    const isMissingTab = currentFilter === 'missing';
+
     for (const g of list) {
       const card = document.createElement('div');
       card.className = 'order-card';
@@ -167,6 +168,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const idsAttr = g.items.map(x => x.id).join(',');
       const softDisabled = g.miss > 0 ? ' is-disabled' : '';
       const aria = g.miss > 0 ? 'aria-disabled="true"' : '';
+
+      // If we're in Missing tab: show "Mark Prepared" with data-action=prepared-order
+      // Else (Total/Prepared): show "Mark Received" with data-action=mark-received (opens upload modal)
+      const actionAttr = isMissingTab ? 'prepared-order' : 'mark-received';
+      const btnLabel   = isMissingTab ? 'Mark Prepared' : 'Mark Received';
 
       card.innerHTML = `
         <div class="order-card__head">
@@ -180,8 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="prepared-order" data-ids="${idsAttr}" ${aria}>
-              <i data-feather="check-square"></i><span>Mark Received</span>
+            <button class="btn btn-3d btn-3d-blue btn-icon${softDisabled}" data-action="${actionAttr}" data-ids="${idsAttr}" ${aria}>
+              <i data-feather="check-square"></i><span>${btnLabel}</span>
             </button>
             <button class="btn btn-3d btn-3d-blue btn-icon" data-action="pdf" data-ids="${idsAttr}">
               <i data-feather="download-cloud"></i><span>Download</span>
@@ -230,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Missing tab -> data-action="prepared-order" (no upload modal)
     if (action === 'prepared-order') {
       const card = btn.closest('.order-card');
       const miss = Number(card?.dataset?.miss || '0');
@@ -409,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // النقطة التانية المهمة: لو كنت على prepared وحصل Missing > 0، نحول تلقائيًا لـ Missing
+  // If user is on Prepared tab and an edit causes Missing > 0, auto-switch to Missing
   function applyRowUpdate(id, available, remaining) {
     const it = itemById.get(id);
     if (it) { it.available = Number(available); it.remaining = Number(remaining); }
@@ -441,19 +448,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function downloadOrderPDF(ids, btn) {
-  try {
-    setBusy(btn, true);
-    // لو المستخدم حالياً على تبويب Fully available نطلع "Receipt"
-    const endpoint = (currentFilter === 'prepared')
-      ? '/api/orders/assigned/receipt'
-      : '/api/orders/assigned/pdf'; // النواقص في باقي الحالات
-
-    const url = endpoint + '?ids=' + encodeURIComponent(ids.join(','));
-    window.open(url, '_blank');
-  } finally {
-    setTimeout(() => setBusy(btn, false), 500);
+    try {
+      setBusy(btn, true);
+      const endpoint = (currentFilter === 'prepared')
+        ? '/api/orders/assigned/receipt'
+        : '/api/orders/assigned/pdf';
+      const url = endpoint + '?ids=' + encodeURIComponent(ids.join(','));
+      window.open(url, '_blank');
+    } finally {
+      setTimeout(() => setBusy(btn, false), 500);
+    }
   }
-}
   function setBusy(btn, busy) {
     if (!btn) return;
     btn.classList.toggle('is-busy', !!busy);
@@ -495,33 +500,24 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(close, duration);
   }
 
+  // --- Active stat helper (keep URL sync if you use ?tab=...) ---
+  (function(){
+    function setActiveStatFromParam(){
+      var params = new URLSearchParams(location.search);
+      var tab = (params.get('tab')||'').toLowerCase();
+      if (tab === 'prepared') currentFilter = 'prepared';
+      else if (tab === 'missing') currentFilter = 'missing';
+      else currentFilter = 'all';
+      [btnAll, btnPrepared, btnMissing].forEach(b => {
+        const active = b?.dataset?.filter === currentFilter;
+        if (!b) return;
+        b.classList.toggle('active', !!active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+    setActiveStatFromParam();
+    window.addEventListener('storage:stats:rerender', setActiveStatFromParam);
+  })();
+
   load();
 });
-
-// --- Active stat helper (added) ---
-(function(){
-  function setActiveStatFromParam(){
-    var params = new URLSearchParams(location.search);
-    var tab = (params.get('tab')||'').toLowerCase();
-    var active =
-      tab.indexOf('fully')>-1 ? 'fully' :
-      tab.indexOf('missing')>-1 ? 'missing' : 'total';
-    try {
-      document.querySelectorAll('.stat.stat--btn, .stat--btn').forEach(function(el){
-        el.classList.remove('active');
-        el.setAttribute('aria-pressed','false');
-      });
-      var map = {
-        total: document.querySelector('.stat--btn[data-kind="total"]'),
-        fully: document.querySelector('.stat--btn[data-kind="fully"]'),
-        missing: document.querySelector('.stat--btn[data-kind="missing"]')
-      };
-      if(map[active]){
-        map[active].classList.add('active');
-        map[active].setAttribute('aria-pressed','true');
-      }
-    } catch(e){ /* no-op */ }
-  }
-  document.addEventListener('DOMContentLoaded', setActiveStatFromParam);
-  window.addEventListener('storage:stats:rerender', setActiveStatFromParam);
-})();
