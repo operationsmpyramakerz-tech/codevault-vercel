@@ -1,61 +1,8 @@
-// === Mark Received flow with image upload -> server -> Blob -> Notion ===
-function openMarkReceivedModal(orderIds) {
-  if (window.UI && typeof UI.modal === 'function') {
-    const body = document.createElement('div');
-    body.innerHTML = `
-      <div class="form-row">
-        <label class="form-label">Upload receipt image</label>
-        <input type="file" id="mr-file" accept="image/*" class="form-input" />
-      </div>`;
-    const modal = UI.modal({
-      title: "Mark Received",
-      body,
-      primary: { label: "Save", action: async () => {
-        const inp = body.querySelector('#mr-file');
-        const file = inp?.files?.[0];
-        if (!file) { UI.toast({ type:'error', title:'Missing image', message:'Please choose an image.' }); return; }
-        const dataUrl = await new Promise((resolve, reject) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(fr.result);
-          fr.onerror = reject;
-          fr.readAsDataURL(file);
-        });
-        try {
-          const resp = await fetch('/api/orders/assigned/mark-received', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderIds, filename: file.name, dataUrl })
-          });
-          const json = await resp.json();
-          if (!resp.ok || !json.success) throw new Error(json.error || 'Failed');
-          UI.toast({ type:'success', title:'Saved', message:'Receipt saved to Notion.' });
-          modal.close();
-          if (typeof reloadAssigned === 'function') reloadAssigned();
-          else location.reload();
-        } catch (e) {
-          UI.toast({ type:'error', title:'Error', message:String(e.message||e) });
-        }
-      }},
-      secondary: { label: "Cancel" }
-    });
-    return;
-  }
-}
+// === assigned-orders.js (FULL) ===
+// يدير تبويبات Storage + عرض الطلبات + Mark Prepared/Received + رفع إيصال الاستلام
 
-// === Delegate clicks for Mark Received buttons (only outside the Missing tab) ===
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-action="mark-prepared"], [data-action="mark-received"]');
-  if (!btn) return;
-  const idsAttr = btn.getAttribute('data-ids') || btn.getAttribute('data-order-id');
-  if (!idsAttr) return;
-  const orderIds = idsAttr.split(',').map(s => s.trim()).filter(Boolean);
-  e.preventDefault();
-  openMarkReceivedModal(orderIds);
-});
-
-
-// === public/js/assigned-orders.js ===
 document.addEventListener('DOMContentLoaded', () => {
+  // عناصر الصفحة
   const grid   = document.getElementById('assigned-grid');
   const empty  = document.getElementById('assigned-empty');
 
@@ -67,18 +14,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnPrepared = document.getElementById('st-btn-full');
   const btnMissing  = document.getElementById('st-btn-missing');
 
+  // Popover (partial)
   const popover      = document.getElementById('partial-popover');
   const popInput     = document.getElementById('popover-input');
   const popHint      = document.getElementById('popover-hint');
-  const popBtnSave   = popover.querySelector('[data-pop="save"]');
-  const popBtnCancel = popover.querySelector('[data-pop="cancel"]');
+  const popBtnSave   = popover?.querySelector('[data-pop="save"]');
+  const popBtnCancel = popover?.querySelector('[data-pop="cancel"]');
 
+  // Modal (Mark Received)
+  const receiptModal      = document.getElementById('receipt-modal');
+  const receiptCloseBtn   = document.getElementById('receipt-modal-close');
+  const receiptForm       = document.getElementById('receipt-form');
+  const receiptOrderInput = document.getElementById('receipt-order-id');
+  const receiptOrderTitle = document.getElementById('receipt-order-title');
+  const receiptFileInput  = document.getElementById('receipt-file');
+  const receiptAlert      = document.getElementById('receipt-alert');
+  const receiptCancel     = document.getElementById('receipt-cancel');
+  const receiptSubmit     = document.getElementById('receipt-submit');
+
+  // حالة داخلية
   let items = [];
   let groups = [];
   let currentFilter = 'all';
   const itemById = new Map();
   let currentEdit = null;
 
+  // أدوات مساعدة
   const fmt = (n) => String(Number(n || 0));
   const esc = (s) =>
     String(s || '').replace(/[&<>"']/g, (c) =>
@@ -135,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderGroups(view);
   }
 
+  // تحميل البيانات
   async function load() {
     try {
       const res = await fetch('/api/orders/assigned', { cache: 'no-store', credentials: 'same-origin' });
@@ -152,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // رسم المجموعات والكروت
   function renderGroups(list) {
     grid.innerHTML = '';
     if (!list.length) { empty.style.display = ''; return; }
@@ -159,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isMissingTab  = currentFilter === 'missing';
     const isPreparedTab = currentFilter === 'prepared';
-    const showRowActions = !isPreparedTab; // HIDE row actions in Prepared tab ONLY
+    const showRowActions = !isPreparedTab; // إخفاء أزرار العناصر الداخلية في تبويب Fully available فقط
 
     for (const g of list) {
       const card = document.createElement('div');
@@ -171,8 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const softDisabled = g.miss > 0 ? ' is-disabled' : '';
       const aria = g.miss > 0 ? 'aria-disabled="true"' : '';
 
-      // If we're in Missing tab: show "Mark Prepared" with data-action=prepared-order
-      // Else (Total/Prepared): show "Mark Received" with data-action=mark-received (opens upload modal)
+      // Missing => Mark Prepared  |  Prepared/Total => Mark Received (يرفع صورة)
       const actionAttr = isMissingTab ? 'prepared-order' : 'mark-received';
       const btnLabel   = isMissingTab ? 'Mark Prepared' : 'Mark Received';
 
@@ -228,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.feather) feather.replace({ 'stroke-width': 2 });
   }
 
+  // أحداث على الجريد (أزرار الكروت)
   grid.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
@@ -239,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Missing tab -> data-action="prepared-order" (no upload modal)
+    // Missing => mark prepared (من غير رفع صورة)
     if (action === 'prepared-order') {
       const card = btn.closest('.order-card');
       const miss = Number(card?.dataset?.miss || '0');
@@ -255,11 +218,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return;
       }
-
       if (ids.length) markOrderPrepared(ids, btn);
       return;
     }
 
+    // Prepared/Total => mark received (يرفع صورة)
+    if (action === 'mark-received') {
+      const ids = (btn.getAttribute('data-ids') || '').split(',').filter(Boolean);
+      if (ids.length) openMarkReceivedModal(ids);
+      return;
+    }
+
+    // أزرار العناصر الداخلية
     const id = btn.getAttribute('data-id');
     if (!id) return;
 
@@ -270,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // تحكم التبويبات
   function setFilter(f) {
     currentFilter = f;
     [btnAll, btnPrepared, btnMissing].forEach(b => {
@@ -283,6 +254,96 @@ document.addEventListener('DOMContentLoaded', () => {
   btnPrepared?.addEventListener('click', () => setFilter('prepared'));
   btnMissing?.addEventListener('click', () => setFilter('missing'));
 
+  // ============== Mark Received: Modal + رفع الصورة ==============
+  function openMarkReceivedModal(orderIds) {
+    // حفظ الـ IDs في الداتا للأستخدام عند الإرسال
+    receiptModal.dataset.orderIds = orderIds.join(',');
+    // عنوان بسيط
+    receiptOrderTitle && (receiptOrderTitle.textContent = `Orders: ${orderIds.length}`);
+    // إعادة ضبط الحقول/الرسائل
+    if (receiptFileInput) receiptFileInput.value = '';
+    if (receiptAlert) {
+      receiptAlert.classList.add('hidden');
+      receiptAlert.classList.remove('success','error');
+      receiptAlert.textContent = '';
+    }
+    // عرض المودال
+    receiptModal?.classList.add('show');
+    receiptModal?.setAttribute('aria-hidden', 'false');
+  }
+  function closeMarkReceivedModal() {
+    receiptModal?.classList.remove('show');
+    receiptModal?.setAttribute('aria-hidden', 'true');
+  }
+  receiptCloseBtn?.addEventListener('click', closeMarkReceivedModal);
+  receiptCancel?.addEventListener('click', closeMarkReceivedModal);
+  receiptModal?.addEventListener('click', (e) => {
+    if (e.target === receiptModal) closeMarkReceivedModal();
+  });
+
+  // إرسال الصورة إلى السيرفر -> Notion
+  receiptForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const orderIds = (receiptModal.dataset.orderIds || '').split(',').filter(Boolean);
+      const file = receiptFileInput?.files?.[0];
+      if (!orderIds.length || !file) {
+        showReceiptAlert('Please choose an image.', 'error');
+        return;
+      }
+      setBusy(receiptSubmit, true);
+
+      // نقرأ الصورة Data URL ونرسل JSON (سيرفرك يدعم dataUrl سابقًا)
+      const dataUrl = await fileToDataURL(file);
+      const resp = await fetch('/api/orders/assigned/mark-received', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          orderIds,
+          filename: file.name,
+          dataUrl
+        })
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.success) throw new Error(json.error || 'Upload failed');
+
+      showReceiptAlert('Receipt saved and status updated.', 'success');
+      setTimeout(() => {
+        closeMarkReceivedModal();
+        // حدّث الحالة محليًا إلى "Received by operations"
+        orderIds.forEach(id => {
+          const it = itemById.get(id);
+          if (it) it.status = 'Received by operations';
+        });
+        groups.forEach(recomputeGroupStats);
+        updatePageStats();
+        applyFilterAndRender();
+      }, 600);
+    } catch (err) {
+      console.error(err);
+      showReceiptAlert(err.message || 'Error while uploading', 'error');
+    } finally {
+      setBusy(receiptSubmit, false);
+    }
+  });
+
+  function showReceiptAlert(msg, type) {
+    if (!receiptAlert) return;
+    receiptAlert.textContent = msg;
+    receiptAlert.classList.remove('hidden','success','error');
+    receiptAlert.classList.add(type === 'success' ? 'success' : 'error');
+  }
+  function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+  }
+
+  // ============== Partial/In-Stock/Updates ==============
   async function makeAllAvailableAndPrepare(cardEl, ids) {
     try {
       const rows = cardEl.querySelectorAll('.order-item');
@@ -334,7 +395,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {
       console.error(e);
       if (!silent) toast({ type: 'error', title: 'Error', message: e.message || 'Error' });
-      else toast({ type: 'error', title: 'Error', message: e.message || 'Failed to Mark Received' });
     } finally {
       if (btn) setBusy(btn, false);
     }
@@ -362,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showPopover(anchorBtn, item) {
+    if (!popover) return;
     currentEdit = {
       id: item.id,
       requested: Number(item.requested),
@@ -376,8 +437,9 @@ document.addEventListener('DOMContentLoaded', () => {
     popInput.focus();
     popInput.select();
   }
-  function hidePopover() { popover.classList.add('hidden'); currentEdit = null; }
+  function hidePopover() { if (popover) { popover.classList.add('hidden'); currentEdit = null; } }
   function positionPopover(anchorBtn) {
+    if (!popover) return;
     const r = anchorBtn.getBoundingClientRect();
     const pad = 8, pw = 260, ph = 130;
     let top = r.bottom + pad, left = r.left + (r.width/2) - (pw/2);
@@ -388,13 +450,13 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.assign(popover.style, { position:'fixed', top:`${top}px`, left:`${left}px` });
   }
   document.addEventListener('click', (e) => {
-    if (!currentEdit) return;
+    if (!currentEdit || !popover) return;
     if (popover.contains(e.target) || currentEdit.anchor.contains(e.target)) return;
     hidePopover();
   });
-  addEventListener('resize', () => { if (currentEdit) positionPopover(currentEdit.anchor); });
-  popBtnCancel.addEventListener('click', hidePopover);
-  popBtnSave.addEventListener('click', async () => {
+  addEventListener('resize', () => { if (currentEdit && popover) positionPopover(currentEdit.anchor); });
+  popBtnCancel?.addEventListener('click', hidePopover);
+  popBtnSave?.addEventListener('click', async () => {
     if (!currentEdit) return;
     const val = Number(popInput.value);
     if (Number.isNaN(val) || val < 0) { toast({ type:'warning', title:'Invalid value', message:'Please enter a valid number' }); return; }
@@ -419,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // If user is on Prepared tab and an edit causes Missing > 0, auto-switch to Missing
+  // تحديث صف بعد تغيير الأرقام
   function applyRowUpdate(id, available, remaining) {
     const it = itemById.get(id);
     if (it) { it.available = Number(available); it.remaining = Number(remaining); }
@@ -438,6 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     groups.forEach(recomputeGroupStats);
     updatePageStats();
 
+    // لو كنا في Prepared واتسببت التعديلات في Missing>0 انقل لمissing
     if (currentFilter === 'prepared' && it) {
       const key = groupKeyOf(it);
       const g = groups.find(x => x.key === key);
@@ -450,6 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilterAndRender();
   }
 
+  // PDF
   async function downloadOrderPDF(ids, btn) {
     try {
       setBusy(btn, true);
@@ -462,58 +526,45 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => setBusy(btn, false), 500);
     }
   }
+
+  // busy helper
   function setBusy(btn, busy) {
     if (!btn) return;
     btn.classList.toggle('is-busy', !!busy);
   }
 
+  // Toast (Fallback بسيط)
   function toast({ type='info', title='', message='', actionText='', onAction=null, duration=6000 }) {
     if (window.UI && typeof UI.toast === 'function') {
       try {
         const t = UI.toast({ type, title, message, actionText, onAction, duration });
         if (t) return;
-      } catch(e) { /* fallback */ }
+      } catch(e) { /* no-op */ }
     }
     let stack = document.getElementById('toast-stack');
     if (!stack) {
-      stack = document.createElement('div');
-      stack.id = 'toast-stack';
+      stack = document.createElement('div'); stack.id = 'toast-stack';
+      Object.assign(stack.style, { position:'fixed', right:'16px', top:'16px', zIndex:99999, display:'grid', gap:'8px' });
       document.body.appendChild(stack);
     }
     const el = document.createElement('div');
-    el.className = `toast-box toast-${type}`;
-    el.innerHTML = `
-      <div class="toast-icon">${type === 'success' ? '✓' : (type==='warning'?'!':'i')}</div>
-      <div class="toast-content">
-        ${title ? `<div class="toast-title">${esc(title)}</div>` : ''}
-        ${message ? `<div class="toast-msg">${esc(message)}</div>` : ''}
-      </div>
-      ${actionText ? `<button class="btn btn-primary btn-sm toast-action">${esc(actionText)}</button>` : ''}
-      <button class="toast-close" aria-label="Close">×</button>
-    `;
+    el.style.cssText = 'background:#111827;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.15);max-width:320px;';
+    el.innerHTML = `<div style="font-weight:700;margin-bottom:4px">${esc(title||type)}</div><div>${esc(message||'')}</div>`;
     stack.appendChild(el);
-
-    const close = () => { el.classList.add('hide'); setTimeout(()=>el.remove(), 200); };
-    el.querySelector('.toast-close').addEventListener('click', close);
-    if (actionText && typeof onAction === 'function') {
-      el.querySelector('.toast-action').addEventListener('click', async () => {
-        try { await onAction(); } finally { close(); }
-      });
-    }
-    setTimeout(close, duration);
+    setTimeout(() => el.remove(), duration);
   }
 
-  // --- Active stat helper (keep URL sync if you use ?tab=...) ---
+  // --- مزامنة التبويب مع ?tab= إن وجد ---
   (function(){
     function setActiveStatFromParam(){
-      var params = new URLSearchParams(location.search);
-      var tab = (params.get('tab')||'').toLowerCase();
-      if (tab === 'prepared') currentFilter = 'prepared';
-      else if (tab === 'missing') currentFilter = 'missing';
+      const params = new URLSearchParams(location.search);
+      const tab = (params.get('tab')||'').toLowerCase();
+      if (tab.includes('prepared') || tab.includes('fully')) currentFilter = 'prepared';
+      else if (tab.includes('missing')) currentFilter = 'missing';
       else currentFilter = 'all';
       [btnAll, btnPrepared, btnMissing].forEach(b => {
-        const active = b?.dataset?.filter === currentFilter;
         if (!b) return;
+        const active = b.dataset.filter === currentFilter;
         b.classList.toggle('active', !!active);
         b.setAttribute('aria-pressed', active ? 'true' : 'false');
       });
