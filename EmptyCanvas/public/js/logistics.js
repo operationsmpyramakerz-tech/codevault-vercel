@@ -1,11 +1,13 @@
 // EmptyCanvas/public/js/logistics.js
-// Logistics: عرض المجموعات fully prepared + تحديث كارت KPI بعنوان Fully prepared مع العدد الصحيح.
+// Logistics: تبويبات فعلية (Fully prepared / Received / Delivered)
+// + عدادات صحيحة لكل تبويب + نفس شكل كروت Storage.
 
 (function () {
   // ---------- helpers ----------
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const N  = (v) => Number.isFinite(+v) ? +v : 0;
+  const S  = (v) => String(v ?? '');
   const fmt = (v) => String(N(v));
   const esc = (s) =>
     String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -13,57 +15,28 @@
     }[c]));
 
   // ---------- DOM refs ----------
-  const searchInput =
-    $('#search') || $('#logistics-search') || $('input[type="search"]') || null;
+  const searchInput = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
+  const grid        = $('#assigned-grid') || $('#logistics-grid') || $('main');
+  const emptyMsg    = $('#assigned-empty') || $('#logistics-empty');
 
-  const grid =
-    $('#assigned-grid') ||
-    $('#logistics-grid') ||
-    $('.assigned-grid') ||
-    $('#list') ||
-    $('main');
+  // tabs & counters
+  const btnPrepared  = $('#lg-btn-prepared');
+  const btnReceived  = $('#lg-btn-received');
+  const btnDelivered = $('#lg-btn-delivered');
 
-  const emptyMsg =
-    $('#assigned-empty') ||
-    $('#logistics-empty') ||
-    (() => {
-      const d = document.createElement('div');
-      d.id = 'assigned-empty';
-      d.style.display = 'none';
-      d.textContent = 'No items.';
-      (grid?.parentElement || document.body).appendChild(d);
-      return d;
-    })();
+  const cPrepared  = $('#lg-count-prepared');
+  const cReceived  = $('#lg-count-received');
+  const cDelivered = $('#lg-count-delivered');
 
-  let allItems = [];
+  // ---------- state ----------
+  let allItems = [];       // raw items from API
+  let activeTab = (new URLSearchParams(location.search).get('tab') || 'prepared').toLowerCase();
 
-  // ---------- grouping ----------
-  const groupKeyOf = (it) => {
-    const reason  = (it.reason && String(it.reason).trim()) || 'No Reason';
-    const created = it.createdTime || it.created_time || it.created || '';
-    const bucket  = (created || '').slice(0, 10);
-    return `grp:${reason}|${bucket}`;
-  };
+  // ---------- data helpers ----------
+  const statusOf = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
+  const isReceived = (it) => statusOf(it) === 'received by operations';
+  const isDelivered = (it) => statusOf(it) === 'delivered';
 
-  function buildGroups(list) {
-    const map = new Map();
-    for (const it of list) {
-      const key = groupKeyOf(it);
-      const g = map.get(key) || {
-        key,
-        title: (it.reason && String(it.reason).trim()) || 'No Reason',
-        subtitle: new Date(it.createdTime || Date.now()).toLocaleString(),
-        items: []
-      };
-      g.items.push(normalizeItem(it));
-      map.set(key, g);
-    }
-    const arr = [...map.values()];
-    arr.forEach(recomputeGroupStats);
-    return arr;
-  }
-
-  // توحيد الحقول + حساب remaining
   function normalizeItem(it) {
     const req   = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
@@ -71,17 +44,47 @@
     rem = (rem == null ? Math.max(0, req - avail) : N(rem));
     return {
       id: it.id,
-      productName: it.productName ?? it.product_name ?? '',
+      reason: S(it.reason || ''),
+      created: S(it.createdTime || it.created_time || it.created || ''),
+      productName: S(it.productName ?? it.product_name ?? ''),
       requested: req,
       available: avail,
       remaining: rem,
+      status: statusOf(it)
     };
+  }
+
+  const groupKeyOf = (it) => {
+    const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
+    const day    = (it.created || '').slice(0,10);
+    return `grp:${reason}|${day}`;
+  };
+
+  function buildGroups(list) {
+    const map = new Map();
+    for (const raw of list) {
+      const it = normalizeItem(raw);
+      const key = groupKeyOf(it);
+      const g = map.get(key) || {
+        key,
+        title: it.reason || 'No Reason',
+        subtitle: new Date(it.created || Date.now()).toLocaleString(),
+        items: []
+      };
+      g.items.push(it);
+      map.set(key, g);
+    }
+    const arr = [...map.values()];
+    arr.forEach(recomputeGroupStats);
+    return arr;
   }
 
   function recomputeGroupStats(g) {
     g.total = g.items.length;
     g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-    g.prepared = g.items.every(x => N(x.remaining) === 0);
+    g.allPrepared = g.items.every(x => N(x.remaining) === 0);
+    g.anyReceived = g.items.some(isReceived);
+    g.anyDelivered= g.items.some(isDelivered);
   }
 
   // ---------- API ----------
@@ -95,78 +98,84 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- تحديث KPI أعلى الصفحة ----------
-  function updatePreparedKPI(preparedCount) {
-    const kpiRow =
-      $('.summary') ||
-      $('.stats') ||
-      $('.summary-cards') ||
-      $('.header-cards') ||
-      $('.cards-row') ||
-      (grid ? grid.previousElementSibling : null);
+  // ---------- counters ----------
+  function setCounter(el, val){ if (el) el.textContent = fmt(val); }
 
-    if (!kpiRow) return;
+  function updateAllCounters(groupsPrepared, groupsReceived, groupsDelivered) {
+    setCounter(cPrepared, groupsPrepared.length);
+    setCounter(cReceived, groupsReceived.length);
+    setCounter(cDelivered, groupsDelivered.length);
+  }
 
-    // ابحث عن كرت "Prepared" وعدّل عليه
-    const candidates = $$('.card, .stat, .kpi-card, .summary-card, .kpi, .box, div', kpiRow);
-    let preparedCard = null, preparedLabelNode = null;
-    for (const el of candidates) {
-      const label = Array.from(el.querySelectorAll('*')).find(x =>
-        /prepared/i.test((x.textContent || '').trim())
-      );
-      if (label) {
-        let cur = label;
-        while (cur && cur !== el && cur !== kpiRow) {
-          if (cur.classList && /card|stat|kpi/i.test(cur.className)) {
-            preparedCard = cur; preparedLabelNode = label; break;
-          }
-          cur = cur.parentElement;
-        }
-      }
-      if (preparedCard) break;
-    }
-    if (!preparedCard) return;
+  // ---------- UI tabs ----------
+  function setActiveTab(tab){
+    activeTab = tab;
+    // toggle aria + class
+    [
+      [btnPrepared , 'prepared'],
+      [btnReceived , 'received'],
+      [btnDelivered, 'delivered']
+    ].forEach(([b, t])=>{
+      if(!b) return;
+      const on = (t === tab);
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
 
-    if (preparedLabelNode) preparedLabelNode.textContent = 'Fully prepared';
-
-    // حدّث قيمة العداد
-    let valueNode =
-      preparedCard.querySelector('.value, .count, .num, .kpi-value, .stat-value, strong, b, .digit');
-
-    if (!valueNode) {
-      const texts = preparedCard.querySelectorAll('*');
-      for (const t of texts) {
-        if (/^\d+$/.test((t.textContent || '').trim())) { valueNode = t; break; }
-      }
-    }
-    if (valueNode) valueNode.textContent = fmt(preparedCount);
+    const url = new URL(location.href);
+    url.searchParams.set('tab', tab);
+    history.replaceState({}, '', url);
   }
 
   // ---------- render ----------
-  function render(list) {
+  function render() {
     if (!grid) return;
     grid.innerHTML = '';
 
     const q = (searchInput?.value || '').trim().toLowerCase();
-    const filtered = q
-      ? list.filter(x =>
-          (x.reason || '').toLowerCase().includes(q) ||
-          (x.productName || x.product_name || '').toLowerCase().includes(q)
+
+    // build & split groups
+    const groupsAll = buildGroups(allItems);
+
+    const groupsPrepared = groupsAll.filter(g => g.allPrepared);
+    const groupsReceived = groupsAll.map(g => ({
+      ...g,
+      items: g.items.filter(isReceived)
+    })).filter(g => g.items.length);
+    const groupsDelivered = groupsAll.map(g => ({
+      ...g,
+      items: g.items.filter(isDelivered)
+    })).filter(g => g.items.length);
+
+    // search filter inside each set
+    const filterByQuery = (gs) => {
+      if(!q) return gs;
+      return gs.map(g => ({
+        ...g,
+        items: g.items.filter(it =>
+          it.productName.toLowerCase().includes(q) ||
+          (g.title || '').toLowerCase().includes(q)
         )
-      : list;
+      })).filter(g => g.items.length);
+    };
 
-    // جهّز المجموعات واختر فقط fully prepared
-    const groupsAll = buildGroups(filtered);
-    const groups    = groupsAll.filter(g => g.prepared);
+    const viewSets = {
+      prepared : filterByQuery(groupsPrepared),
+      received : filterByQuery(groupsReceived),
+      delivered: filterByQuery(groupsDelivered)
+    };
 
-    if (!groups.length) {
-      emptyMsg.style.display = '';
-      updatePreparedKPI(0);
+    // counters top
+    updateAllCounters(groupsPrepared, groupsReceived, groupsDelivered);
+
+    const view = viewSets[activeTab] || [];
+    if (!view.length) {
+      if (emptyMsg) emptyMsg.style.display = '';
       return;
     }
-    emptyMsg.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = 'none';
 
-    for (const g of groups) {
+    for (const g of view) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
@@ -182,8 +191,8 @@
             </div>
           </div>
           <div class="order-card__right">
-            <span class="badge badge--count">Items: ${fmt(g.total)}</span>
-            <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
+            <span class="badge badge--count">Items: ${fmt(g.items.length)}</span>
+            <span class="badge badge--missing">Missing: ${fmt(g.items.filter(x=>N(x.remaining)>0).length)}</span>
           </div>
         </div>
 
@@ -209,26 +218,36 @@
       grid.appendChild(card);
     }
 
-    if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
-
-    // العداد = عدد المجموعات fully prepared المعروضة
-    const preparedCount = groups.length;
-    updatePreparedKPI(preparedCount);
+    window.feather?.replace?.({ 'stroke-width': 2 });
   }
 
   // ---------- init ----------
   async function load() {
     try {
-      allItems = await fetchAssigned();
-      render(allItems);
+      const raw = await fetchAssigned();
+      allItems = raw;
+      render();
     } catch (e) {
       console.error(e);
       if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
-      updatePreparedKPI(0);
+      [cPrepared,cReceived,cDelivered].forEach(el => el && (el.textContent='0'));
     }
   }
 
-  searchInput && searchInput.addEventListener('input', () => render(allItems));
+  // wire up tabs
+  [[btnPrepared,'prepared'],[btnReceived,'received'],[btnDelivered,'delivered']]
+    .forEach(([btn,tab])=>{
+      btn && btn.addEventListener('click', ()=>{
+        setActiveTab(tab);
+        render();
+      });
+    });
+
+  // activate initial tab from URL (prepared/received/delivered)
+  setActiveTab(activeTab);
+
+  // search
+  searchInput && searchInput.addEventListener('input', render);
 
   load();
 })();
