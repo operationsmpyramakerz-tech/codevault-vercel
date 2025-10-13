@@ -1,8 +1,12 @@
 // EmptyCanvas/public/js/logistics.js
 // Logistics: تبويبات فعلية (Fully prepared / Received / Delivered)
 // + عدادات صحيحة لكل تبويب + نفس شكل كروت Storage.
+// + زر "Mark Received" لكل كارت في تبويب Fully prepared يحوّل الحالة إلى "Received by operations".
 
 (function () {
+  // ---------- config ----------
+  const MARK_RECEIVED_URL = '/api/logistics/mark-received'; // غيّره لو مسارك مختلف
+
   // ---------- helpers ----------
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -14,6 +18,20 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
 
+  async function postJSON(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify(body || {})
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(()=>'');
+      throw new Error(`POST ${url} failed: ${res.status} ${t}`);
+    }
+    try { return await res.json(); } catch { return {}; }
+  }
+
   // ---------- DOM refs ----------
   const searchInput = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
   const grid        = $('#assigned-grid') || $('#logistics-grid') || $('main');
@@ -24,9 +42,9 @@
   const btnReceived  = $('#lg-btn-received');
   const btnDelivered = $('#lg-btn-delivered');
 
-  const cPrepared  = $('#lg-count-prepared');
-  const cReceived  = $('#lg-count-received');
-  const cDelivered = $('#lg-count-delivered');
+  const cPrepared  = $('#lg-count-prepared') || $('#lg-prepared');
+  const cReceived  = $('#lg-count-received') || $('#lg-received');
+  const cDelivered = $('#lg-count-delivered') || $('#lg-delivered');
 
   // ---------- state ----------
   let allItems = [];       // raw items from API
@@ -34,7 +52,7 @@
 
   // ---------- data helpers ----------
   const statusOf = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
-  const isReceived = (it) => statusOf(it) === 'received by operations';
+  const isReceived  = (it) => statusOf(it) === 'received by operations';
   const isDelivered = (it) => statusOf(it) === 'delivered';
 
   function normalizeItem(it) {
@@ -82,7 +100,7 @@
   function recomputeGroupStats(g) {
     g.total = g.items.length;
     g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-    g.allPrepared = g.items.every(x => N(x.remaining) === 0);
+    g.allPrepared = g.items.every(x => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x));
     g.anyReceived = g.items.some(isReceived);
     g.anyDelivered= g.items.some(isDelivered);
   }
@@ -110,7 +128,6 @@
   // ---------- UI tabs ----------
   function setActiveTab(tab){
     activeTab = tab;
-    // toggle aria + class
     [
       [btnPrepared , 'prepared'],
       [btnReceived , 'received'],
@@ -125,6 +142,39 @@
     const url = new URL(location.href);
     url.searchParams.set('tab', tab);
     history.replaceState({}, '', url);
+  }
+
+  // ---------- actions ----------
+  async function markGroupReceived(group, buttonEl){
+    try {
+      if (buttonEl) {
+        buttonEl.disabled = true;
+        buttonEl.textContent = 'Saving...';
+      }
+      const ids = group.items.map(i => i.id).filter(Boolean);
+      if (!ids.length) return;
+
+      await postJSON(MARK_RECEIVED_URL, {
+        itemIds: ids,
+        status: 'Received by operations'
+      });
+
+      // locally flip status then re-render
+      allItems = allItems.map(r => {
+        if (ids.includes(r.id)) {
+          return { ...r, operationsStatus: 'Received by operations', status: 'Received by operations' };
+        }
+        return r;
+      });
+      render();
+    } catch (e) {
+      console.error(e);
+      if (buttonEl) {
+        buttonEl.disabled = false;
+        buttonEl.textContent = 'Mark Received';
+      }
+      alert('Failed to mark as received. Please try again.');
+    }
   }
 
   // ---------- render ----------
@@ -181,6 +231,11 @@
       card.dataset.key = g.key;
       card.dataset.miss = String(g.miss);
 
+      // actions area: نظهر زر Mark Received في تبويب fully prepared فقط
+      const actionsHTML = (activeTab === 'prepared')
+        ? `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`
+        : ``;
+
       card.innerHTML = `
         <div class="order-card__head">
           <div class="order-card__title">
@@ -193,6 +248,7 @@
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.items.length)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.items.filter(x=>N(x.remaining)>0).length)}</span>
+            ${actionsHTML}
           </div>
         </div>
 
@@ -215,6 +271,13 @@
           `).join('')}
         </div>
       `;
+
+      // wire button if exists
+      const btn = card.querySelector('[data-act="mark-received"]');
+      if (btn) {
+        btn.addEventListener('click', () => markGroupReceived(g, btn));
+      }
+
       grid.appendChild(card);
     }
 
