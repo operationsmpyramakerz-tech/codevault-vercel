@@ -2205,3 +2205,93 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 .form-label { font-size: 12px; color:#6b7280; }
 .form-input { display:block; width:100%; border:1px solid #e5e7eb; border-radius: 10px; padding: 10px; }
 .loading-skeleton { opacity: .6; pointer-events: none; }
+/* === Logistics => look exactly like Storage cards === */
+#logistics-list .order-card{
+  background:#fff;
+  border:1px solid #eef0f3;
+  border-radius:18px;
+  box-shadow:0 2px 12px rgba(17,24,39,0.04);
+  overflow:hidden;
+}
+
+/* header = نفس رأس كارت Storage */
+#logistics-list .order-card__head{
+  display:grid;
+  grid-template-columns: 1fr auto 1fr;   /* left | center title | right badges */
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  border-bottom:1px solid #f2f4f7;
+  background:#fff;
+}
+#logistics-list .order-card__title{           /* left side (اسم الأوردر/أيقونة) */
+  display:flex; align-items:center; gap:8px;
+  color:#6b7280; font-weight:600;
+}
+#logistics-list .order-card__title-text{
+  display:flex; flex-direction:column;
+}
+#logistics-list .order-card__title-main{      /* عنوان الأوردر */
+  font-weight:700; color:#111827; font-size:16px;
+}
+#logistics-list .order-card__subtitle{        /* التاريخ */
+  font-size:12px; color:#6b7280;
+}
+
+/* يمين الهيدر: البادچات */
+#logistics-list .order-card__right{
+  display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;
+}
+
+/* جسم الكارت = سطور شبيهة بـ storage-row */
+#logistics-list .order-card__items{
+  padding:6px 10px 12px 10px;
+  display:grid; gap:0;              /* الفواصل dashed بدل مسافات كبيرة */
+}
+#logistics-list .order-card__items .order-item{
+  display:grid;
+  grid-template-columns: 1fr auto;  /* الاسم والمقاييس | الأكشنات/البادچات */
+  gap:8px;
+  padding:10px;
+  border:0;                         /* نشيل البوردر القديم */
+  border-radius:12px;
+}
+#logistics-list .order-card__items .order-item:not(:last-child){
+  border-bottom:1px dashed #eef2f7; /* نفس الـ dashed separator */
+}
+
+/* الاسم + المقاييس */
+#logistics-list .order-item .item-left .item-name{
+  font-size:14px; font-weight:700; color:#111827;
+}
+#logistics-list .order-item .item-mid{
+  display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; color:#374151;
+}
+#logistics-list .order-item .item-mid .num strong{ font-weight:800; }
+
+/* البادچات/الحالة يمين السطر */
+#logistics-list .order-item .item-actions{
+  display:flex; align-items:center; gap:10px;
+}
+
+/* شكل البادچات شبه Storage */
+#logistics-list .badge,
+#logistics-list .pill{
+  display:inline-flex; align-items:center; height:28px;
+  padding:0 10px; border-radius:999px; font-weight:700; font-size:12px;
+  border:1px solid transparent;
+}
+#logistics-list .badge--count{ background:#f3f4f6; color:#111827; border-color:#e5e7eb; }
+#logistics-list .badge--missing{ background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+#logistics-list .pill--success{ background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+#logistics-list .pill--danger { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+#logistics-list .pill--muted  { background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; }
+
+/* نلطف أزرار اللوجستكس لو لسه ظاهرة في تبويبات تانية */
+#logistics-list .btn, 
+#logistics-list .receive-btn{
+  border:1px solid #E5E7EB; background:#fff; color:#111827;
+  font-weight:700; padding:.55rem .9rem; border-radius:10px;
+  box-shadow:0 1px 2px rgba(0,0,0,.06);
+}
+#logistics-list .btn:hover{ background:#F9FAFB; }
