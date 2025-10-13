@@ -9,12 +9,12 @@
 </head>
 <body>
 <script>
-  (function() {
+  (function () {
     try {
       if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
         document.body.classList.add('sidebar-mini');
       }
-    } catch(e) {}
+    } catch (e) {}
   })();
 </script>
 
@@ -27,6 +27,7 @@
         <i data-feather="chevrons-left"></i>
       </button>
     </div>
+
     <nav class="sidebar-nav">
       <ul class="nav-list">
         <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
@@ -38,6 +39,7 @@
         <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
       </ul>
     </nav>
+
     <div class="sidebar-footer">
       <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
     </div>
@@ -76,7 +78,7 @@
     </header>
 
     <main class="container-full-width">
-      <!-- Stats same style as Storage -->
+      <!-- نفس الـ stats شكل Storage -->
       <div class="stats" id="lg-stats">
         <button id="lg-btn-prepared" class="stat stat--btn active" type="button" data-filter="Prepared" aria-pressed="true">
           <div class="stat__label">Prepared</div>
@@ -93,14 +95,12 @@
       </div>
 
       <div id="assigned-empty" class="muted" style="display:none;">No items.</div>
-      <!-- use same grid class to inherit Storage cards CSS -->
+
+      <!-- مهم: نفس الكلاس المستخدم في Storage -->
       <div id="assigned-grid" class="assigned-grid"></div>
     </main>
   </div>
 </div>
-
-<!-- Hidden file input for receipts -->
-<input id="lg-upload" type="file" accept="image/*" style="display:none" />
 
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
