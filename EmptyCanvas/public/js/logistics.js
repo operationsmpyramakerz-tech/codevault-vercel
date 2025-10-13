@@ -5,76 +5,97 @@
 
 (function () {
   // ---------- config ----------
-  const MARK_RECEIVED_URL = '/api/logistics/mark-received'; // غيّره لو مسارك مختلف
+  const MARK_RECEIVED_URL = "/api/logistics/mark-received"; // endpoint
 
   // ---------- helpers ----------
-  const $  = (sel, root = document) => root.querySelector(sel);
+  const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const N  = (v) => Number.isFinite(+v) ? +v : 0;
-  const S  = (v) => String(v ?? '');
+  const N = (v) => (Number.isFinite(+v) ? +v : 0);
+  const S = (v) => String(v ?? "");
   const fmt = (v) => String(N(v));
   const esc = (s) =>
-    String(s ?? '').replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
+    String(s ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
 
   async function postJSON(url, body) {
     const res = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      credentials: 'same-origin',
-      body: JSON.stringify(body || {})
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(body || {}),
     });
-    if (!res.ok) {
-      const t = await res.text().catch(()=>'');
-      throw new Error(`POST ${url} failed: ${res.status} ${t}`);
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* ignore */
     }
-    try { return await res.json(); } catch { return {}; }
+    if (!res.ok || (data && data.ok === false)) {
+      const msg =
+        (data && (data.error || data.details)) ||
+        `POST ${url} failed: ${res.status}`;
+      throw new Error(msg);
+    }
+    return data || {};
   }
 
   // ---------- DOM refs ----------
-  const searchInput = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
-  const grid        = $('#assigned-grid') || $('#logistics-grid') || $('main');
-  const emptyMsg    = $('#assigned-empty') || $('#logistics-empty');
+  const searchInput = $("#logisticsSearch") || $("#search") || $('input[type="search"]');
+  const grid = $("#assigned-grid") || $("#logistics-grid") || $("main");
+  const emptyMsg = $("#assigned-empty") || $("#logistics-empty");
 
   // tabs & counters
-  const btnPrepared  = $('#lg-btn-prepared');
-  const btnReceived  = $('#lg-btn-received');
-  const btnDelivered = $('#lg-btn-delivered');
-
-  const cPrepared  = $('#lg-count-prepared') || $('#lg-prepared');
-  const cReceived  = $('#lg-count-received') || $('#lg-received');
-  const cDelivered = $('#lg-count-delivered') || $('#lg-delivered');
+  const btnPrepared = $("#lg-btn-prepared");
+  const btnReceived = $("#lg-btn-received");
+  const btnDelivered = $("#lg-btn-delivered");
+  const cPrepared = $("#lg-count-prepared") || $("#lg-prepared");
+  const cReceived = $("#lg-count-received") || $("#lg-received");
+  const cDelivered = $("#lg-count-delivered") || $("#lg-delivered");
 
   // ---------- state ----------
-  let allItems = [];       // raw items from API
-  let activeTab = (new URLSearchParams(location.search).get('tab') || 'prepared').toLowerCase();
+  let allItems = []; // raw items from API
+  let activeTab = (new URLSearchParams(location.search).get("tab") || "prepared").toLowerCase();
 
   // ---------- data helpers ----------
-  const statusOf = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
-  const isReceived  = (it) => statusOf(it) === 'received by operations';
-  const isDelivered = (it) => statusOf(it) === 'delivered';
+  const statusOf = (it) => S(it.operationsStatus || it.opsStatus || it.status || "").toLowerCase();
+  const isReceived = (it) => statusOf(it) === "received by operations";
+  const isDelivered = (it) => statusOf(it) === "delivered";
 
   function normalizeItem(it) {
-    const req   = N(it.requested ?? it.req);
+    const req = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
-    let rem     = it.remaining ?? it.rem;
-    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
+    let rem = it.remaining ?? it.rem;
+    rem = rem == null ? Math.max(0, req - avail) : N(rem);
+
+    // نحاول نجيب الـ pageId الصحيح مهما كان اسمه في الـ payload
+    const pageId =
+      S(
+        it.pageId ??
+          it.page_id ??
+          it.notionPageId ??
+          it.notion_page_id ??
+          it.page ??
+          it.id // fallback أخير
+      );
+
     return {
-      id: it.id,
-      reason: S(it.reason || ''),
-      created: S(it.createdTime || it.created_time || it.created || ''),
-      productName: S(it.productName ?? it.product_name ?? ''),
+      // نسيب id كما هو للـ DOM، و نحفظ pageId لاستخدامه في API
+      id: S(it.id ?? pageId),
+      pageId,
+      reason: S(it.reason || ""),
+      created: S(it.createdTime || it.created_time || it.created || ""),
+      productName: S(it.productName ?? it.product_name ?? ""),
       requested: req,
       available: avail,
       remaining: rem,
-      status: statusOf(it)
+      status: statusOf(it),
     };
   }
 
   const groupKeyOf = (it) => {
-    const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
-    const day    = (it.created || '').slice(0,10);
+    const reason = (it.reason && String(it.reason).trim()) || "No Reason";
+    const day = (it.created || "").slice(0, 10);
     return `grp:${reason}|${day}`;
   };
 
@@ -83,12 +104,13 @@
     for (const raw of list) {
       const it = normalizeItem(raw);
       const key = groupKeyOf(it);
-      const g = map.get(key) || {
-        key,
-        title: it.reason || 'No Reason',
-        subtitle: new Date(it.created || Date.now()).toLocaleString(),
-        items: []
-      };
+      const g =
+        map.get(key) || {
+          key,
+          title: it.reason || "No Reason",
+          subtitle: new Date(it.created || Date.now()).toLocaleString(),
+          items: [],
+        };
       g.items.push(it);
       map.set(key, g);
     }
@@ -99,26 +121,29 @@
 
   function recomputeGroupStats(g) {
     g.total = g.items.length;
-    g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-    g.allPrepared = g.items.every(x => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x));
+    g.miss = g.items.filter((x) => N(x.remaining) > 0).length;
+    g.allPrepared = g.items.every(
+      (x) => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x)
+    );
     g.anyReceived = g.items.some(isReceived);
-    g.anyDelivered= g.items.some(isDelivered);
+    g.anyDelivered = g.items.some(isDelivered);
   }
 
   // ---------- API ----------
   async function fetchAssigned() {
-    const res = await fetch('/api/orders/assigned', {
-      cache: 'no-store',
-      credentials: 'same-origin'
+    const res = await fetch("/api/orders/assigned", {
+      cache: "no-store",
+      credentials: "same-origin",
     });
-    if (!res.ok) throw new Error('Failed to load assigned orders');
+    if (!res.ok) throw new Error("Failed to load assigned orders");
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   }
 
   // ---------- counters ----------
-  function setCounter(el, val){ if (el) el.textContent = fmt(val); }
-
+  function setCounter(el, val) {
+    if (el) el.textContent = fmt(val);
+  }
   function updateAllCounters(groupsPrepared, groupsReceived, groupsDelivered) {
     setCounter(cPrepared, groupsPrepared.length);
     setCounter(cReceived, groupsReceived.length);
@@ -126,93 +151,103 @@
   }
 
   // ---------- UI tabs ----------
-  function setActiveTab(tab){
+  function setActiveTab(tab) {
     activeTab = tab;
     [
-      [btnPrepared , 'prepared'],
-      [btnReceived , 'received'],
-      [btnDelivered, 'delivered']
-    ].forEach(([b, t])=>{
-      if(!b) return;
-      const on = (t === tab);
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      [btnPrepared, "prepared"],
+      [btnReceived, "received"],
+      [btnDelivered, "delivered"],
+    ].forEach(([b, t]) => {
+      if (!b) return;
+      const on = t === tab;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
     });
-
     const url = new URL(location.href);
-    url.searchParams.set('tab', tab);
-    history.replaceState({}, '', url);
+    url.searchParams.set("tab", tab);
+    history.replaceState({}, "", url);
   }
 
   // ---------- actions ----------
-  async function markGroupReceived(group, buttonEl){
+  async function markGroupReceived(group, buttonEl) {
     try {
       if (buttonEl) {
         buttonEl.disabled = true;
-        buttonEl.textContent = 'Saving...';
+        buttonEl.textContent = "Saving...";
       }
-      const ids = group.items.map(i => i.id).filter(Boolean);
-      if (!ids.length) return;
 
-      await postJSON(MARK_RECEIVED_URL, {
-        itemIds: ids,
-        status: 'Received by operations'
-      });
+      // نبعث pageIds (وليس itemIds) للـ API
+      const pageIds = group.items.map((i) => i.pageId).filter(Boolean);
+      if (!pageIds.length) throw new Error("No pageIds to update");
 
-      // locally flip status then re-render
-      allItems = allItems.map(r => {
-        if (ids.includes(r.id)) {
-          return { ...r, operationsStatus: 'Received by operations', status: 'Received by operations' };
+      await postJSON(MARK_RECEIVED_URL, { pageIds });
+
+      // نعدّل الحالة محليًا ونرندر
+      const setIds = new Set(pageIds);
+      allItems = allItems.map((r) => {
+        const rPageId =
+          r.pageId ||
+          r.page_id ||
+          r.notionPageId ||
+          r.notion_page_id ||
+          r.id;
+        if (setIds.has(String(rPageId))) {
+          return {
+            ...r,
+            operationsStatus: "Received by operations",
+            status: "Received by operations",
+          };
         }
         return r;
       });
+
       render();
     } catch (e) {
       console.error(e);
       if (buttonEl) {
         buttonEl.disabled = false;
-        buttonEl.textContent = 'Mark Received';
+        buttonEl.textContent = "Mark Received";
       }
-      alert('Failed to mark as received. Please try again.');
+      alert("Failed to mark as received. Please try again.");
     }
   }
 
   // ---------- render ----------
   function render() {
     if (!grid) return;
-    grid.innerHTML = '';
+    grid.innerHTML = "";
 
-    const q = (searchInput?.value || '').trim().toLowerCase();
+    const q = (searchInput?.value || "").trim().toLowerCase();
 
     // build & split groups
     const groupsAll = buildGroups(allItems);
-
-    const groupsPrepared = groupsAll.filter(g => g.allPrepared);
-    const groupsReceived = groupsAll.map(g => ({
-      ...g,
-      items: g.items.filter(isReceived)
-    })).filter(g => g.items.length);
-    const groupsDelivered = groupsAll.map(g => ({
-      ...g,
-      items: g.items.filter(isDelivered)
-    })).filter(g => g.items.length);
+    const groupsPrepared = groupsAll.filter((g) => g.allPrepared);
+    const groupsReceived = groupsAll
+      .map((g) => ({ ...g, items: g.items.filter(isReceived) }))
+      .filter((g) => g.items.length);
+    const groupsDelivered = groupsAll
+      .map((g) => ({ ...g, items: g.items.filter(isDelivered) }))
+      .filter((g) => g.items.length);
 
     // search filter inside each set
     const filterByQuery = (gs) => {
-      if(!q) return gs;
-      return gs.map(g => ({
-        ...g,
-        items: g.items.filter(it =>
-          it.productName.toLowerCase().includes(q) ||
-          (g.title || '').toLowerCase().includes(q)
-        )
-      })).filter(g => g.items.length);
+      if (!q) return gs;
+      return gs
+        .map((g) => ({
+          ...g,
+          items: g.items.filter(
+            (it) =>
+              it.productName.toLowerCase().includes(q) ||
+              (g.title || "").toLowerCase().includes(q)
+          ),
+        }))
+        .filter((g) => g.items.length);
     };
 
     const viewSets = {
-      prepared : filterByQuery(groupsPrepared),
-      received : filterByQuery(groupsReceived),
-      delivered: filterByQuery(groupsDelivered)
+      prepared: filterByQuery(groupsPrepared),
+      received: filterByQuery(groupsReceived),
+      delivered: filterByQuery(groupsDelivered),
     };
 
     // counters top
@@ -220,21 +255,22 @@
 
     const view = viewSets[activeTab] || [];
     if (!view.length) {
-      if (emptyMsg) emptyMsg.style.display = '';
+      if (emptyMsg) emptyMsg.style.display = "";
       return;
     }
-    if (emptyMsg) emptyMsg.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = "none";
 
     for (const g of view) {
-      const card = document.createElement('div');
-      card.className = 'order-card';
+      const card = document.createElement("div");
+      card.className = "order-card";
       card.dataset.key = g.key;
       card.dataset.miss = String(g.miss);
 
       // actions area: نظهر زر Mark Received في تبويب fully prepared فقط
-      const actionsHTML = (activeTab === 'prepared')
-        ? `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`
-        : ``;
+      const actionsHTML =
+        activeTab === "prepared"
+          ? `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`
+          : ``;
 
       card.innerHTML = `
         <div class="order-card__head">
@@ -247,41 +283,49 @@
           </div>
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.items.length)}</span>
-            <span class="badge badge--missing">Missing: ${fmt(g.items.filter(x=>N(x.remaining)>0).length)}</span>
+            <span class="badge badge--missing">Missing: ${fmt(
+              g.items.filter((x) => N(x.remaining) > 0).length
+            )}</span>
             ${actionsHTML}
           </div>
         </div>
-
         <div class="order-card__items">
-          ${g.items.map(it => `
+          ${g.items
+            .map(
+              (it) => `
             <div class="order-item" id="row-${esc(it.id)}">
               <div class="item-left">
                 <div class="item-name">${esc(it.productName)}</div>
               </div>
               <div class="item-mid">
                 <div class="num">Req: <strong>${fmt(it.requested)}</strong></div>
-                <div class="num">Avail: <strong data-col="available">${fmt(it.available)}</strong></div>
+                <div class="num">Avail: <strong data-col="available">${fmt(
+                  it.available
+                )}</strong></div>
                 <div class="num">
                   Rem:
-                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}"
-                        data-col="remaining">${fmt(it.remaining)}</span>
+                  <span class="pill ${
+                    N(it.remaining) > 0 ? "pill--danger" : "pill--success"
+                  }" data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
             </div>
-          `).join('')}
+          `
+            )
+            .join("")}
         </div>
       `;
 
       // wire button if exists
       const btn = card.querySelector('[data-act="mark-received"]');
       if (btn) {
-        btn.addEventListener('click', () => markGroupReceived(g, btn));
+        btn.addEventListener("click", () => markGroupReceived(g, btn));
       }
 
       grid.appendChild(card);
     }
 
-    window.feather?.replace?.({ 'stroke-width': 2 });
+    window.feather?.replace?.({ "stroke-width": 2 });
   }
 
   // ---------- init ----------
@@ -293,24 +337,31 @@
     } catch (e) {
       console.error(e);
       if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
-      [cPrepared,cReceived,cDelivered].forEach(el => el && (el.textContent='0'));
+      [cPrepared, cReceived, cDelivered].forEach(
+        (el) => el && (el.textContent = "0")
+      );
     }
   }
 
   // wire up tabs
-  [[btnPrepared,'prepared'],[btnReceived,'received'],[btnDelivered,'delivered']]
-    .forEach(([btn,tab])=>{
-      btn && btn.addEventListener('click', ()=>{
+  [
+    [btnPrepared, "prepared"],
+    [btnReceived, "received"],
+    [btnDelivered, "delivered"],
+  ].forEach(([btn, tab]) => {
+    btn &&
+      btn.addEventListener("click", () => {
         setActiveTab(tab);
         render();
       });
-    });
+  });
 
   // activate initial tab from URL (prepared/received/delivered)
   setActiveTab(activeTab);
 
   // search
-  searchInput && searchInput.addEventListener('input', render);
+  searchInput && searchInput.addEventListener("input", render);
 
+  // go!
   load();
 })();
