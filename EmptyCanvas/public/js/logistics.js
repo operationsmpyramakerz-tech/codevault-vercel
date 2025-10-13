@@ -1,6 +1,6 @@
 // EmptyCanvas/public/js/logistics.js
-// Logistics: يعرض Fully prepared (نفس "Fully available" في Storage) بكروت مطابقة لصفحة Storage.
-// بيحدّث العداد في الهيدر ويعيد تسمية اللابل إلى "Fully prepared" لو كان موجود.
+// Logistics page: إظهار الطلبات الـ Fully prepared (نفس منطق Storage)
+// + مزامنة كارت KPI: تغيير العنوان إلى "Fully prepared" وتحديث العدد حتى بدون IDs ثابتة.
 
 (function () {
   // ---------- helpers ----------
@@ -12,22 +12,25 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
 
-  // ---------- DOM ----------
-  const searchInput       = $('#search');
-  const preparedCountEl   = $('#prepared-count');   // الرقم في كارت الهيدر
-  const receivedCountEl   = $('#received-count');
-  const deliveredCountEl  = $('#delivered-count');
-  const preparedLabelEl   = $('#prepared-label');   // النص "Prepared" لو موجود هنبدّله
-  const grid              = $('#assigned-grid');
-  const emptyMsg          = $('#assigned-empty');
+  // ---------- DOM refs (flexible) ----------
+  const searchInput = $('#search') || $('#logistics-search') || $('input[type="search"]');
 
-  // غيّر عنوان اللابل لو عنصره موجود
-  if (preparedLabelEl) preparedLabelEl.textContent = 'Fully prepared';
+  // الحاوية اللي بنرندر فيها الكروت
+  const grid = $('#assigned-grid') || $('#logistics-grid') || $('.assigned-grid') || $('#list') || $('main');
+
+  // رسالة فاضية
+  const emptyMsg = $('#assigned-empty') || $('#logistics-empty') || (() => {
+    const d = document.createElement('div');
+    d.id = 'assigned-empty';
+    d.style.display = 'none';
+    d.textContent = 'No items.';
+    (grid?.parentElement || document.body).appendChild(d);
+    return d;
+  })();
 
   let allItems = [];
-  let groups   = [];
 
-  // ---------- storage-like grouping ----------
+  // ---------- grouping واحتساب الـ Fully prepared ----------
   const groupKeyOf = (it) => {
     const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
     const created = it.createdTime || it.created_time || it.created || '';
@@ -53,25 +56,17 @@
     return arr;
   }
 
-  // نفس منطق Storage: الجروب "Fully prepared" لما rem=0 لكل عناصره
   function recomputeGroupStats(g) {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining ?? x.rem ?? 0) === 0).length;
     g.total = total;
     g.miss  = total - full;
 
-    // مستعد بالكامل لو كل العناصر remaining=0 وأيضاً مفيش missing
+    // المجموعة تعتبر Fully prepared لو كل العناصر remaining=0 ومفيش missing
     g.prepared = g.items.every(x => Number(x.remaining ?? x.rem ?? 0) === 0) && g.miss === 0;
   }
 
-  function updateHeaderCounts() {
-    const preparedOrders = groups.filter(g => g.prepared).length;
-    if (preparedCountEl)  preparedCountEl.textContent = fmt(preparedOrders);
-    if (receivedCountEl)  receivedCountEl.textContent = fmt(0); // لحد ما نوصل الداتا الحقيقية
-    if (deliveredCountEl) deliveredCountEl.textContent = fmt(0);
-  }
-
-  // ---------- fetch ----------
+  // ---------- API ----------
   async function fetchAssigned() {
     const res = await fetch('/api/orders/assigned', {
       cache: 'no-store',
@@ -82,8 +77,76 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- render (كروت مطابقة لصفحة Storage بدون أزرار) ----------
+  // ---------- KPI sync (بدون IDs) ----------
+  function syncPreparedKPIFromDOM() {
+    // عدد الكروت المعروضة (كل مجموعة Fully prepared ككارت واحد)
+    const preparedCount = $$('.order-card', grid).length;
+
+    // دور على أي كارت KPI عنوانه يحتوي Prepared وغيّر العنوان والقيمة
+    const kpiCandidates = $$(
+      // شوية احتمالات شائعة لأقسام الـ KPI/summary
+      '.summary, .stats, .kpi, .summary-cards, .header-cards, .cards-row'
+    ).flatMap(c => $$('.card, .stat, .kpi-card, .summary-card, .kpi-box, .box', c));
+
+    // لو مالقيناش حاجة، جرّب ندور في أول صف فوق الصفحة
+    if (!kpiCandidates.length) {
+      kpiCandidates.push(...$$('.card, .stat, .kpi-card, .summary-card, .kpi-box, .box'));
+    }
+
+    let updated = false;
+
+    for (const card of kpiCandidates) {
+      // عنصر العنوان داخل كارت KPI
+      const labelEl =
+        card.querySelector('.label, .title, .name, .stat-label, .kpi-label, .text-muted, small, .card-subtitle') ||
+        // fallback: أصغر نص داخل الكارت
+        (function () {
+          const smallish = card.querySelector('small, .text-muted');
+          return smallish || null;
+        })();
+
+      if (!labelEl) continue;
+
+      const labelText = labelEl.textContent.trim();
+      if (/^prepared$/i.test(labelText)) {
+        // غيّر العنوان
+        labelEl.textContent = 'Fully prepared';
+
+        // عنصر القيمة داخل كارت KPI
+        const valueEl =
+          card.querySelector('.value, .count, .num, .kpi-value, .card-title strong, .h4, .stat-value, .digit') ||
+          // fallback: أول عنصر رقمي بداخل الكارت
+          (function () {
+            const digits = card.querySelectorAll('*');
+            for (const el of digits) {
+              if (/^\d+$/.test(el.textContent.trim())) return el;
+            }
+            return null;
+          })();
+
+        if (valueEl) valueEl.textContent = fmt(preparedCount);
+        updated = true;
+      }
+    }
+
+    // كحل أخير لو مالقيناش كارت KPI: اعمل واحد بسيط (لن يحدث غالبًا)
+    if (!updated) {
+      let headerRow = $('.summary') || $('.stats') || grid.previousElementSibling;
+      if (!headerRow) return;
+      const pill = document.createElement('div');
+      pill.className = 'summary-card';
+      pill.innerHTML = `
+        <div class="label">Fully prepared</div>
+        <div class="value">${fmt(preparedCount)}</div>
+      `;
+      headerRow.appendChild(pill);
+    }
+  }
+
+  // ---------- render ----------
   function render(list) {
+    if (!grid) return;
+
     grid.innerHTML = '';
 
     const q = (searchInput?.value || '').trim().toLowerCase();
@@ -96,11 +159,9 @@
 
     const viewGroups = buildGroups(filtered).filter(g => g.prepared);
 
-    // حدّث العداد بعد ما حددنا الـ groups المعروضة
-    updateHeaderCounts();
-
     if (!viewGroups.length) {
       emptyMsg.style.display = '';
+      syncPreparedKPIFromDOM(); // يحدّث العداد إلى 0 ويعيد تسمية اللابل
       return;
     }
     emptyMsg.style.display = 'none';
@@ -150,17 +211,20 @@
     }
 
     if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
+
+    // بعد الريندر حدّث كارت KPI (تغيير Prepared -> Fully prepared + العدد الصحيح)
+    syncPreparedKPIFromDOM();
   }
 
   // ---------- init ----------
   async function load() {
     try {
       allItems = await fetchAssigned();
-      groups   = buildGroups(allItems);
       render(allItems);
     } catch (e) {
       console.error(e);
       grid.innerHTML = '<div class="error">Failed to load items.</div>';
+      syncPreparedKPIFromDOM();
     }
   }
 
