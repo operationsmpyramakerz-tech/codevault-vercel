@@ -201,25 +201,6 @@ async function detectStatusPropName() {
   );
 }
 
-async function detectReceivedByOpsPropName() {
-  const dbId = process.env.Products_list;
-  if (!dbId) return null;
-  try {
-    const db = await notion.databases.retrieve({ database_id: dbId });
-    const entries = Object.entries(db.properties || {});
-    for (const [name, prop] of entries) {
-      const n = (name || "").toLowerCase();
-      if (prop?.type === "number" && (n.includes("quantity received") || n.includes("received by operations") || n.includes("received"))) {
-        return name;
-      }
-    }
-  } catch (e) {
-    console.error("detectReceivedByOpsPropName error:", e.body || e);
-  }
-  return null;
-}
-
-
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
@@ -822,7 +803,6 @@ app.get(
             ? Number(props[availableProp]?.number || 0)
             : 0;
           const remaining = Math.max(0, requested - available);
-          const received = receivedProp ? Number(props[receivedProp]?.number || 0) : 0;
           const reason = props.Reason?.title?.[0]?.plain_text || "No Reason";
           const status = statusProp ? (props[statusProp]?.select?.name || "") : "";
 
@@ -831,7 +811,6 @@ app.get(
             productName,
             requested,
             available,
-            received,
             remaining,
             createdTime: page.created_time,
             reason,
