@@ -1,171 +1,181 @@
-/* Logistics page – show cards exactly like Storage (no action buttons) */
+// EmptyCanvas/public/js/logistics.js
+// Logistics page: Prepared = Storage (Fully available). Received/Delivered placeholders.
+// Renders cards بنفس ستايل Storage (order-card, pills, badges)
+
 (function () {
-  // ====== Helpers ======
-  const qs  = (s, el = document) => el.querySelector(s);
-  const qsa = (s, el = document) => Array.from(el.querySelectorAll(s));
+  // ---------- helpers ----------
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const fmt = (n) =>
+    typeof n === 'number' ? n.toLocaleString() : (n ?? '');
 
-  const $ordersList = qs('#ordersList');
-  const $helloName  = qs('#helloName');
-  const $search     = qs('#searchInput');
+  // ---------- DOM ----------
+  const searchInput     = $('#search');
+  const preparedCountEl = $('#prepared-count');
+  const receivedCountEl = $('#received-count');
+  const deliveredCountEl= $('#delivered-count');
+  const grid            = $('#assigned-grid');
+  const emptyMsg        = $('#assigned-empty');
 
-  const $countPrepared = qs('#countPrepared');
-  const $countReceived = qs('#countReceived');
-  const $countDelivered = qs('#countDelivered');
-  const $loading = qs('#loadingRow');
+  // ---------- routing (tab) ----------
+  const url = new URL(location.href);
+  let currentTab = (url.searchParams.get('tab') || 'Prepared').toLowerCase();
 
-  // أي دالة عندك بترجع اسم المستخدم – إن لم تتوفر نقرأ من سشن
-  async function getMe() {
-    try {
-      const r = await fetch('/api/session/me');
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
+  let allItems = [];
+
+  // ---------- data ----------
+  async function fetchAssigned() {
+    // نفس الـ API المستخدم في Storage
+    const res = await fetch('/api/orders/assigned', {
+      cache: 'no-store',
+      credentials: 'same-origin'
+    });
+    if (!res.ok) throw new Error('Failed to load assigned orders');
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   }
 
-  // نفس شكل الكارت المستعمل في Storage (بدون أزرار)
-  function renderOrderCard(group) {
-    // group: { id, schoolName, createdAtISO, items: [{name, req, avail, rem}], missingCount, itemsCount }
-    const created = group.createdAtISO
-      ? new Date(group.createdAtISO).toLocaleString()
-      : '';
+  async function fetchLogistics(state /* 'prepared' | 'received' | 'delivered' */) {
+    state = state.toLowerCase();
 
-    const itemsBadges = `
-      <div class="inline-badges">
-        <span class="badge badge-pill">Items: ${group.itemsCount ?? group.items?.length ?? 0}</span>
-        <span class="badge badge-pill badge-missing">Missing: ${group.missingCount ?? 0}</span>
-      </div>
-    `;
-
-    const itemsList = (group.items || []).map(it => `
-      <div class="order-item">
-        <div class="order-item__name">${it.name}</div>
-        <div class="order-item__badges">
-          <span class="tag tag-req">Req: ${it.req ?? 0}</span>
-          <span class="tag tag-avail">Avail: ${it.avail ?? 0}</span>
-          <span class="tag tag-rem">Rem: ${it.rem ?? 0}</span>
-        </div>
-      </div>
-    `).join('');
-
-    return `
-      <article class="order-card">
-        <header class="order-card__head">
-          <div class="head-left">
-            <div class="school-icon" aria-hidden="true"></div>
-            <div class="meta">
-              <div class="school-name">${group.schoolName || ''}</div>
-              <div class="created-at">${created}</div>
-            </div>
-          </div>
-          <div class="head-right">
-            ${itemsBadges}
-          </div>
-        </header>
-
-        <div class="order-card__body">
-          ${itemsList || '<div class="muted">No items.</div>'}
-        </div>
-      </article>
-    `;
-  }
-
-  function mountOrders(list) {
-    if (!Array.isArray(list) || !list.length) {
-      $ordersList.innerHTML = '<div class="muted px-2 py-6">No items.</div>';
-      return;
+    if (state === 'prepared') {
+      // Prepared = Fully available من Storage
+      const items = await fetchAssigned();
+      // العنصر جاهز لو remaining/rem == 0
+      return items.filter(it => Number(it.remaining ?? it.rem ?? 0) === 0);
     }
-    $ordersList.innerHTML = list.map(renderOrderCard).join('');
+
+    // أما Received / Delivered فلو لسه مش موصولة، نرجّع فاضي (هنوصلها لاحقاً)
+    // حطينا محاولة على /api/logistics كإحتياط لو موجود عندك
+    const endpoints = [
+      `/api/logistics/${state}`,
+      `/api/logistics?status=${encodeURIComponent(state)}`
+    ];
+    for (const ep of endpoints) {
+      try {
+        const r = await fetch(ep, { cache: 'no-store', credentials: 'same-origin' });
+        if (r.ok) {
+          const arr = await r.json();
+          if (Array.isArray(arr)) return arr;
+        }
+      } catch { /* ignore */ }
+    }
+    return [];
   }
 
-  function filterOrders(text, src) {
-    const t = (text || '').trim().toLowerCase();
-    if (!t) return src;
-    return src.filter(g =>
-      (g.schoolName || '').toLowerCase().includes(t) ||
-      (g.items || []).some(it => (it.name || '').toLowerCase().includes(t))
+  // ---------- grouping بنفس منطق Storage ----------
+  function groupByOrder(items) {
+    const map = new Map();
+    for (const it of items) {
+      // key by order (reason + createdTime or orderId)
+      const key = `${it.reason || 'Unknown'}|${it.orderId || it.order_id || it.createdTime || it.created_time || ''}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          reason: it.reason || 'Unknown',
+          createdTime: it.createdTime || it.created_time || '',
+          items: []
+        });
+      }
+      map.get(key).items.push(it);
+    }
+    // newest first
+    return Array.from(map.values()).sort(
+      (a, b) => (b.createdTime || '').localeCompare(a.createdTime || '')
     );
   }
 
-  // ====== Data fetching ======
-  // نفس مصدر “Fully available” في Storage
-  async function fetchPrepared() {
-    // يعتمد على ما عندك في السيرفر، هذا المسار متوافق مع تعديلات Storage السابقة
-    const url = '/api/orders/assigned?tab=FullyAvailable';
-    const r = await fetch(url);
-    if (!r.ok) throw new Error('Failed to load prepared');
-    const data = await r.json();
-    // نتوقع شكلاً قريبًا من { groups: [{ schoolName, createdAtISO, items:[{name,req,avail,rem}], missingCount, itemsCount }]}
-    return Array.isArray(data?.groups) ? data.groups : [];
-  }
+  // ---------- render ----------
+  function render(list) {
+    grid.innerHTML = '';
 
-  // احصائيات اللوجستيات (اختياري؛ إن لم تتوفر أرقام، سنحسب prepared فقط)
-  async function fetchLogisticsCounts() {
-    try {
-      const r = await fetch('/api/logistics/counts'); // إن لم يوجد يرجع 404
-      if (!r.ok) throw 0;
-      const j = await r.json();
-      return {
-        prepared: j?.prepared ?? 0,
-        received: j?.received ?? 0,
-        delivered: j?.delivered ?? 0
-      };
-    } catch {
-      // fallback بسيط: نحسب Prepared فقط من طول القائمة
-      return null;
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    const filtered = q
+      ? list.filter(x =>
+          (x.reason || '').toLowerCase().includes(q) ||
+          (x.productName || x.product_name || '').toLowerCase().includes(q)
+        )
+      : list;
+
+    const groups = groupByOrder(filtered);
+
+    // counters
+    if (preparedCountEl)  preparedCountEl.textContent  = fmt(list.length);
+    if (receivedCountEl)  receivedCountEl.textContent  = fmt(0);
+    if (deliveredCountEl) deliveredCountEl.textContent = fmt(0);
+
+    if (!groups.length) {
+      emptyMsg.style.display = '';
+      return;
     }
+    emptyMsg.style.display = 'none';
+
+    for (const g of groups) {
+      const total = g.items.length;
+      const missing = g.items.filter(x => Number(x.remaining ?? x.rem ?? 0) > 0).length;
+
+      const card = document.createElement('div');
+      card.className = 'order-card';
+
+      card.innerHTML = `
+        <div class="order-card__header">
+          <div class="order-card__title">
+            <div class="order-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M3 7h18M3 12h18M3 17h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="order-meta">
+              <div class="reason">${g.reason}</div>
+              <div class="created">${g.createdTime || ''}</div>
+            </div>
+          </div>
+          <div class="order-card__actions">
+            <span class="badge badge--count">Items: ${fmt(total)}</span>
+            <span class="badge badge--missing">Missing: ${fmt(missing)}</span>
+          </div>
+        </div>
+        <div class="order-card__items">
+          ${g.items
+            .map(
+              (it) => `
+              <div class="order-item" id="row-${it.id}">
+                <div class="item-left">
+                  <div class="prod">${it.productName || it.product_name || ''}</div>
+                </div>
+                <div class="item-right">
+                  <span class="pill pill-gray">Req: ${fmt(it.requested ?? it.req ?? 0)}</span>
+                  <span class="pill pill-green">Avail: ${fmt(it.available ?? it.avail ?? 0)}</span>
+                  <span class="pill pill-amber">Rem: ${fmt(it.remaining ?? it.rem ?? 0)}</span>
+                </div>
+              </div>`
+            )
+            .join('')}
+        </div>
+      `;
+
+      grid.appendChild(card);
+    }
+
+    // Feather icons (لو متحملة)
+    if (window.feather?.replace) window.feather.replace();
   }
 
-  // ====== State ======
-  let ALL_PREPARED = [];
-
+  // ---------- load ----------
   async function load() {
     try {
-      $loading.style.display = '';
-      const me = await getMe();
-      if (me?.name) $helloName.textContent = me.name;
-
-      const [preparedList, counts] = await Promise.all([
-        fetchPrepared(),
-        fetchLogisticsCounts()
-      ]);
-
-      ALL_PREPARED = preparedList;
-      const filtered = filterOrders($search.value, ALL_PREPARED);
-      mountOrders(filtered);
-
-      if (counts) {
-        $countPrepared.textContent = counts.prepared;
-        $countReceived.textContent = counts.received;
-        $countDelivered.textContent = counts.delivered;
-      } else {
-        $countPrepared.textContent = ALL_PREPARED.length;
-      }
-    } catch (e) {
-      $ordersList.innerHTML = `<div class="error px-2 py-6">Failed to load items.</div>`;
-      // console.error(e);
-    } finally {
-      $loading.style.display = 'none';
+      const list = await fetchLogistics(currentTab);
+      allItems = list;
+      render(allItems);
+    } catch (err) {
+      console.error(err);
+      grid.innerHTML = '<div class="error">Failed to load items.</div>';
     }
   }
 
-  // ====== Events ======
-  $search.addEventListener('input', () => {
-    const filtered = filterOrders($search.value, ALL_PREPARED);
-    mountOrders(filtered);
-  });
+  // search
+  if (searchInput) searchInput.addEventListener('input', () => render(allItems));
 
-  // (اختياري) جعل الكروت تتغير عند الضغط على الشرائح
-  qs('#statPrepared').addEventListener('click', () => {
-    const filtered = filterOrders($search.value, ALL_PREPARED);
-    mountOrders(filtered);
-  });
-  qs('#statReceived').addEventListener('click', () => {
-    // مستقبلاً عند إضافة تبويب Received هنا
-  });
-  qs('#statDelivered').addEventListener('click', () => {
-    // مستقبلاً عند إضافة تبويب Delivered هنا
-  });
-
-  // Start
+  // initial
   load();
 })();
