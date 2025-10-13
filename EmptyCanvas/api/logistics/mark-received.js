@@ -1,60 +1,73 @@
-// File: /api/logistics/mark-received.js
+// /api/logistics/mark-received.js
 import { Client } from "@notionhq/client";
 
-/**
- * Env required:
- *  - NOTION_TOKEN  -> Internal Integration token (must have access to the DB/pages)
- *
- * Body JSON:
- *  { "pageId": "<notion_page_id>" }
- *  or { "rowId": "<notion_page_id>" }
- *  or { "id": "<notion_page_id>" }
- */
+const notion = new Client({ auth: process.env.NOTION_SECRET });
+
+// CORS helpers (آمن لو احتجت تستدعيه من صفحات متعددة)
+function setCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
 
 export default async function handler(req, res) {
+  setCors(res);
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
+  // تأكيد توافر مفاتيح Notion
+  if (!process.env.NOTION_SECRET) {
+    return res.status(500).json({ ok: false, error: "Missing NOTION_SECRET" });
+  }
+
+  let body;
   try {
-    const notion = new Client({ auth: process.env.NOTION_TOKEN });
-    const body = await readJson(req);
-    const pageId = body.pageId || body.rowId || body.id;
-    if (!pageId) {
-      return res.status(400).json({ ok: false, error: "Missing pageId/rowId" });
+    body = await readJson(req);
+  } catch {
+    return res.status(400).json({ ok: false, error: "Invalid JSON body" });
+  }
+
+  // نتوقع مصفوفة من pageIds (IDs لصفحات/صفوف Notion)
+  const pageIds = Array.isArray(body?.pageIds) ? body.pageIds.filter(Boolean) : [];
+  if (!pageIds.length) {
+    return res.status(400).json({ ok: false, error: "pageIds[] is required" });
+  }
+
+  const STATUS_VALUE = "Received by operations"; // اسم القيمة داخل حقل Status (select)
+
+  try {
+    const results = [];
+    for (const pid of pageIds) {
+      const updated = await notion.pages.update({
+        page_id: pid,
+        properties: {
+          // اسم العمود بالضبط كما ذكرت: Status (من نوع Select)
+          Status: { select: { name: STATUS_VALUE } },
+        },
+      });
+      results.push({ id: updated.id });
     }
-
-    // اسم عمود الـ Select ثابت هنا حسب طلبك
-    const statusProp = "Status";
-    const targetValue = "Received by operations";
-
-    await notion.pages.update({
-      page_id: pageId,
-      properties: {
-        [statusProp]: { select: { name: targetValue } },
-      },
-    });
-
-    return res.status(200).json({ ok: true });
-  } catch (err) {
-    console.error("mark-received error:", err?.message || err);
+    return res.status(200).json({ ok: true, updated: results.length, items: results });
+  } catch (e) {
+    // هيساعدك لو عاوز تشوف الخطأ في لوجز Vercel
+    console.error("mark-received error:", e?.body || e?.message || e);
     return res.status(500).json({
       ok: false,
-      error: "Update failed. Check NOTION_TOKEN permissions.",
-      detail: err?.message || String(err),
+      error: "Notion update failed",
+      details: e?.body || e?.message || String(e),
     });
   }
 }
 
-// --- helpers ---
+// ------- helpers -------
 async function readJson(req) {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const raw = Buffer.concat(chunks).toString("utf8") || "{}";
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+  return JSON.parse(raw);
 }
