@@ -1,7 +1,5 @@
-// Logistics: تبويبات أعلى الصفحة + كروت مطابقة لصفحة Storage
-// - تبويب Fully prepared يعرُض الجروبات اللي كل عناصرها remaining=0
-// - زر التبويب النشط عليه .active (Shadow زي Storage)
-// - العداد في الكارت يتحدث بعد الفلترة
+// public/js/logistics.js
+// Logistics page: Tabs (Fully prepared / Received / Delivered) + counters + Storage-like cards
 
 (function () {
   // ---------- helpers ----------
@@ -14,15 +12,13 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
 
-  // ---------- DOM refs ----------
-  const searchInput =
-    $('#logisticsSearch') || $('#search') || $('input[type="search"]');
-
-  const grid = $('#assigned-grid') || $('.assigned-grid') || $('main');
-
-  const emptyMsg = $('#assigned-empty') || (() => {
+  // ---------- DOM ----------
+  const searchInput = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
+  // الحاوية: خليك مرن — لو موجودة logistics-grid استخدمها، وإلا assigned-grid
+  const grid = $('#logistics-grid') || $('#assigned-grid') || $('.assigned-grid') || $('main');
+  const emptyMsg = $('#logistics-empty') || $('#assigned-empty') || (() => {
     const d = document.createElement('div');
-    d.id = 'assigned-empty';
+    d.id = 'logistics-empty';
     d.className = 'muted';
     d.style.display = 'none';
     d.textContent = 'No items.';
@@ -30,67 +26,23 @@
     return d;
   })();
 
-  // تبويبات
-  const tabBtns = {
-    FullyPrepared: $('#lg-tab-prepared'),
-    Received:      $('#lg-tab-received'),
-    Delivered:     $('#lg-tab-delivered')
+  // أزرار التبويب (بتعمل shadow من الـ HTML)
+  const tabs = {
+    prepared:  $('#lg-btn-prepared'),
+    received:  $('#lg-btn-received'),
+    delivered: $('#lg-btn-delivered'),
   };
+
+  // العدادات
   const kpi = {
-    prepared:  $('#lg-count-prepared'),
-    received:  $('#lg-count-received'),
-    delivered: $('#lg-count-delivered'),
+    prepared:  $('#lg-prepared'),
+    received:  $('#lg-received'),
+    delivered: $('#lg-delivered'),
   };
 
   let allItems = [];
-  let currentTab = 'FullyPrepared';
-
-  // ---------- normalize & group ----------
-  function normalizeItem(it) {
-    const req   = N(it.requested ?? it.req);
-    const avail = N(it.available ?? it.avail);
-    let rem     = it.remaining ?? it.rem;
-    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
-    return {
-      id: it.id,
-      productName: it.productName ?? it.product_name ?? '',
-      requested: req,
-      available: avail,
-      remaining: rem,
-      reason: (it.reason && String(it.reason).trim()) || 'No Reason',
-      created: it.createdTime || it.created_time || it.created || ''
-    };
-  }
-
-  function groupKeyOf(it) {
-    const bucket = (it.created || '').slice(0, 10);
-    return `grp:${it.reason}|${bucket}`;
-  }
-
-  function recomputeGroupStats(g) {
-    g.total = g.items.length;
-    g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-    g.prepared = g.items.every(x => N(x.remaining) === 0);
-  }
-
-  function buildGroups(list) {
-    const map = new Map();
-    for (const raw of list) {
-      const it = normalizeItem(raw);
-      const key = groupKeyOf(it);
-      const g = map.get(key) || {
-        key,
-        title: it.reason,
-        subtitle: new Date(it.created || Date.now()).toLocaleString(),
-        items: []
-      };
-      g.items.push(it);
-      map.set(key, g);
-    }
-    const arr = [...map.values()];
-    arr.forEach(recomputeGroupStats);
-    return arr;
-  }
+  let groups   = [];
+  let currentTab = readTabFromURL();
 
   // ---------- API ----------
   async function fetchAssigned() {
@@ -103,50 +55,108 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- counts ----------
-  function updateCounts(groups) {
+  // ---------- normalize & grouping ----------
+  function normalizeItem(it) {
+    const req   = N(it.requested ?? it.req);
+    const avail = N(it.available ?? it.avail);
+    let rem     = it.remaining ?? it.rem;
+    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
+    return {
+      id: it.id,
+      productName: it.productName ?? it.product_name ?? '-',
+      reason: (it.reason && String(it.reason).trim()) || 'No Reason',
+      requested: req,
+      available: avail,
+      remaining: rem,
+      status: String(it.status || ''),
+      created: it.createdTime || it.created_time || it.created || ''
+    };
+  }
+
+  function groupKeyOf(it) {
+    const bucket = (it.created || '').slice(0, 10);
+    return `grp:${it.reason}|${bucket}`;
+  }
+
+  function recomputeGroupStats(g) {
+    g.total = g.items.length;
+    g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
+
+    // Fully prepared = كل العناصر remaining=0 وحالتها Prepared
+    const allZero = g.items.every(x => N(x.remaining) === 0);
+    const allPreparedStatus = g.items.every(x => x.status === 'Prepared');
+
+    // Received tab = كل العناصر status='Received by operations'
+    const allReceived = g.items.every(x => x.status === 'Received by operations');
+
+    // Delivered tab = كل العناصر status='Delivered'
+    const allDelivered = g.items.every(x => x.status === 'Delivered');
+
+    g.prepared  = allZero && allPreparedStatus;
+    g.received  = allReceived;
+    g.delivered = allDelivered;
+  }
+
+  function buildGroups(list) {
+    const map = new Map();
+    for (const raw of list) {
+      const it = normalizeItem(raw);
+      const key = groupKeyOf(it);
+      const g = map.get(key) || {
+        key,
+        title: it.reason,
+        subtitle: new Date(it.created || Date.now()).toLocaleString(),
+        items: [],
+      };
+      g.items.push(it);
+      map.set(key, g);
+    }
+    const arr = [...map.values()];
+    arr.forEach(recomputeGroupStats);
+    return arr;
+  }
+
+  // ---------- counters ----------
+  function updateCounters() {
     const preparedCount  = groups.filter(g => g.prepared).length;
-    // مبدئيًا: Received/Delivered = 0 لحد ما نوصل الـAPI الخاص بيهم
-    const receivedCount  = 0;
-    const deliveredCount = 0;
+    const receivedCount  = groups.filter(g => g.received).length;
+    const deliveredCount = groups.filter(g => g.delivered).length;
+
     if (kpi.prepared)  kpi.prepared.textContent  = fmt(preparedCount);
     if (kpi.received)  kpi.received.textContent  = fmt(receivedCount);
     if (kpi.delivered) kpi.delivered.textContent = fmt(deliveredCount);
   }
 
-  // ---------- render ----------
-  function render(list) {
+  // ---------- filtering & render ----------
+  function filteredGroups() {
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    const base = q
+      ? groups.filter(g =>
+          g.title.toLowerCase().includes(q) ||
+          g.items.some(it => (it.productName || '').toLowerCase().includes(q))
+        )
+      : groups;
+
+    if (currentTab === 'prepared')   return base.filter(g => g.prepared);
+    if (currentTab === 'received')   return base.filter(g => g.received);
+    if (currentTab === 'delivered')  return base.filter(g => g.delivered);
+    return base;
+  }
+
+  function render() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    const q = (searchInput?.value || '').trim().toLowerCase();
-    const filtered = q
-      ? list.filter(x =>
-          (x.reason || '').toLowerCase().includes(q) ||
-          (x.productName || '').toLowerCase().includes(q)
-        )
-      : list;
+    updateCounters();
 
-    const groupsAll = buildGroups(filtered);
-    updateCounts(groupsAll);
-
-    // تبويب: نعرض فقط fully prepared في تبويب FullyPrepared
-    let groupsToShow = groupsAll;
-    if (currentTab === 'FullyPrepared') {
-      groupsToShow = groupsAll.filter(g => g.prepared);
-    } else if (currentTab === 'Received') {
-      groupsToShow = []; // هتكمل لما نربط API الاستلام
-    } else if (currentTab === 'Delivered') {
-      groupsToShow = []; // هتكمل لما نربط API التسليم
-    }
-
-    if (!groupsToShow.length) {
+    const view = filteredGroups();
+    if (!view.length) {
       emptyMsg.style.display = '';
       return;
     }
     emptyMsg.style.display = 'none';
 
-    for (const g of groupsToShow) {
+    for (const g of view) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
@@ -191,33 +201,62 @@
     if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
   }
 
-  // ---------- tabs ----------
-  function setActiveTab(tabName) {
-    currentTab = tabName;
-    Object.entries(tabBtns).forEach(([name, btn]) => {
-      const active = name === tabName;
-      btn?.classList.toggle('active', active);
-      btn?.setAttribute('aria-pressed', active ? 'true' : 'false');
-    });
-    render(allItems);
+  // ---------- tabs logic ----------
+  function readTabFromURL() {
+    const p = (new URLSearchParams(location.search).get('tab') || '').toLowerCase();
+    if (p === 'prepared' || p === 'received' || p === 'delivered') return p;
+    return 'prepared';
   }
 
-  tabBtns.FullyPrepared?.addEventListener('click', () => setActiveTab('FullyPrepared'));
-  tabBtns.Received?.addEventListener('click',      () => setActiveTab('Received'));
-  tabBtns.Delivered?.addEventListener('click',     () => setActiveTab('Delivered'));
+  function setActiveTab(tab) {
+    currentTab = tab;
+    // تفعيل/تعطيل ظل التبويب (CSS في HTML)
+    Object.entries(tabs).forEach(([key, btn]) => {
+      const on = key === tab;
+      btn?.classList.toggle('active', on);
+      btn?.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn?.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+
+    // حدث URL بدون ريفرش
+    const url = new URL(location.href);
+    url.searchParams.set('tab', tab);
+    history.replaceState({}, '', url);
+
+    render();
+  }
+
+  // استمع لإيفنت من الـ HTML لما المستخدم يضغط تبويب
+  window.addEventListener('logistics:set-filter-from-tab', (ev) => {
+    const tab = String(ev.detail?.tab || '').toLowerCase();
+    if (tab === 'prepared' || tab === 'received' || tab === 'delivered') {
+      setActiveTab(tab);
+    }
+  });
+
+  // لو مفيش إيفنت (فتح الصفحة مباشرة) — فعّل من الـURL
+  function initTabs() {
+    const tab = readTabFromURL();
+    setActiveTab(tab);
+
+    tabs.prepared?.addEventListener('click', () => setActiveTab('prepared'));
+    tabs.received?.addEventListener('click', () => setActiveTab('received'));
+    tabs.delivered?.addEventListener('click', () => setActiveTab('delivered'));
+  }
 
   // ---------- init ----------
   async function load() {
     try {
-      allItems = await fetchAssigned();
-      setActiveTab('FullyPrepared'); // default
+      const raw = await fetchAssigned();
+      groups = buildGroups(raw);
+      initTabs();
     } catch (e) {
       console.error(e);
-      grid.innerHTML = '<div class="error">Failed to load items.</div>';
+      if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
     }
   }
 
-  searchInput && searchInput.addEventListener('input', () => render(allItems));
+  searchInput && searchInput.addEventListener('input', render);
 
   load();
 })();

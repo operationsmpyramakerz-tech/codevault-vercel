@@ -1,105 +1,172 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Logistics</title>
-  <link rel="stylesheet" href="/css/style.css"/>
-  <script src="https://unpkg.com/feather-icons"></script>
-</head>
-<body>
-<script>
-  (function () {
-    try {
-      if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
-        document.body.classList.add('sidebar-mini');
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Logistics</title>
+
+    <!-- Main styles -->
+    <link rel="stylesheet" href="/css/style.css" />
+
+    <!-- Feather icons (optional) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+      /* ظل للتبويب النشط (لا يغيّر التصميم العام) */
+      .tabs-bar{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:18px 0 8px;}
+      .tab-card{
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        padding:16px; border-radius:14px; background:#fff; border:1px solid rgba(15,23,42,.06);
+        transition:box-shadow .2s ease, transform .06s ease; cursor:pointer; user-select:none;
       }
-    } catch (e) {}
-  })();
-</script>
+      .tab-card:hover{transform:translateY(-1px)}
+      .tab-card.active{box-shadow:0 10px 28px rgba(2,8,23,.12)}
+      .tab-title{font-size:14px; color:#6b7280; margin-bottom:6px}
+      .tab-value{font-size:22px; font-weight:700; color:#0f172a}
+      /* لإظهار أن الزر الحالي هو تبويب */
+      .tab-card[aria-pressed="true"]{box-shadow:0 10px 28px rgba(2,8,23,.12)}
+      /* شبكة الكروت */
+      .cards-grid{display:flex; flex-direction:column; gap:18px}
+    </style>
+  </head>
 
-<div class="app-container">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <h2>Dashboard</h2>
-      <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
-        <i data-feather="chevrons-left"></i>
-      </button>
-    </div>
-    <nav class="sidebar-nav">
-      <ul class="nav-list">
-        <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
-        <li><a class="nav-link" href="/orders/requested"><i data-feather="users"></i><span class="nav-label">Schools Requested Orders</span></a></li>
-        <li><a class="nav-link" href="/orders/assigned"><i data-feather="user-check"></i><span class="nav-label">Storage</span></a></li>
-        <li><a class="nav-link" href="/orders/new"><i data-feather="plus-circle"></i><span class="nav-label">Create New Order</span></a></li>
-        <li><a class="nav-link" href="/stocktaking"><i data-feather="archive"></i><span class="nav-label">Stocktaking</span></a></li>
-        <li><a class="nav-link active" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
-        <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
-      </ul>
-    </nav>
-    <div class="sidebar-footer">
-      <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <div class="main-content">
-    <header class="main-header">
-      <div class="header-row1">
-        <div class="left">
-          <div class="greeting-pill" aria-live="polite">
-            <span class="greeting-avatar"><img src="/images/greeting-icon.png" alt="Hi icon"/></span>
-            <div class="greet-text">
-              <div class="greet-title">Hi, <span data-username="">...</span> 👋</div>
-              <div class="greet-sub">Your logistics overview</div>
-            </div>
-          </div>
-
-          <div id="logistics-searchbar" class="searchbar" role="search">
-            <i data-feather="search"></i>
-            <input id="logisticsSearch" type="search" placeholder="Search items for logistics..." aria-label="Search logistics items"/>
-          </div>
-        </div>
-
-        <div class="right topbar-right">
-          <a class="account-mini" href="/account" aria-label="My account" title="My account">
-            <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
-            <span class="label">My account</span>
+  <body class="page">
+    <div class="layout">
+      <!-- ===== Sidebar ===== -->
+      <aside class="sidebar">
+        <div class="sidebar__inner">
+          <a href="/orders" class="sidebar-link">
+            <i data-feather="list"></i><span>Current Orders</span>
+          </a>
+          <a href="/orders/requested" class="sidebar-link">
+            <i data-feather="inbox"></i><span>Schools Requested Orders</span>
+          </a>
+          <a href="/orders/assigned" class="sidebar-link">
+            <i data-feather="package"></i><span>Storage</span>
+          </a>
+          <a href="/order/create" class="sidebar-link">
+            <i data-feather="plus-circle"></i><span>Create New Order</span>
+          </a>
+          <a href="/stocktaking" class="sidebar-link">
+            <i data-feather="archive"></i><span>Stocktaking</span>
+          </a>
+          <a href="/logistics" class="sidebar-link active">
+            <i data-feather="truck"></i><span>Logistics</span>
+          </a>
+          <a href="/funds" class="sidebar-link">
+            <i data-feather="dollar-sign"></i><span>Funds</span>
           </a>
         </div>
-      </div>
+        <div class="sidebar__bottom">
+          <a href="/logout" class="btn btn-ghost"><i data-feather="log-out"></i><span>Logout</span></a>
+        </div>
+      </aside>
 
-      <!-- Tabs (نفس ستايل Storage: stat--btn + active للـshadow) -->
-      <div class="stats" id="lg-stats">
-        <button id="lg-tab-prepared"  class="stat stat--btn active" type="button" data-tab="FullyPrepared" aria-pressed="true">
-          <div class="stat__label">Fully prepared</div>
-          <div class="stat__value" id="lg-count-prepared">0</div>
-        </button>
-        <button id="lg-tab-received"  class="stat stat--btn" type="button" data-tab="Received" aria-pressed="false">
-          <div class="stat__label">Received</div>
-          <div class="stat__value stat__value--ok" id="lg-count-received">0</div>
-        </button>
-        <button id="lg-tab-delivered" class="stat stat--btn" type="button" data-tab="Delivered" aria-pressed="false">
-          <div class="stat__label">Delivered</div>
-          <div class="stat__value stat__value--muted" id="lg-count-delivered">0</div>
-        </button>
-      </div>
-    </header>
+      <!-- ===== Main ===== -->
+      <main class="main">
+        <!-- Header hello + search -->
+        <div class="page-head">
+          <div class="hello-box">
+            <div class="hello-title">Hi, <span id="hello-name">...</span> 👋</div>
+            <div class="hello-sub">Your logistics overview</div>
+          </div>
+          <div class="search-box">
+            <i data-feather="search"></i>
+            <input id="search" class="search-input" type="search" placeholder="Search items for logistics..." />
+          </div>
+        </div>
 
-    <main class="container-full-width">
-      <div id="assigned-empty" class="muted" style="display:none;">No items.</div>
-      <!-- نفس الكلاس بتاع Storage علشان ياخد نفس الكروت -->
-      <div id="assigned-grid" class="assigned-grid"></div>
-    </main>
-  </div>
-</div>
+        <!-- ===== Tabs Bar (Top bar as tabs with active shadow) ===== -->
+        <div class="tabs-bar" role="tablist" aria-label="Logistics filters">
+          <button id="lg-btn-prepared"
+                  class="tab-card active"
+                  role="tab" aria-selected="true" aria-pressed="true"
+                  data-filter="prepared">
+            <div class="tab-title">Fully prepared</div>
+            <div class="tab-value" id="lg-prepared">0</div>
+          </button>
 
-<!-- hidden upload (مستقبلاً للـreceived/delivered) -->
-<input id="lg-upload" type="file" accept="image/*" style="display:none" />
+          <button id="lg-btn-received"
+                  class="tab-card"
+                  role="tab" aria-selected="false" aria-pressed="false"
+                  data-filter="received">
+            <div class="tab-title">Received</div>
+            <div class="tab-value" id="lg-received">0</div>
+          </button>
 
-<script>feather.replace();</script>
-<script src="/js/common-ui.js"></script>
-<script src="/js/logistics.js"></script>
-</body>
+          <button id="lg-btn-delivered"
+                  class="tab-card"
+                  role="tab" aria-selected="false" aria-pressed="false"
+                  data-filter="delivered">
+            <div class="tab-title">Delivered</div>
+            <div class="tab-value" id="lg-delivered">0</div>
+          </button>
+        </div>
+
+        <!-- Grid: orders/cards -->
+        <section id="logistics-grid" class="cards-grid"></section>
+        <div id="logistics-empty" class="empty-state" style="display:none">
+          <div class="empty-title">No items.</div>
+          <div class="empty-sub">There are no orders to show here right now.</div>
+        </div>
+
+        <!-- Popover (if needed by JS for partial edits / etc.) -->
+        <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-label="Edit">
+          <div class="popover__body">
+            <div class="form-row">
+              <label class="form-label">Available</label>
+              <input id="popover-input" type="number" min="0" class="form-input" />
+              <div id="popover-hint" class="form-hint"></div>
+            </div>
+            <div class="popover__actions">
+              <button class="btn" data-pop="cancel">Cancel</button>
+              <button class="btn btn-primary" data-pop="save">Save</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Page script -->
+    <script src="/js/logistics.js"></script>
+    <script>
+      // تفعيل Feather icons
+      if (window.feather) feather.replace({ 'stroke-width': 2 });
+
+      // مزامنة التبويب النشط مع الزرار (بيستخدمه logistics.js لتغيير الفلتر)
+      (function () {
+        const buttons = [
+          document.getElementById('lg-btn-prepared'),
+          document.getElementById('lg-btn-received'),
+          document.getElementById('lg-btn-delivered')
+        ];
+        function activate(btn){
+          buttons.forEach(b=>{
+            if(!b) return;
+            const on = b===btn;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+            b.setAttribute('aria-pressed',  on ? 'true' : 'false');
+          });
+        }
+        buttons.forEach(b=>{
+          if(!b) return;
+          b.addEventListener('click', ()=>{
+            // logistics.js هيلتقط data-filter ويطبق الفلتر
+            activate(b);
+            const tab = b.getAttribute('data-filter') || '';
+            const url = new URL(location.href);
+            url.searchParams.set('tab', tab);
+            history.replaceState({}, '', url);
+            window.dispatchEvent(new CustomEvent('logistics:set-filter-from-tab',{detail:{tab}}));
+          });
+        });
+
+        // لو فيه ?tab= في الرابط فعِّله بصريًا
+        const p = (new URLSearchParams(location.search).get('tab')||'').toLowerCase();
+        const m = {prepared:'lg-btn-prepared', received:'lg-btn-received', delivered:'lg-btn-delivered'};
+        if (m[p] && document.getElementById(m[p])) activate(document.getElementById(m[p]));
+      })();
+    </script>
+  </body>
 </html>
