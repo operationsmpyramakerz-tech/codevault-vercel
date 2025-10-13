@@ -1,6 +1,6 @@
 // Logistics tabs (Fully prepared / Missing / Received / Delivered) + counters
 // "Mark Received" في Fully prepared و "Mark Received Anyway" في Missing
-// Missing: يحدّث الحالة فقط للمكوّنات اللي Avail > 0. المكوّنات اللي Rem > 0 تظلّ ظاهرة في تبويب Missing.
+// كلاهما يحدّث Notion Status -> "Received by operations" ثم ينقل الأوردر إلى تبويب Received
 
 (function () {
   // ---------- config ----------
@@ -69,7 +69,7 @@
     );
 
     return {
-      id: S(it.id ?? pageId),
+      id: S(it.id ?? pageId), // DOM id
       pageId,
       reason: S(it.reason || ""),
       created: S(it.createdTime || it.created_time || it.created || ""),
@@ -153,28 +153,16 @@
   // ---------- actions ----------
   async function markGroupReceived(group, buttonEl) {
     const prevText = buttonEl ? buttonEl.textContent : "";
-
     try {
       if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = "Saving..."; }
 
-      // NEW: في تبويب Missing نستهدف فقط العناصر Avail > 0
-      let targets = group.items;
-      if (activeTab === "missing") {
-        targets = group.items.filter(it => N(it.available) > 0 && !isReceived(it));
-      }
-      // في تبويب Prepared نرسل كل عناصر الجروب (هو أصلًا Fully prepared)
-      const pageIds = targets.map(i => i.pageId).filter(Boolean);
-
-      if (!pageIds.length) {
-        if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = prevText || "Mark Received"; }
-        alert("لا توجد مكوّنات ذات كمية متاحة (> 0) لكي يتم استلامها.");
-        return;
-      }
+      const pageIds = group.items.map(i => i.pageId).filter(Boolean);
+      if (!pageIds.length) throw new Error("No pageIds to update");
 
       await postJSON(MARK_RECEIVED_URL, { pageIds });
 
-      // Update locally فقط للعناصر اللي فعلاً اتبعت IDs بتاعتها
-      const setIds = new Set(pageIds.map(String));
+      // local flip
+      const setIds = new Set(pageIds);
       allItems = allItems.map(r => {
         const rPageId = r.pageId || r.page_id || r.notionPageId || r.notion_page_id || r.id;
         if (setIds.has(String(rPageId))) {
@@ -183,8 +171,7 @@
         return r;
       });
 
-      render(); // العناصر اللي اتعملها Received هتظهر في تبويب Received
-               // والعناصر اللي Rem > 0 هتظل ظاهرة في Missing كما هي
+      render();
     } catch (e) {
       console.error(e);
       if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = prevText || "Mark Received"; }
@@ -203,8 +190,9 @@
 
     const groupsPrepared = groupsAll.filter(g => g.allPrepared);
 
-    // نظهر الجروبس اللي فيها أي عنصر ناقص، ونُظهر كل عناصر الطلب داخل الجروب (سواء Rem=0 أو لأ)
-    const groupsMissing = groupsAll.filter(g => g.items.some(x => N(x.remaining) > 0));
+    // اعرض كل عناصر الطلب، بس اختار الجروبس اللي فيها أي عنصر ناقص
+const groupsMissing = groupsAll
+  .filter(g => g.items.some(x => N(x.remaining) > 0));
 
     const groupsReceived = groupsAll
       .map(g => ({ ...g, items: g.items.filter(isReceived) }))
