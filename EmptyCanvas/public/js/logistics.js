@@ -1,14 +1,12 @@
 // EmptyCanvas/public/js/logistics.js
-// Logistics page: عرض الطلبات الـ Fully prepared مثل Storage
-// + تعديل كارت KPI الموجود في الهيدر نفسه:
-//   تغيير العنوان من "Prepared" إلى "Fully prepared" وتحديث قيمته بعد الريندر.
+// Logistics: عرض المجموعات fully prepared + تحديث كارت KPI في الهيدر بعنوان Fully prepared مع العدد الصحيح.
 
 (function () {
   // ---------- helpers ----------
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const n  = (v) => Number(v ?? 0);
-  const fmt = (v) => String(Number(v ?? 0));
+  const N  = (v) => Number.isFinite(+v) ? +v : 0;
+  const fmt = (v) => String(N(v));
   const esc = (s) =>
     String(s ?? '').replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -18,7 +16,6 @@
   const searchInput =
     $('#search') || $('#logistics-search') || $('input[type="search"]') || null;
 
-  // الحاوية اللي بنرندر فيها الكروت (نختار أقرب عنصر معروف)
   const grid =
     $('#assigned-grid') ||
     $('#logistics-grid') ||
@@ -40,9 +37,9 @@
 
   let allItems = [];
 
-  // ---------- تجميع وفلترة fully prepared ----------
+  // ---------- grouping ----------
   const groupKeyOf = (it) => {
-    const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
+    const reason  = (it.reason && String(it.reason).trim()) || 'No Reason';
     const created = it.createdTime || it.created_time || it.created || '';
     const bucket  = (created || '').slice(0, 10);
     return `grp:${reason}|${bucket}`;
@@ -58,7 +55,7 @@
         subtitle: new Date(it.createdTime || Date.now()).toLocaleString(),
         items: []
       };
-      g.items.push(it);
+      g.items.push(normalizeItem(it));
       map.set(key, g);
     }
     const arr = [...map.values()];
@@ -66,13 +63,27 @@
     return arr;
   }
 
+  // نوحّد الحقول ونحسب remaining لو مش موجود
+  function normalizeItem(it) {
+    const req   = N(it.requested ?? it.req);
+    const avail = N(it.available ?? it.avail);
+    let rem     = it.remaining ?? it.rem;
+    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
+    return {
+      id: it.id,
+      productName: it.productName ?? it.product_name ?? '',
+      requested: req,
+      available: avail,
+      remaining: rem,
+    };
+  }
+
   function recomputeGroupStats(g) {
-    const total = g.items.length;
-    const full  = g.items.filter(x => n(x.remaining ?? x.rem) === 0).length;
-    g.total = total;
-    g.miss  = total - full;
-    // المجموعة تعتبر fully prepared لو كل الآيتيمز remaining=0 ومفيش missing
-    g.prepared = g.items.every(x => n(x.remaining ?? x.rem) === 0) && g.miss === 0;
+    g.total = g.items.length;
+    // عناصر ناقصة = أي عنصر remaining > 0
+    g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
+    // المجموعة fully prepared فقط لو كل العناصر remaining = 0
+    g.prepared = g.items.every(x => N(x.remaining) === 0);
   }
 
   // ---------- API ----------
@@ -86,75 +97,56 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- تحديث كارت KPI الموجود (بدون إنشاء كروت جديدة) ----------
-  function updatePreparedKPI(preparedCardsCount) {
-    // نحدد الحاوية اللي فيها كروت الـ KPI أعلى الصفحة
+  // ---------- KPI (الهيدر نفسه) ----------
+  function updatePreparedKPI(preparedCount) {
     const kpiRow =
       $('.summary') ||
       $('.stats') ||
       $('.summary-cards') ||
       $('.header-cards') ||
       $('.cards-row') ||
-      // fallback: الصف اللي قبل الجريد مباشرة
       (grid ? grid.previousElementSibling : null);
 
     if (!kpiRow) return;
 
-    // هنبحث عن الكارت اللي عنوانه Prepared داخل الهيدر
-    const allEls = $$('.card, .stat, .kpi-card, .summary-card, .kpi, .box, div', kpiRow);
-
-    // نلاقي عنصر فيه كلمة Prepared (case-insensitive)
-    let preparedCard = null;
-    let preparedLabelNode = null;
-
-    for (const el of allEls) {
-      // ندور على عنصر نصّي جوه الكارت مكتوب فيه Prepared
-      const cand = Array.from(el.querySelectorAll('*')).find(x =>
+    // لاقي كارت الهيدر اللي كان عنوانه Prepared وعدّل عليه
+    const candidates = $$('.card, .stat, .kpi-card, .summary-card, .kpi, .box, div', kpiRow);
+    let preparedCard = null, preparedLabelNode = null;
+    for (const el of candidates) {
+      const label = Array.from(el.querySelectorAll('*')).find(x =>
         /prepared/i.test((x.textContent || '').trim())
       );
-      if (cand) {
-        // نطلع لأعلى لحد أقرب "كارت"
-        let cur = cand;
+      if (label) {
+        let cur = label;
         while (cur && cur !== el && cur !== kpiRow) {
-          if (cur.classList &&
-              /card|stat|kpi/i.test(cur.className)) {
-            preparedCard = cur;
-            preparedLabelNode = cand;
-            break;
+          if (cur.classList && /card|stat|kpi/i.test(cur.className)) {
+            preparedCard = cur; preparedLabelNode = label; break;
           }
           cur = cur.parentElement;
         }
-        if (preparedCard) break;
       }
+      if (preparedCard) break;
     }
-
     if (!preparedCard) return;
 
-    // غير عنوان الكارت
     if (preparedLabelNode) preparedLabelNode.textContent = 'Fully prepared';
 
-    // حدث القيمة الرقمية داخل نفس الكارت
+    // ابحث عن عنصر القيمة داخل نفس الكارت وحدثه
     let valueNode =
       preparedCard.querySelector('.value, .count, .num, .kpi-value, .stat-value, strong, b, .digit');
 
     if (!valueNode) {
-      // لو مفيش، نختار أول عنصر رقمي داخل الكارت
       const texts = preparedCard.querySelectorAll('*');
       for (const t of texts) {
-        if (/^\d+$/.test((t.textContent || '').trim())) {
-          valueNode = t;
-          break;
-        }
+        if (/^\d+$/.test((t.textContent || '').trim())) { valueNode = t; break; }
       }
     }
-
-    if (valueNode) valueNode.textContent = fmt(preparedCardsCount);
+    if (valueNode) valueNode.textContent = fmt(preparedCount);
   }
 
   // ---------- render ----------
   function render(list) {
     if (!grid) return;
-
     grid.innerHTML = '';
 
     const q = (searchInput?.value || '').trim().toLowerCase();
@@ -165,11 +157,13 @@
         )
       : list;
 
-    const groups = buildGroups(filtered).filter(g => g.prepared);
+    // جهّز المجموعات واختر فقط fully prepared
+    const groupsAll = buildGroups(filtered);
+    const groups    = groupsAll.filter(g => g.prepared);
 
     if (!groups.length) {
       emptyMsg.style.display = '';
-      updatePreparedKPI(0); // Prepared -> Fully prepared + 0
+      updatePreparedKPI(0);
       return;
     }
     emptyMsg.style.display = 'none';
@@ -199,30 +193,29 @@
           ${g.items.map(it => `
             <div class="order-item" id="row-${esc(it.id)}">
               <div class="item-left">
-                <div class="item-name">${esc(it.productName || it.product_name || '-')}</div>
+                <div class="item-name">${esc(it.productName)}</div>
               </div>
               <div class="item-mid">
-                <div class="num">Req: <strong>${fmt(it.requested ?? it.req)}</strong></div>
-                <div class="num">Avail: <strong data-col="available">${fmt(it.available ?? it.avail)}</strong></div>
+                <div class="num">Req: <strong>${fmt(it.requested)}</strong></div>
+                <div class="num">Avail: <strong data-col="available">${fmt(it.available)}</strong></div>
                 <div class="num">
                   Rem:
-                  <span class="pill ${n(it.remaining ?? it.rem) > 0 ? 'pill--danger' : 'pill--success'}"
-                        data-col="remaining">${fmt(it.remaining ?? it.rem)}</span>
+                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}"
+                        data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
             </div>
           `).join('')}
         </div>
       `;
-
       grid.appendChild(card);
     }
 
     if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
 
-    // عدّ الكروت المعروضة (المجموعات fully prepared) وحدِّث كارت الهيدر الموجود
-    const preparedCardsCount = $$('.order-card', grid).length;
-    updatePreparedKPI(preparedCardsCount);
+    // العدد الصحيح = عدد المجموعات fully prepared المعروضة
+    const preparedCount = groups.length;
+    updatePreparedKPI(preparedCount);
   }
 
   // ---------- init ----------
