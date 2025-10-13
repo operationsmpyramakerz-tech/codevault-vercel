@@ -101,19 +101,19 @@ document.addEventListener('DOMContentLoaded',()=>{
     const totalOrders    = groups.length;
     const preparedOrders = groups.filter(g=>g.prepared).length;
     const receivedOrders = groups.filter(g=>g.received).length;
-    const notCompleted   = totalOrders - preparedOrders;
+    const missingOrders  = groups.filter(g=>!g.prepared && !g.received).length; // استبعاد received من missing
 
     stTotal.textContent = fmt(totalOrders);
     stFull.textContent  = fmt(preparedOrders);
     stRecv.textContent  = fmt(receivedOrders);
-    stMiss.textContent  = fmt(notCompleted);
+    stMiss.textContent  = fmt(missingOrders);
   }
 
   function applyFilterAndRender(){
     let view=groups;
     if(currentFilter==='prepared') view=groups.filter(g=>g.prepared);
     else if(currentFilter==='received') view=groups.filter(g=>g.received);
-    else if(currentFilter==='missing') view=groups.filter(g=>!g.prepared);
+    else if(currentFilter==='missing') view=groups.filter(g=>!g.prepared && !g.received); // استبعاد received
     renderGroups(view);
   }
 
