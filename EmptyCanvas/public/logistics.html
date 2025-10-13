@@ -5,28 +5,22 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Logistics</title>
 
-    <!-- Main styles -->
-    <link rel="stylesheet" href="/css/style.css" />
+    <!-- Main styles (اتأكد إن المسار ده شغال عندك) -->
+    <link id="main-style" rel="stylesheet" href="/css/style.css?v=20251012" />
 
-    <!-- Feather icons (optional) -->
+    <!-- Feather icons (اختياري) -->
     <script src="https://unpkg.com/feather-icons"></script>
 
     <style>
-      /* ظل للتبويب النشط (لا يغيّر التصميم العام) */
-      .tabs-bar{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:18px 0 8px;}
-      .tab-card{
-        display:flex; flex-direction:column; align-items:center; justify-content:center;
-        padding:16px; border-radius:14px; background:#fff; border:1px solid rgba(15,23,42,.06);
-        transition:box-shadow .2s ease, transform .06s ease; cursor:pointer; user-select:none;
-      }
+      /* تبويب العدّادات أعلى الصفحة – ظل للتبويب النشط فقط */
+      .tabs-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:18px 0 8px}
+      .tab-card{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;border-radius:14px;background:#fff;border:1px solid rgba(15,23,42,.06);transition:box-shadow .2s,transform .06s;cursor:pointer;user-select:none}
       .tab-card:hover{transform:translateY(-1px)}
-      .tab-card.active{box-shadow:0 10px 28px rgba(2,8,23,.12)}
-      .tab-title{font-size:14px; color:#6b7280; margin-bottom:6px}
-      .tab-value{font-size:22px; font-weight:700; color:#0f172a}
-      /* لإظهار أن الزر الحالي هو تبويب */
-      .tab-card[aria-pressed="true"]{box-shadow:0 10px 28px rgba(2,8,23,.12)}
+      .tab-card.active,.tab-card[aria-pressed="true"]{box-shadow:0 10px 28px rgba(2,8,23,.12)}
+      .tab-title{font-size:14px;color:#6b7280;margin-bottom:6px}
+      .tab-value{font-size:22px;font-weight:700;color:#0f172a}
       /* شبكة الكروت */
-      .cards-grid{display:flex; flex-direction:column; gap:18px}
+      .cards-grid{display:flex;flex-direction:column;gap:18px}
     </style>
   </head>
 
@@ -35,30 +29,34 @@
       <!-- ===== Sidebar ===== -->
       <aside class="sidebar">
         <div class="sidebar__inner">
-          <a href="/orders" class="sidebar-link">
-            <i data-feather="list"></i><span>Current Orders</span>
-          </a>
-          <a href="/orders/requested" class="sidebar-link">
-            <i data-feather="inbox"></i><span>Schools Requested Orders</span>
-          </a>
-          <a href="/orders/assigned" class="sidebar-link">
-            <i data-feather="package"></i><span>Storage</span>
-          </a>
-          <a href="/order/create" class="sidebar-link">
-            <i data-feather="plus-circle"></i><span>Create New Order</span>
-          </a>
-          <a href="/stocktaking" class="sidebar-link">
-            <i data-feather="archive"></i><span>Stocktaking</span>
-          </a>
-          <a href="/logistics" class="sidebar-link active">
-            <i data-feather="truck"></i><span>Logistics</span>
-          </a>
-          <a href="/funds" class="sidebar-link">
-            <i data-feather="dollar-sign"></i><span>Funds</span>
-          </a>
+          <nav class="sidebar-nav">
+            <a href="/orders" class="nav-link">
+              <i data-feather="list"></i><span>Current Orders</span>
+            </a>
+            <a href="/orders/requested" class="nav-link">
+              <i data-feather="inbox"></i><span>Schools Requested Orders</span>
+            </a>
+            <a href="/orders/assigned" class="nav-link">
+              <i data-feather="package"></i><span>Storage</span>
+            </a>
+            <a href="/order/create" class="nav-link">
+              <i data-feather="plus-circle"></i><span>Create New Order</span>
+            </a>
+            <a href="/stocktaking" class="nav-link">
+              <i data-feather="archive"></i><span>Stocktaking</span>
+            </a>
+            <a href="/logistics" class="nav-link active">
+              <i data-feather="truck"></i><span>Logistics</span>
+            </a>
+            <a href="/funds" class="nav-link">
+              <i data-feather="dollar-sign"></i><span>Funds</span>
+            </a>
+          </nav>
         </div>
         <div class="sidebar__bottom">
-          <a href="/logout" class="btn btn-ghost"><i data-feather="log-out"></i><span>Logout</span></a>
+          <a href="/logout" class="btn btn-ghost">
+            <i data-feather="log-out"></i><span>Logout</span>
+          </a>
         </div>
       </aside>
 
@@ -76,10 +74,10 @@
           </div>
         </div>
 
-        <!-- ===== Tabs Bar (Top bar as tabs with active shadow) ===== -->
+        <!-- ===== Top bar as tabs (بظل للتبويب النشط) ===== -->
         <div class="tabs-bar" role="tablist" aria-label="Logistics filters">
           <button id="lg-btn-prepared"
-                  class="tab-card active"
+                  class="tab-card"
                   role="tab" aria-selected="true" aria-pressed="true"
                   data-filter="prepared">
             <div class="tab-title">Fully prepared</div>
@@ -105,12 +103,14 @@
 
         <!-- Grid: orders/cards -->
         <section id="logistics-grid" class="cards-grid"></section>
+
+        <!-- Empty state -->
         <div id="logistics-empty" class="empty-state" style="display:none">
           <div class="empty-title">No items.</div>
           <div class="empty-sub">There are no orders to show here right now.</div>
         </div>
 
-        <!-- Popover (if needed by JS for partial edits / etc.) -->
+        <!-- (اختياري) popover للمدخلات الجزئية إن لزم -->
         <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-label="Edit">
           <div class="popover__body">
             <div class="form-row">
@@ -130,18 +130,18 @@
     <!-- Page script -->
     <script src="/js/logistics.js"></script>
     <script>
-      // تفعيل Feather icons
-      if (window.feather) feather.replace({ 'stroke-width': 2 });
+      // Feather icons
+      window.feather && feather.replace({ 'stroke-width': 2 });
 
-      // مزامنة التبويب النشط مع الزرار (بيستخدمه logistics.js لتغيير الفلتر)
+      // تفعيل التبويب بصريًا + مزامنة الـ URL + إبلاغ logistics.js
       (function () {
-        const buttons = [
+        const btns = [
           document.getElementById('lg-btn-prepared'),
           document.getElementById('lg-btn-received'),
           document.getElementById('lg-btn-delivered')
         ];
-        function activate(btn){
-          buttons.forEach(b=>{
+        function setActive(btn){
+          btns.forEach(b=>{
             if(!b) return;
             const on = b===btn;
             b.classList.toggle('active', on);
@@ -149,11 +149,10 @@
             b.setAttribute('aria-pressed',  on ? 'true' : 'false');
           });
         }
-        buttons.forEach(b=>{
+        btns.forEach(b=>{
           if(!b) return;
           b.addEventListener('click', ()=>{
-            // logistics.js هيلتقط data-filter ويطبق الفلتر
-            activate(b);
+            setActive(b);
             const tab = b.getAttribute('data-filter') || '';
             const url = new URL(location.href);
             url.searchParams.set('tab', tab);
@@ -162,10 +161,11 @@
           });
         });
 
-        // لو فيه ?tab= في الرابط فعِّله بصريًا
-        const p = (new URLSearchParams(location.search).get('tab')||'').toLowerCase();
-        const m = {prepared:'lg-btn-prepared', received:'lg-btn-received', delivered:'lg-btn-delivered'};
-        if (m[p] && document.getElementById(m[p])) activate(document.getElementById(m[p]));
+        // فعل التبويب من ?tab= في الرابط لو موجود
+        const initial = (new URLSearchParams(location.search).get('tab')||'prepared').toLowerCase();
+        const map = {prepared:'lg-btn-prepared', received:'lg-btn-received', delivered:'lg-btn-delivered'};
+        const first = document.getElementById(map[initial]) || btns[0];
+        first && first.click(); // يضبط الفلتر ويشغّل الحدث
       })();
     </script>
   </body>
