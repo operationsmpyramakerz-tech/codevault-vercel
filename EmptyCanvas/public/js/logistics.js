@@ -76,6 +76,7 @@
       productName: S(it.productName ?? it.product_name ?? ""),
       requested: req,
       available: avail,
+      received: N(it.received ?? it.rec ?? it.quantityReceivedByOperations ?? it['Quantity received by operations'] ?? 0),
       remaining: rem,
       status: statusOf(it),
     };
@@ -268,6 +269,7 @@ const groupsMissing = groupsAll
               <div class="item-mid">
                 <div class="num">Req: <strong>${fmt(it.requested)}</strong></div>
                 <div class="num">Avail: <strong data-col="available">${fmt(it.available)}</strong></div>
+                <div class="num">Rec: <strong data-col="received">${fmt(it.received)}</strong></div>
                 <div class="num">
                   Rem:
                   <span class="pill ${N(it.remaining) > 0 ? "pill--danger" : "pill--success"}" data-col="remaining">${fmt(it.remaining)}</span>
