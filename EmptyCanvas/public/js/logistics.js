@@ -1,6 +1,6 @@
 // EmptyCanvas/public/js/logistics.js
-// Logistics: يعرض Prepared (= Fully available من Storage) بنفس كروت Storage.
-// Received/Delivered لسه بدون مصدر بيانات، فبنعدّهم 0 مؤقتاً.
+// Logistics: يعرض Fully prepared (نفس "Fully available" في Storage) بكروت مطابقة لصفحة Storage.
+// بيحدّث العداد في الهيدر ويعيد تسمية اللابل إلى "Fully prepared" لو كان موجود.
 
 (function () {
   // ---------- helpers ----------
@@ -13,12 +13,16 @@
     }[c]));
 
   // ---------- DOM ----------
-  const searchInput      = $('#search');
-  const preparedCountEl  = $('#prepared-count');
-  const receivedCountEl  = $('#received-count');
-  const deliveredCountEl = $('#delivered-count');
-  const grid             = $('#assigned-grid');
-  const emptyMsg         = $('#assigned-empty');
+  const searchInput       = $('#search');
+  const preparedCountEl   = $('#prepared-count');   // الرقم في كارت الهيدر
+  const receivedCountEl   = $('#received-count');
+  const deliveredCountEl  = $('#delivered-count');
+  const preparedLabelEl   = $('#prepared-label');   // النص "Prepared" لو موجود هنبدّله
+  const grid              = $('#assigned-grid');
+  const emptyMsg          = $('#assigned-empty');
+
+  // غيّر عنوان اللابل لو عنصره موجود
+  if (preparedLabelEl) preparedLabelEl.textContent = 'Fully prepared';
 
   let allItems = [];
   let groups   = [];
@@ -26,7 +30,6 @@
   // ---------- storage-like grouping ----------
   const groupKeyOf = (it) => {
     const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
-    // نخلي الـ subtitle تاريخ الإنشاء زي Storage
     const created = it.createdTime || it.created_time || it.created || '';
     const bucket  = (created || '').slice(0, 10);
     return `grp:${reason}|${bucket}`;
@@ -50,25 +53,22 @@
     return arr;
   }
 
-  // نفس منطق Storage: prepared لما rem=0 لكل عناصر الجروب
+  // نفس منطق Storage: الجروب "Fully prepared" لما rem=0 لكل عناصره
   function recomputeGroupStats(g) {
     const total = g.items.length;
     const full  = g.items.filter(x => Number(x.remaining ?? x.rem ?? 0) === 0).length;
     g.total = total;
     g.miss  = total - full;
 
-    const allPrepared = g.items.every(x => Number(x.remaining ?? x.rem ?? 0) === 0);
-    // لو بتستخدم status في النوشن/الـ API ممكن تضيف شرط إضافي هنا:
-    // const allPrepared = g.items.every(x => String(x.status||'') === 'Prepared');
-    g.prepared = allPrepared && g.miss === 0;
+    // مستعد بالكامل لو كل العناصر remaining=0 وأيضاً مفيش missing
+    g.prepared = g.items.every(x => Number(x.remaining ?? x.rem ?? 0) === 0) && g.miss === 0;
   }
 
   function updateHeaderCounts() {
     const preparedOrders = groups.filter(g => g.prepared).length;
-    // لحد ما نوصل داتا Received/Delivered هنسيبهم 0
-    preparedCountEl && (preparedCountEl.textContent = fmt(preparedOrders));
-    receivedCountEl && (receivedCountEl.textContent = fmt(0));
-    deliveredCountEl && (deliveredCountEl.textContent = fmt(0));
+    if (preparedCountEl)  preparedCountEl.textContent = fmt(preparedOrders);
+    if (receivedCountEl)  receivedCountEl.textContent = fmt(0); // لحد ما نوصل الداتا الحقيقية
+    if (deliveredCountEl) deliveredCountEl.textContent = fmt(0);
   }
 
   // ---------- fetch ----------
@@ -82,7 +82,7 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- render (نفس كارت Storage بدون أزرار) ----------
+  // ---------- render (كروت مطابقة لصفحة Storage بدون أزرار) ----------
   function render(list) {
     grid.innerHTML = '';
 
@@ -96,6 +96,7 @@
 
     const viewGroups = buildGroups(filtered).filter(g => g.prepared);
 
+    // حدّث العداد بعد ما حددنا الـ groups المعروضة
     updateHeaderCounts();
 
     if (!viewGroups.length) {
@@ -122,7 +123,6 @@
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.total)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.miss)}</span>
-            <!-- لا أزرار في اللوجستكس -->
           </div>
         </div>
 
@@ -141,7 +141,6 @@
                         data-col="remaining">${fmt(it.remaining ?? it.rem)}</span>
                 </div>
               </div>
-              <!-- لا أزرار في الصف -->
             </div>
           `).join('')}
         </div>
