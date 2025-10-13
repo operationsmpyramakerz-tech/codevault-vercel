@@ -942,6 +942,34 @@ app.post(
     }
   },
 );
+// === Logistics: mark received (يغيّر عمود Status إلى "Received by operations") ===
+app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
+  try {
+    const { pageIds } = req.body || {};
+    if (!Array.isArray(pageIds) || pageIds.length === 0) {
+      return res.status(400).json({ ok: false, error: "pageIds required" });
+    }
+
+    // لو حابب تثبّت الاسم "Status" حرفيًا، بدل السطرين دول بخاصية Status مباشرة.
+    const statusProp = await detectStatusPropName(); // غالبًا بترجع "Status"
+
+    await Promise.all(
+      pageIds.map((pid) =>
+        notion.pages.update({
+          page_id: String(pid),
+          properties: {
+            [statusProp]: { select: { name: "Received by operations" } },
+          },
+        })
+      )
+    );
+
+    return res.json({ ok: true, updated: pageIds.length });
+  } catch (e) {
+    console.error("logistics/mark-received error:", e?.body || e);
+    return res.status(500).json({ ok: false, error: "Failed to mark received" });
+  }
+});
 
 // 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
 
