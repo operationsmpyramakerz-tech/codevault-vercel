@@ -190,10 +190,9 @@
 
     const groupsPrepared = groupsAll.filter(g => g.allPrepared);
 
-    // Missing = العناصر التي بها remaining>0 ولم تُستلم/تُسلّم
-    const groupsMissing = groupsAll
-      .map(g => ({ ...g, items: g.items.filter(it => N(it.remaining) > 0 && !isReceived(it) && !isDelivered(it)) }))
-      .filter(g => g.items.length);
+    // اعرض كل عناصر الطلب، بس اختار الجروبس اللي فيها أي عنصر ناقص
+const groupsMissing = groupsAll
+  .filter(g => g.items.some(x => N(x.remaining) > 0));
 
     const groupsReceived = groupsAll
       .map(g => ({ ...g, items: g.items.filter(isReceived) }))
