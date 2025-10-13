@@ -1,4 +1,6 @@
-// Logistics page: Tabs (Fully prepared / Received / Delivered) + counters + Storage-like cards
+// EmptyCanvas/public/js/logistics.js
+// Logistics: عرض المجموعات fully prepared + تحديث كارت KPI في الهيدر بعنوان Fully prepared مع العدد الصحيح.
+
 (function () {
   // ---------- helpers ----------
   const $  = (sel, root = document) => root.querySelector(sel);
@@ -10,36 +12,79 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
 
-  // ---------- DOM ----------
-  const searchInput = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
-  // الحاوية: خليك مرن — لو موجودة logistics-grid استخدمها، وإلا assigned-grid
-  const grid = $('#logistics-grid') || $('#assigned-grid') || $('.assigned-grid') || $('main');
-  const emptyMsg = $('#logistics-empty') || $('#assigned-empty') || (() => {
-    const d = document.createElement('div');
-    d.id = 'logistics-empty';
-    d.className = 'muted';
-    d.style.display = 'none';
-    d.textContent = 'No items.';
-    (grid?.parentElement || document.body).appendChild(d);
-    return d;
-  })();
+  // ---------- DOM refs ----------
+  const searchInput =
+    $('#search') || $('#logistics-search') || $('input[type="search"]') || null;
 
-  // أزرار التبويب (بتعمل shadow من الـ HTML)
-  const tabs = {
-    prepared:  $('#lg-btn-prepared'),
-    received:  $('#lg-btn-received'),
-    delivered: $('#lg-btn-delivered'),
+  const grid =
+    $('#assigned-grid') ||
+    $('#logistics-grid') ||
+    $('.assigned-grid') ||
+    $('#list') ||
+    $('main');
+
+  const emptyMsg =
+    $('#assigned-empty') ||
+    $('#logistics-empty') ||
+    (() => {
+      const d = document.createElement('div');
+      d.id = 'assigned-empty';
+      d.style.display = 'none';
+      d.textContent = 'No items.';
+      (grid?.parentElement || document.body).appendChild(d);
+      return d;
+    })();
+
+  let allItems = [];
+
+  // ---------- grouping ----------
+  const groupKeyOf = (it) => {
+    const reason  = (it.reason && String(it.reason).trim()) || 'No Reason';
+    const created = it.createdTime || it.created_time || it.created || '';
+    const bucket  = (created || '').slice(0, 10);
+    return `grp:${reason}|${bucket}`;
   };
 
-  // العدادات
-  const kpi = {
-    prepared:  $('#lg-prepared'),
-    received:  $('#lg-received'),
-    delivered: $('#lg-delivered'),
-  };
+  function buildGroups(list) {
+    const map = new Map();
+    for (const it of list) {
+      const key = groupKeyOf(it);
+      const g = map.get(key) || {
+        key,
+        title: (it.reason && String(it.reason).trim()) || 'No Reason',
+        subtitle: new Date(it.createdTime || Date.now()).toLocaleString(),
+        items: []
+      };
+      g.items.push(normalizeItem(it));
+      map.set(key, g);
+    }
+    const arr = [...map.values()];
+    arr.forEach(recomputeGroupStats);
+    return arr;
+  }
 
-  let groups   = [];
-  let currentTab = readTabFromURL();
+  // نوحّد الحقول ونحسب remaining لو مش موجود
+  function normalizeItem(it) {
+    const req   = N(it.requested ?? it.req);
+    const avail = N(it.available ?? it.avail);
+    let rem     = it.remaining ?? it.rem;
+    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
+    return {
+      id: it.id,
+      productName: it.productName ?? it.product_name ?? '',
+      requested: req,
+      available: avail,
+      remaining: rem,
+    };
+  }
+
+  function recomputeGroupStats(g) {
+    g.total = g.items.length;
+    // عناصر ناقصة = أي عنصر remaining > 0
+    g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
+    // المجموعة fully prepared فقط لو كل العناصر remaining = 0
+    g.prepared = g.items.every(x => N(x.remaining) === 0);
+  }
 
   // ---------- API ----------
   async function fetchAssigned() {
@@ -52,108 +97,78 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- normalize & grouping ----------
-  function normalizeItem(it) {
-    const req   = N(it.requested ?? it.req);
-    const avail = N(it.available ?? it.avail);
-    let rem     = it.remaining ?? it.rem;
-    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
-    return {
-      id: it.id,
-      productName: it.productName ?? it.product_name ?? '-',
-      reason: (it.reason && String(it.reason).trim()) || 'No Reason',
-      requested: req,
-      available: avail,
-      remaining: rem,
-      status: String(it.status || ''),
-      created: it.createdTime || it.created_time || it.created || ''
-    };
-  }
+  // ---------- KPI (الهيدر نفسه) ----------
+  function updatePreparedKPI(preparedCount) {
+    const kpiRow =
+      $('.summary') ||
+      $('.stats') ||
+      $('.summary-cards') ||
+      $('.header-cards') ||
+      $('.cards-row') ||
+      (grid ? grid.previousElementSibling : null);
 
-  function groupKeyOf(it) {
-    const bucket = (it.created || '').slice(0, 10);
-    return `grp:${it.reason}|${bucket}`;
-  }
+    if (!kpiRow) return;
 
-  function recomputeGroupStats(g) {
-    g.total = g.items.length;
-    g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-
-    // Fully prepared = كل العناصر remaining=0 وحالتها Prepared
-    const allZero = g.items.every(x => N(x.remaining) === 0);
-    const allPreparedStatus = g.items.every(x => x.status === 'Prepared');
-
-    // Received tab = كل العناصر status='Received by operations'
-    const allReceived = g.items.every(x => x.status === 'Received by operations');
-
-    // Delivered tab = كل العناصر status='Delivered'
-    const allDelivered = g.items.every(x => x.status === 'Delivered');
-
-    g.prepared  = allZero && allPreparedStatus;
-    g.received  = allReceived;
-    g.delivered = allDelivered;
-  }
-
-  function buildGroups(list) {
-    const map = new Map();
-    for (const raw of list) {
-      const it = normalizeItem(raw);
-      const key = groupKeyOf(it);
-      const g = map.get(key) || {
-        key,
-        title: it.reason,
-        subtitle: new Date(it.created || Date.now()).toLocaleString(),
-        items: [],
-      };
-      g.items.push(it);
-      map.set(key, g);
+    // لاقي كارت الهيدر اللي كان عنوانه Prepared وعدّل عليه
+    const candidates = $$('.card, .stat, .kpi-card, .summary-card, .kpi, .box, div', kpiRow);
+    let preparedCard = null, preparedLabelNode = null;
+    for (const el of candidates) {
+      const label = Array.from(el.querySelectorAll('*')).find(x =>
+        /prepared/i.test((x.textContent || '').trim())
+      );
+      if (label) {
+        let cur = label;
+        while (cur && cur !== el && cur !== kpiRow) {
+          if (cur.classList && /card|stat|kpi/i.test(cur.className)) {
+            preparedCard = cur; preparedLabelNode = label; break;
+          }
+          cur = cur.parentElement;
+        }
+      }
+      if (preparedCard) break;
     }
-    const arr = [...map.values()];
-    arr.forEach(recomputeGroupStats);
-    return arr;
+    if (!preparedCard) return;
+
+    if (preparedLabelNode) preparedLabelNode.textContent = 'Fully prepared';
+
+    // ابحث عن عنصر القيمة داخل نفس الكارت وحدثه
+    let valueNode =
+      preparedCard.querySelector('.value, .count, .num, .kpi-value, .stat-value, strong, b, .digit');
+
+    if (!valueNode) {
+      const texts = preparedCard.querySelectorAll('*');
+      for (const t of texts) {
+        if (/^\d+$/.test((t.textContent || '').trim())) { valueNode = t; break; }
+      }
+    }
+    if (valueNode) valueNode.textContent = fmt(preparedCount);
   }
 
-  // ---------- counters ----------
-  function updateCounters() {
-    const preparedCount  = groups.filter(g => g.prepared).length;
-    const receivedCount  = groups.filter(g => g.received).length;
-    const deliveredCount = groups.filter(g => g.delivered).length;
-
-    if (kpi.prepared)  kpi.prepared.textContent  = fmt(preparedCount);
-    if (kpi.received)  kpi.received.textContent  = fmt(receivedCount);
-    if (kpi.delivered) kpi.delivered.textContent = fmt(deliveredCount);
-  }
-
-  // ---------- filtering & render ----------
-  function filteredGroups() {
-    const q = (searchInput?.value || '').trim().toLowerCase();
-    const base = q
-      ? groups.filter(g =>
-          g.title.toLowerCase().includes(q) ||
-          g.items.some(it => (it.productName || '').toLowerCase().includes(q))
-        )
-      : groups;
-
-    if (currentTab === 'prepared')   return base.filter(g => g.prepared);
-    if (currentTab === 'received')   return base.filter(g => g.received);
-    if (currentTab === 'delivered')  return base.filter(g => g.delivered);
-    return base;
-  }
-
-  function render() {
+  // ---------- render ----------
+  function render(list) {
     if (!grid) return;
     grid.innerHTML = '';
 
-    updateCounters();
+    const q = (searchInput?.value || '').trim().toLowerCase();
+    const filtered = q
+      ? list.filter(x =>
+          (x.reason || '').toLowerCase().includes(q) ||
+          (x.productName || x.product_name || '').toLowerCase().includes(q)
+        )
+      : list;
 
-    const view = filteredGroups();
-    if (!view.length) {
+    // جهّز المجموعات واختر فقط fully prepared
+    const groupsAll = buildGroups(filtered);
+    const groups    = groupsAll.filter(g => g.prepared);
+
+    if (!groups.length) {
       emptyMsg.style.display = '';
+      updatePreparedKPI(0);
       return;
     }
     emptyMsg.style.display = 'none';
 
-    for (const g of view) {
+    for (const g of groups) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
@@ -185,7 +200,8 @@
                 <div class="num">Avail: <strong data-col="available">${fmt(it.available)}</strong></div>
                 <div class="num">
                   Rem:
-                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}" data-col="remaining">${fmt(it.remaining)}</span>
+                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}"
+                        data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
             </div>
@@ -196,64 +212,25 @@
     }
 
     if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
-  }
 
-  // ---------- tabs logic ----------
-  function readTabFromURL() {
-    const p = (new URLSearchParams(location.search).get('tab') || '').toLowerCase();
-    if (p === 'prepared' || p === 'received' || p === 'delivered') return p;
-    return 'prepared';
-  }
-
-  function setActiveTab(tab) {
-    currentTab = tab;
-    // تفعيل/تعطيل ظل التبويب (CSS في HTML)
-    Object.entries(tabs).forEach(([key, btn]) => {
-      const on = key === tab;
-      btn?.classList.toggle('active', on);
-      btn?.setAttribute('aria-pressed', on ? 'true' : 'false');
-      btn?.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-
-    // حدث URL بدون ريفرش
-    const url = new URL(location.href);
-    url.searchParams.set('tab', tab);
-    history.replaceState({}, '', url);
-
-    render();
-  }
-
-  // استمع لإيفنت من الـ HTML لما المستخدم يضغط تبويب
-  window.addEventListener('logistics:set-filter-from-tab', (ev) => {
-    const tab = String(ev.detail?.tab || '').toLowerCase();
-    if (tab === 'prepared' || tab === 'received' || tab === 'delivered') {
-      setActiveTab(tab);
-    }
-  });
-
-  // لو مفيش إيفنت (فتح الصفحة مباشرة) — فعّل من الـURL
-  function initTabs() {
-    const tab = readTabFromURL();
-    setActiveTab(tab);
-
-    tabs.prepared?.addEventListener('click', () => setActiveTab('prepared'));
-    tabs.received?.addEventListener('click', () => setActiveTab('received'));
-    tabs.delivered?.addEventListener('click', () => setActiveTab('delivered'));
+    // العدد الصحيح = عدد المجموعات fully prepared المعروضة
+    const preparedCount = groups.length;
+    updatePreparedKPI(preparedCount);
   }
 
   // ---------- init ----------
   async function load() {
     try {
-      const raw = await fetchAssigned();
-      groups = buildGroups(raw);
-      initTabs();
+      allItems = await fetchAssigned();
+      render(allItems);
     } catch (e) {
       console.error(e);
-      if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
+      grid.innerHTML = '<div class="error">Failed to load items.</div>';
+      updatePreparedKPI(0);
     }
   }
 
-  searchInput && searchInput.addEventListener('input', render);
+  searchInput && searchInput.addEventListener('input', () => render(allItems));
 
   load();
 })();
