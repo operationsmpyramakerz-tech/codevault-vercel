@@ -76,11 +76,15 @@
     </header>
 
     <main class="container-full-width">
-      <!-- Tabs counters (نفس ستايل Storage وبـ shadow للتبويب النشط) -->
+      <!-- Tabs counters (نفس ستايل Storage مع تبويب Missing الجديد) -->
       <div class="stats" id="lg-stats">
-        <button id="lg-btn-prepared" class="stat stat--btn active" type="button" data-filter="prepared" aria-pressed="true">
+        <button id="lg-btn-prepared" class="stat stat--btn" type="button" data-filter="prepared" aria-pressed="false">
           <div class="stat__label">Fully prepared</div>
           <div class="stat__value" id="lg-count-prepared">0</div>
+        </button>
+        <button id="lg-btn-missing" class="stat stat--btn" type="button" data-filter="missing" aria-pressed="false">
+          <div class="stat__label">Missing</div>
+          <div class="stat__value stat__value--warn" id="lg-count-missing">0</div>
         </button>
         <button id="lg-btn-received" class="stat stat--btn" type="button" data-filter="received" aria-pressed="false">
           <div class="stat__label">Received</div>
@@ -98,9 +102,6 @@
     </main>
   </div>
 </div>
-
-<!-- hidden file input (لو احتجناه مستقبلاً) -->
-<input id="lg-upload" type="file" accept="image/*" style="display:none" />
 
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>

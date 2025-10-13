@@ -1,6 +1,6 @@
-// public/js/logistics.js
-// Logistics tabs (Fully prepared / Received / Delivered) + counters
-// "Mark Received" in Fully prepared => sets Notion Status to "Received by operations"
+// Logistics tabs (Fully prepared / Missing / Received / Delivered) + counters
+// "Mark Received" في Fully prepared و "Mark Received Anyway" في Missing
+// كلاهما يحدّث Notion Status -> "Received by operations" ثم ينقل الأوردر إلى تبويب Received
 
 (function () {
   // ---------- config ----------
@@ -40,9 +40,12 @@
 
   // tabs & counters
   const btnPrepared  = $("#lg-btn-prepared");
+  const btnMissing   = $("#lg-btn-missing");
   const btnReceived  = $("#lg-btn-received");
   const btnDelivered = $("#lg-btn-delivered");
+
   const cPrepared  = $("#lg-count-prepared")  || $("#lg-prepared");
+  const cMissing   = $("#lg-count-missing");
   const cReceived  = $("#lg-count-received")  || $("#lg-received");
   const cDelivered = $("#lg-count-delivered") || $("#lg-delivered");
 
@@ -121,8 +124,9 @@
 
   // ---------- counters ----------
   function setCounter(el, val){ if (el) el.textContent = fmt(val); }
-  function updateAllCounters(groupsPrepared, groupsReceived, groupsDelivered) {
+  function updateAllCounters(groupsPrepared, groupsMissing, groupsReceived, groupsDelivered) {
     setCounter(cPrepared , groupsPrepared.length);
+    setCounter(cMissing  , groupsMissing.length);
     setCounter(cReceived , groupsReceived.length);
     setCounter(cDelivered, groupsDelivered.length);
   }
@@ -130,7 +134,12 @@
   // ---------- UI tabs ----------
   function setActiveTab(tab) {
     activeTab = tab;
-    [[btnPrepared,"prepared"],[btnReceived,"received"],[btnDelivered,"delivered"]].forEach(([b,t])=>{
+    [
+      [btnPrepared,"prepared"],
+      [btnMissing,"missing"],
+      [btnReceived,"received"],
+      [btnDelivered,"delivered"]
+    ].forEach(([b,t])=>{
       if (!b) return;
       const on = (t === tab);
       b.classList.toggle("active", on);
@@ -143,6 +152,7 @@
 
   // ---------- actions ----------
   async function markGroupReceived(group, buttonEl) {
+    const prevText = buttonEl ? buttonEl.textContent : "";
     try {
       if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = "Saving..."; }
 
@@ -164,7 +174,7 @@
       render();
     } catch (e) {
       console.error(e);
-      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = "Mark Received"; }
+      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = prevText || "Mark Received"; }
       alert("Failed to mark as received. Please try again.");
     }
   }
@@ -177,14 +187,24 @@
     const q = (searchInput?.value || "").trim().toLowerCase();
 
     const groupsAll = buildGroups(allItems);
+
     const groupsPrepared = groupsAll.filter(g => g.allPrepared);
-    const groupsReceived = groupsAll.map(g => ({ ...g, items: g.items.filter(isReceived) }))
-                                    .filter(g => g.items.length);
-    const groupsDelivered = groupsAll.map(g => ({ ...g, items: g.items.filter(isDelivered) }))
-                                     .filter(g => g.items.length);
+
+    // Missing = العناصر التي بها remaining>0 ولم تُستلم/تُسلّم
+    const groupsMissing = groupsAll
+      .map(g => ({ ...g, items: g.items.filter(it => N(it.remaining) > 0 && !isReceived(it) && !isDelivered(it)) }))
+      .filter(g => g.items.length);
+
+    const groupsReceived = groupsAll
+      .map(g => ({ ...g, items: g.items.filter(isReceived) }))
+      .filter(g => g.items.length);
+
+    const groupsDelivered = groupsAll
+      .map(g => ({ ...g, items: g.items.filter(isDelivered) }))
+      .filter(g => g.items.length);
 
     // counters
-    updateAllCounters(groupsPrepared, groupsReceived, groupsDelivered);
+    updateAllCounters(groupsPrepared, groupsMissing, groupsReceived, groupsDelivered);
 
     // search
     const filterByQuery = (gs) => {
@@ -200,6 +220,7 @@
 
     const viewSets = {
       prepared : filterByQuery(groupsPrepared),
+      missing  : filterByQuery(groupsMissing),
       received : filterByQuery(groupsReceived),
       delivered: filterByQuery(groupsDelivered)
     };
@@ -217,9 +238,12 @@
       card.dataset.key  = g.key;
       card.dataset.miss = String(g.miss);
 
-      const actionsHTML = (activeTab === "prepared")
-        ? `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`
-        : ``;
+      let actionsHTML = "";
+      if (activeTab === "prepared") {
+        actionsHTML = `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`;
+      } else if (activeTab === "missing") {
+        actionsHTML = `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received Anyway</button>`;
+      }
 
       card.innerHTML = `
         <div class="order-card__head">
@@ -273,11 +297,11 @@
     } catch (e) {
       console.error(e);
       if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
-      [cPrepared,cReceived,cDelivered].forEach(el => el && (el.textContent="0"));
+      [cPrepared,cMissing,cReceived,cDelivered].forEach(el => el && (el.textContent="0"));
     }
   }
 
-  [[btnPrepared,"prepared"],[btnReceived,"received"],[btnDelivered,"delivered"]]
+  [[btnPrepared,"prepared"],[btnMissing,"missing"],[btnReceived,"received"],[btnDelivered,"delivered"]]
     .forEach(([btn,tab])=>{
       btn && btn.addEventListener("click", ()=>{ setActiveTab(tab); render(); });
     });
