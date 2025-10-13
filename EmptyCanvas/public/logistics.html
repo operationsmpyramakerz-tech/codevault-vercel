@@ -9,12 +9,12 @@
 </head>
 <body>
 <script>
-  (function() {
+  (function () {
     try {
       if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
         document.body.classList.add('sidebar-mini');
       }
-    } catch(e) {}
+    } catch (e) {}
   })();
 </script>
 
@@ -70,36 +70,32 @@
         </div>
       </div>
 
-      <div class="header-row2">
-        <h1 class="page-title">Logistics</h1>
-      </div>
-    </header>
-
-    <main class="container-full-width">
-      <!-- Stats same style as Storage -->
+      <!-- Tabs (نفس ستايل Storage: stat--btn + active للـshadow) -->
       <div class="stats" id="lg-stats">
-        <button id="lg-btn-prepared" class="stat stat--btn active" type="button" data-filter="Prepared" aria-pressed="true">
-          <div class="stat__label">Prepared</div>
+        <button id="lg-tab-prepared"  class="stat stat--btn active" type="button" data-tab="FullyPrepared" aria-pressed="true">
+          <div class="stat__label">Fully prepared</div>
           <div class="stat__value" id="lg-count-prepared">0</div>
         </button>
-        <button id="lg-btn-received" class="stat stat--btn" type="button" data-filter="Received" aria-pressed="false">
+        <button id="lg-tab-received"  class="stat stat--btn" type="button" data-tab="Received" aria-pressed="false">
           <div class="stat__label">Received</div>
           <div class="stat__value stat__value--ok" id="lg-count-received">0</div>
         </button>
-        <button id="lg-btn-delivered" class="stat stat--btn" type="button" data-filter="Delivered" aria-pressed="false">
+        <button id="lg-tab-delivered" class="stat stat--btn" type="button" data-tab="Delivered" aria-pressed="false">
           <div class="stat__label">Delivered</div>
           <div class="stat__value stat__value--muted" id="lg-count-delivered">0</div>
         </button>
       </div>
+    </header>
 
+    <main class="container-full-width">
       <div id="assigned-empty" class="muted" style="display:none;">No items.</div>
-      <!-- use same grid class to inherit Storage cards CSS -->
+      <!-- نفس الكلاس بتاع Storage علشان ياخد نفس الكروت -->
       <div id="assigned-grid" class="assigned-grid"></div>
     </main>
   </div>
 </div>
 
-<!-- Hidden file input for receipts -->
+<!-- hidden upload (مستقبلاً للـreceived/delivered) -->
 <input id="lg-upload" type="file" accept="image/*" style="display:none" />
 
 <script>feather.replace();</script>

@@ -1,5 +1,7 @@
-// EmptyCanvas/public/js/logistics.js
-// Logistics: عرض المجموعات fully prepared + تحديث كارت KPI في الهيدر بعنوان Fully prepared مع العدد الصحيح.
+// Logistics: تبويبات أعلى الصفحة + كروت مطابقة لصفحة Storage
+// - تبويب Fully prepared يعرُض الجروبات اللي كل عناصرها remaining=0
+// - زر التبويب النشط عليه .active (Shadow زي Storage)
+// - العداد في الكارت يتحدث بعد الفلترة
 
 (function () {
   // ---------- helpers ----------
@@ -14,56 +16,36 @@
 
   // ---------- DOM refs ----------
   const searchInput =
-    $('#search') || $('#logistics-search') || $('input[type="search"]') || null;
+    $('#logisticsSearch') || $('#search') || $('input[type="search"]');
 
-  const grid =
-    $('#assigned-grid') ||
-    $('#logistics-grid') ||
-    $('.assigned-grid') ||
-    $('#list') ||
-    $('main');
+  const grid = $('#assigned-grid') || $('.assigned-grid') || $('main');
 
-  const emptyMsg =
-    $('#assigned-empty') ||
-    $('#logistics-empty') ||
-    (() => {
-      const d = document.createElement('div');
-      d.id = 'assigned-empty';
-      d.style.display = 'none';
-      d.textContent = 'No items.';
-      (grid?.parentElement || document.body).appendChild(d);
-      return d;
-    })();
+  const emptyMsg = $('#assigned-empty') || (() => {
+    const d = document.createElement('div');
+    d.id = 'assigned-empty';
+    d.className = 'muted';
+    d.style.display = 'none';
+    d.textContent = 'No items.';
+    (grid?.parentElement || document.body).appendChild(d);
+    return d;
+  })();
 
-  let allItems = [];
-
-  // ---------- grouping ----------
-  const groupKeyOf = (it) => {
-    const reason  = (it.reason && String(it.reason).trim()) || 'No Reason';
-    const created = it.createdTime || it.created_time || it.created || '';
-    const bucket  = (created || '').slice(0, 10);
-    return `grp:${reason}|${bucket}`;
+  // تبويبات
+  const tabBtns = {
+    FullyPrepared: $('#lg-tab-prepared'),
+    Received:      $('#lg-tab-received'),
+    Delivered:     $('#lg-tab-delivered')
+  };
+  const kpi = {
+    prepared:  $('#lg-count-prepared'),
+    received:  $('#lg-count-received'),
+    delivered: $('#lg-count-delivered'),
   };
 
-  function buildGroups(list) {
-    const map = new Map();
-    for (const it of list) {
-      const key = groupKeyOf(it);
-      const g = map.get(key) || {
-        key,
-        title: (it.reason && String(it.reason).trim()) || 'No Reason',
-        subtitle: new Date(it.createdTime || Date.now()).toLocaleString(),
-        items: []
-      };
-      g.items.push(normalizeItem(it));
-      map.set(key, g);
-    }
-    const arr = [...map.values()];
-    arr.forEach(recomputeGroupStats);
-    return arr;
-  }
+  let allItems = [];
+  let currentTab = 'FullyPrepared';
 
-  // نوحّد الحقول ونحسب remaining لو مش موجود
+  // ---------- normalize & group ----------
   function normalizeItem(it) {
     const req   = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
@@ -75,15 +57,39 @@
       requested: req,
       available: avail,
       remaining: rem,
+      reason: (it.reason && String(it.reason).trim()) || 'No Reason',
+      created: it.createdTime || it.created_time || it.created || ''
     };
+  }
+
+  function groupKeyOf(it) {
+    const bucket = (it.created || '').slice(0, 10);
+    return `grp:${it.reason}|${bucket}`;
   }
 
   function recomputeGroupStats(g) {
     g.total = g.items.length;
-    // عناصر ناقصة = أي عنصر remaining > 0
     g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-    // المجموعة fully prepared فقط لو كل العناصر remaining = 0
     g.prepared = g.items.every(x => N(x.remaining) === 0);
+  }
+
+  function buildGroups(list) {
+    const map = new Map();
+    for (const raw of list) {
+      const it = normalizeItem(raw);
+      const key = groupKeyOf(it);
+      const g = map.get(key) || {
+        key,
+        title: it.reason,
+        subtitle: new Date(it.created || Date.now()).toLocaleString(),
+        items: []
+      };
+      g.items.push(it);
+      map.set(key, g);
+    }
+    const arr = [...map.values()];
+    arr.forEach(recomputeGroupStats);
+    return arr;
   }
 
   // ---------- API ----------
@@ -97,51 +103,15 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- KPI (الهيدر نفسه) ----------
-  function updatePreparedKPI(preparedCount) {
-    const kpiRow =
-      $('.summary') ||
-      $('.stats') ||
-      $('.summary-cards') ||
-      $('.header-cards') ||
-      $('.cards-row') ||
-      (grid ? grid.previousElementSibling : null);
-
-    if (!kpiRow) return;
-
-    // لاقي كارت الهيدر اللي كان عنوانه Prepared وعدّل عليه
-    const candidates = $$('.card, .stat, .kpi-card, .summary-card, .kpi, .box, div', kpiRow);
-    let preparedCard = null, preparedLabelNode = null;
-    for (const el of candidates) {
-      const label = Array.from(el.querySelectorAll('*')).find(x =>
-        /prepared/i.test((x.textContent || '').trim())
-      );
-      if (label) {
-        let cur = label;
-        while (cur && cur !== el && cur !== kpiRow) {
-          if (cur.classList && /card|stat|kpi/i.test(cur.className)) {
-            preparedCard = cur; preparedLabelNode = label; break;
-          }
-          cur = cur.parentElement;
-        }
-      }
-      if (preparedCard) break;
-    }
-    if (!preparedCard) return;
-
-    if (preparedLabelNode) preparedLabelNode.textContent = 'Fully prepared';
-
-    // ابحث عن عنصر القيمة داخل نفس الكارت وحدثه
-    let valueNode =
-      preparedCard.querySelector('.value, .count, .num, .kpi-value, .stat-value, strong, b, .digit');
-
-    if (!valueNode) {
-      const texts = preparedCard.querySelectorAll('*');
-      for (const t of texts) {
-        if (/^\d+$/.test((t.textContent || '').trim())) { valueNode = t; break; }
-      }
-    }
-    if (valueNode) valueNode.textContent = fmt(preparedCount);
+  // ---------- counts ----------
+  function updateCounts(groups) {
+    const preparedCount  = groups.filter(g => g.prepared).length;
+    // مبدئيًا: Received/Delivered = 0 لحد ما نوصل الـAPI الخاص بيهم
+    const receivedCount  = 0;
+    const deliveredCount = 0;
+    if (kpi.prepared)  kpi.prepared.textContent  = fmt(preparedCount);
+    if (kpi.received)  kpi.received.textContent  = fmt(receivedCount);
+    if (kpi.delivered) kpi.delivered.textContent = fmt(deliveredCount);
   }
 
   // ---------- render ----------
@@ -153,22 +123,30 @@
     const filtered = q
       ? list.filter(x =>
           (x.reason || '').toLowerCase().includes(q) ||
-          (x.productName || x.product_name || '').toLowerCase().includes(q)
+          (x.productName || '').toLowerCase().includes(q)
         )
       : list;
 
-    // جهّز المجموعات واختر فقط fully prepared
     const groupsAll = buildGroups(filtered);
-    const groups    = groupsAll.filter(g => g.prepared);
+    updateCounts(groupsAll);
 
-    if (!groups.length) {
+    // تبويب: نعرض فقط fully prepared في تبويب FullyPrepared
+    let groupsToShow = groupsAll;
+    if (currentTab === 'FullyPrepared') {
+      groupsToShow = groupsAll.filter(g => g.prepared);
+    } else if (currentTab === 'Received') {
+      groupsToShow = []; // هتكمل لما نربط API الاستلام
+    } else if (currentTab === 'Delivered') {
+      groupsToShow = []; // هتكمل لما نربط API التسليم
+    }
+
+    if (!groupsToShow.length) {
       emptyMsg.style.display = '';
-      updatePreparedKPI(0);
       return;
     }
     emptyMsg.style.display = 'none';
 
-    for (const g of groups) {
+    for (const g of groupsToShow) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
@@ -200,8 +178,7 @@
                 <div class="num">Avail: <strong data-col="available">${fmt(it.available)}</strong></div>
                 <div class="num">
                   Rem:
-                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}"
-                        data-col="remaining">${fmt(it.remaining)}</span>
+                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}" data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
             </div>
@@ -212,21 +189,31 @@
     }
 
     if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
-
-    // العدد الصحيح = عدد المجموعات fully prepared المعروضة
-    const preparedCount = groups.length;
-    updatePreparedKPI(preparedCount);
   }
+
+  // ---------- tabs ----------
+  function setActiveTab(tabName) {
+    currentTab = tabName;
+    Object.entries(tabBtns).forEach(([name, btn]) => {
+      const active = name === tabName;
+      btn?.classList.toggle('active', active);
+      btn?.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    render(allItems);
+  }
+
+  tabBtns.FullyPrepared?.addEventListener('click', () => setActiveTab('FullyPrepared'));
+  tabBtns.Received?.addEventListener('click',      () => setActiveTab('Received'));
+  tabBtns.Delivered?.addEventListener('click',     () => setActiveTab('Delivered'));
 
   // ---------- init ----------
   async function load() {
     try {
       allItems = await fetchAssigned();
-      render(allItems);
+      setActiveTab('FullyPrepared'); // default
     } catch (e) {
       console.error(e);
       grid.innerHTML = '<div class="error">Failed to load items.</div>';
-      updatePreparedKPI(0);
     }
   }
 
