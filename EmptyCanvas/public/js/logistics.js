@@ -1,6 +1,4 @@
-// public/js/logistics.js
 // Logistics page: Tabs (Fully prepared / Received / Delivered) + counters + Storage-like cards
-
 (function () {
   // ---------- helpers ----------
   const $  = (sel, root = document) => root.querySelector(sel);
@@ -40,7 +38,6 @@
     delivered: $('#lg-delivered'),
   };
 
-  let allItems = [];
   let groups   = [];
   let currentTab = readTabFromURL();
 

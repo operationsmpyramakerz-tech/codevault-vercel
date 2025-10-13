@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Logistics</title>
 
-    <!-- Main styles (اتأكد إن المسار ده شغال عندك) -->
-    <link id="main-style" rel="stylesheet" href="/css/style.css?v=20251012" />
+    <!-- Main styles (اتأكد من المسار) -->
+    <link rel="stylesheet" href="/css/style.css?v=20251012" />
 
     <!-- Feather icons (اختياري) -->
     <script src="https://unpkg.com/feather-icons"></script>
@@ -19,7 +19,7 @@
       .tab-card.active,.tab-card[aria-pressed="true"]{box-shadow:0 10px 28px rgba(2,8,23,.12)}
       .tab-title{font-size:14px;color:#6b7280;margin-bottom:6px}
       .tab-value{font-size:22px;font-weight:700;color:#0f172a}
-      /* شبكة الكروت */
+      /* شبكة الكروت (نفس فكرة Storage) */
       .cards-grid{display:flex;flex-direction:column;gap:18px}
     </style>
   </head>
@@ -30,33 +30,17 @@
       <aside class="sidebar">
         <div class="sidebar__inner">
           <nav class="sidebar-nav">
-            <a href="/orders" class="nav-link">
-              <i data-feather="list"></i><span>Current Orders</span>
-            </a>
-            <a href="/orders/requested" class="nav-link">
-              <i data-feather="inbox"></i><span>Schools Requested Orders</span>
-            </a>
-            <a href="/orders/assigned" class="nav-link">
-              <i data-feather="package"></i><span>Storage</span>
-            </a>
-            <a href="/order/create" class="nav-link">
-              <i data-feather="plus-circle"></i><span>Create New Order</span>
-            </a>
-            <a href="/stocktaking" class="nav-link">
-              <i data-feather="archive"></i><span>Stocktaking</span>
-            </a>
-            <a href="/logistics" class="nav-link active">
-              <i data-feather="truck"></i><span>Logistics</span>
-            </a>
-            <a href="/funds" class="nav-link">
-              <i data-feather="dollar-sign"></i><span>Funds</span>
-            </a>
+            <a href="/orders" class="nav-link"><i data-feather="list"></i><span>Current Orders</span></a>
+            <a href="/orders/requested" class="nav-link"><i data-feather="inbox"></i><span>Schools Requested Orders</span></a>
+            <a href="/orders/assigned" class="nav-link"><i data-feather="package"></i><span>Storage</span></a>
+            <a href="/order/create" class="nav-link"><i data-feather="plus-circle"></i><span>Create New Order</span></a>
+            <a href="/stocktaking" class="nav-link"><i data-feather="archive"></i><span>Stocktaking</span></a>
+            <a href="/logistics" class="nav-link active"><i data-feather="truck"></i><span>Logistics</span></a>
+            <a href="/funds" class="nav-link"><i data-feather="dollar-sign"></i><span>Funds</span></a>
           </nav>
         </div>
         <div class="sidebar__bottom">
-          <a href="/logout" class="btn btn-ghost">
-            <i data-feather="log-out"></i><span>Logout</span>
-          </a>
+          <a href="/logout" class="btn btn-ghost"><i data-feather="log-out"></i><span>Logout</span></a>
         </div>
       </aside>
 
@@ -76,26 +60,17 @@
 
         <!-- ===== Top bar as tabs (بظل للتبويب النشط) ===== -->
         <div class="tabs-bar" role="tablist" aria-label="Logistics filters">
-          <button id="lg-btn-prepared"
-                  class="tab-card"
-                  role="tab" aria-selected="true" aria-pressed="true"
-                  data-filter="prepared">
+          <button id="lg-btn-prepared" class="tab-card" role="tab" aria-selected="true" aria-pressed="true" data-filter="prepared">
             <div class="tab-title">Fully prepared</div>
             <div class="tab-value" id="lg-prepared">0</div>
           </button>
 
-          <button id="lg-btn-received"
-                  class="tab-card"
-                  role="tab" aria-selected="false" aria-pressed="false"
-                  data-filter="received">
+          <button id="lg-btn-received" class="tab-card" role="tab" aria-selected="false" aria-pressed="false" data-filter="received">
             <div class="tab-title">Received</div>
             <div class="tab-value" id="lg-received">0</div>
           </button>
 
-          <button id="lg-btn-delivered"
-                  class="tab-card"
-                  role="tab" aria-selected="false" aria-pressed="false"
-                  data-filter="delivered">
+          <button id="lg-btn-delivered" class="tab-card" role="tab" aria-selected="false" aria-pressed="false" data-filter="delivered">
             <div class="tab-title">Delivered</div>
             <div class="tab-value" id="lg-delivered">0</div>
           </button>
@@ -110,7 +85,7 @@
           <div class="empty-sub">There are no orders to show here right now.</div>
         </div>
 
-        <!-- (اختياري) popover للمدخلات الجزئية إن لزم -->
+        <!-- (اختياري) popover -->
         <div id="partial-popover" class="popover hidden" role="dialog" aria-modal="true" aria-label="Edit">
           <div class="popover__body">
             <div class="form-row">
@@ -161,7 +136,7 @@
           });
         });
 
-        // فعل التبويب من ?tab= في الرابط لو موجود
+        // فعّل التبويب من ?tab= في الرابط لو موجود (افتراضي prepared)
         const initial = (new URLSearchParams(location.search).get('tab')||'prepared').toLowerCase();
         const map = {prepared:'lg-btn-prepared', received:'lg-btn-received', delivered:'lg-btn-delivered'};
         const first = document.getElementById(map[initial]) || btns[0];
