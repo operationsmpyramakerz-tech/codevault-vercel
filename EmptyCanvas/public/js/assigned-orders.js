@@ -114,6 +114,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(currentFilter==='prepared') view=groups.filter(g=>g.prepared);
     else if(currentFilter==='received') view=groups.filter(g=>g.received);
     else if(currentFilter==='missing') view=groups.filter(g=>!g.prepared && !g.received); // استبعاد received
+    else view=groups; // total assigned
     renderGroups(view);
   }
 
@@ -137,12 +138,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!list.length){ empty.style.display=''; return; }
     empty.style.display='none';
 
+    const isAllTab      = currentFilter==='all';       // NEW: Total assigned
     const isMissingTab  = currentFilter==='missing';
     const isPreparedTab = currentFilter==='prepared';
     const isReceivedTab = currentFilter==='received';
 
-    const hideRowActions  = isPreparedTab || isReceivedTab;
-    const hideHeadActions = isPreparedTab || isReceivedTab;
+    // NEW: اخفاء الأزرار في Total assigned أيضًا
+    const hideRowActions  = isAllTab || isPreparedTab || isReceivedTab;
+    const hideHeadActions = isAllTab || isPreparedTab || isReceivedTab;
 
     for(const g of list){
       const card=document.createElement('div');
@@ -381,7 +384,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   (function(){
     function setActiveFromParam(){
       const tab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
-      currentFilter = (tab==='prepared'||tab==='missing'||tab==='received') ? tab : 'all';
+      currentFilter = (tab==='prepared'||tab==='missing'||tab==='received'||tab==='all') ? tab : 'all';
       [btnAll,btnPrepared,btnReceived,btnMissing].forEach(b=>{
         if(!b) return; const active=b.dataset.filter===currentFilter;
         b.classList.toggle('active',active); b.setAttribute('aria-pressed',active?'true':'false');
