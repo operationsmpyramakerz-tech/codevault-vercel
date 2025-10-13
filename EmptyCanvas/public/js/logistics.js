@@ -1,5 +1,5 @@
 // EmptyCanvas/public/js/logistics.js
-// Logistics: عرض المجموعات fully prepared + تحديث كارت KPI في الهيدر بعنوان Fully prepared مع العدد الصحيح.
+// Logistics: عرض المجموعات fully prepared + تحديث كارت KPI بعنوان Fully prepared مع العدد الصحيح.
 
 (function () {
   // ---------- helpers ----------
@@ -63,7 +63,7 @@
     return arr;
   }
 
-  // نوحّد الحقول ونحسب remaining لو مش موجود
+  // توحيد الحقول + حساب remaining
   function normalizeItem(it) {
     const req   = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
@@ -80,9 +80,7 @@
 
   function recomputeGroupStats(g) {
     g.total = g.items.length;
-    // عناصر ناقصة = أي عنصر remaining > 0
     g.miss  = g.items.filter(x => N(x.remaining) > 0).length;
-    // المجموعة fully prepared فقط لو كل العناصر remaining = 0
     g.prepared = g.items.every(x => N(x.remaining) === 0);
   }
 
@@ -97,7 +95,7 @@
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- KPI (الهيدر نفسه) ----------
+  // ---------- تحديث KPI أعلى الصفحة ----------
   function updatePreparedKPI(preparedCount) {
     const kpiRow =
       $('.summary') ||
@@ -109,7 +107,7 @@
 
     if (!kpiRow) return;
 
-    // لاقي كارت الهيدر اللي كان عنوانه Prepared وعدّل عليه
+    // ابحث عن كرت "Prepared" وعدّل عليه
     const candidates = $$('.card, .stat, .kpi-card, .summary-card, .kpi, .box, div', kpiRow);
     let preparedCard = null, preparedLabelNode = null;
     for (const el of candidates) {
@@ -131,7 +129,7 @@
 
     if (preparedLabelNode) preparedLabelNode.textContent = 'Fully prepared';
 
-    // ابحث عن عنصر القيمة داخل نفس الكارت وحدثه
+    // حدّث قيمة العداد
     let valueNode =
       preparedCard.querySelector('.value, .count, .num, .kpi-value, .stat-value, strong, b, .digit');
 
@@ -213,7 +211,7 @@
 
     if (window.feather?.replace) window.feather.replace({ 'stroke-width': 2 });
 
-    // العدد الصحيح = عدد المجموعات fully prepared المعروضة
+    // العداد = عدد المجموعات fully prepared المعروضة
     const preparedCount = groups.length;
     updatePreparedKPI(preparedCount);
   }
@@ -225,7 +223,7 @@
       render(allItems);
     } catch (e) {
       console.error(e);
-      grid.innerHTML = '<div class="error">Failed to load items.</div>';
+      if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
       updatePreparedKPI(0);
     }
   }
