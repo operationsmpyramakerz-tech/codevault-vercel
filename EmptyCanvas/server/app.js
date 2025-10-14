@@ -942,54 +942,92 @@ app.post(
     }
   },
 );
-// =================== Logistics: mark-received (with recording Rec) ===================
-const STATUS_PROP = 'Status';
-const REC_PROP    = 'Quantity received by operations';
-
-// helper لقراءة JSON body (لو مش عندك واحد بالفعل)
-async function readJsonBody(req) {
-  const chunks = [];
-  for await (const c of req) chunks.push(c);
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); }
-  catch { return {}; }
-}
-
+// --- Logistics: mark-received (Status + Quantity received by operations) ---
+// يدعم status/select ويقبل أسماء الأعمدة من env أو يكتشف تلقائيًا لو ما اتحددتش
 app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
   try {
-    const { receivedIds = [], partialIds = [], recMap = {} } = await readJsonBody(req);
+    const { itemIds = [], statusById = {}, recMap = {} } = req.body || {};
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No itemIds' });
+    }
 
-    // دالة تحديث صفحة في Notion
-    const setStatus = async (pageId, statusName) => {
-      if (!pageId) return;
+    const notion = getNotionClient();
 
-      const recVal = Number(recMap[pageId]);
-      const properties = {};
+    // ممكن تحدد أسماء الأعمدة من الـ env لو عايز (اختياري)
+    const STATUS_PROP_ENV = process.env.NOTION_STATUS_PROP || ''; // مثال: "Status"
+    const REC_PROP_ENV    = process.env.NOTION_REC_PROP    || ''; // مثال: "Quantity received by operations"
 
-      // Status (select)
-      properties[STATUS_PROP] = { select: { name: statusName } };
-
-      // Quantity received by operations (number) — نسجل الـ Avail اللي جاي من الواجهة
-      if (Number.isFinite(recVal)) {
-        properties[REC_PROP] = { number: recVal };
+    const findPropName = (props, preferredName, typeWanted, fallbackNames = []) => {
+      // 1) لو اسم متحدد (env) وموجود بالنوع المطلوب
+      if (preferredName && props[preferredName] && (!typeWanted || props[preferredName].type === typeWanted)) {
+        return preferredName;
       }
-
-      return notion.pages.update({
-        page_id: pageId,
-        properties
-      });
+      // 2) جرّب fallback names
+      for (const n of fallbackNames) {
+        if (props[n] && (!typeWanted || props[n].type === typeWanted)) return n;
+      }
+      // 3) لو عايز نوع معين (status/select/number)، دور عليه بأي اسم
+      if (typeWanted) {
+        const hit = Object.keys(props).find(k => props[k]?.type === typeWanted);
+        if (hit) return hit;
+      }
+      return null;
     };
 
-    // شغل التحديثات كلها
-    const ops = [];
-    for (const pid of receivedIds) ops.push(setStatus(pid, 'Received by operations'));
-    for (const pid of partialIds)  ops.push(setStatus(pid, 'Partially received by operations'));
+    const results = [];
 
-    await Promise.all(ops);
+    for (const pageId of itemIds) {
+      const page = await notion.pages.retrieve({ page_id: pageId });
+      const props = page.properties || {};
 
-    return res.json({
-      ok: true,
-      updated: { received: receivedIds.length, partial: partialIds.length }
-    });
+      // اكتشاف/تحديد أسماء الأعمدة
+      const statusPropName = findPropName(
+        props,
+        STATUS_PROP_ENV,
+        /* typeWanted */ null, // ممكن يكون "select" أو "status"
+        ['Status', 'Order Status', 'Operations Status']
+      );
+      const recPropName = findPropName(
+        props,
+        REC_PROP_ENV,
+        'number',
+        ['Quantity received by operations', 'Received Qty', 'Rec']
+      );
+
+      const nextStatusName = (statusById[pageId] || '').trim();
+      const recValue = recMap[pageId];
+
+      const updateProps = {};
+
+      // اكتب الـ Status لو متوفر اسم الخاصية واسم الاختيار
+      if (nextStatusName && statusPropName && props[statusPropName]) {
+        const t = props[statusPropName].type; // "select" أو "status" أو غيره
+        if (t === 'select') {
+          updateProps[statusPropName] = { select: { name: nextStatusName } };
+        } else if (t === 'status') {
+          updateProps[statusPropName] = { status: { name: nextStatusName } };
+        }
+      }
+
+      // اكتب رقم الـ Rec لو العمود موجود ورقم صالح
+      if (
+        recPropName &&
+        props[recPropName]?.type === 'number' &&
+        Number.isFinite(+recValue)
+      ) {
+        updateProps[recPropName] = { number: +recValue };
+      }
+
+      if (Object.keys(updateProps).length === 0) {
+        results.push({ pageId, skipped: true, reason: 'No matching properties on page' });
+        continue;
+      }
+
+      await notion.pages.update({ page_id: pageId, properties: updateProps });
+      results.push({ pageId, ok: true });
+    }
+
+    return res.json({ ok: true, updated: results });
   } catch (e) {
     console.error('logistics/mark-received error:', e?.body || e);
     return res.status(500).json({ ok: false, error: 'Failed to mark received' });

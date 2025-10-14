@@ -154,119 +154,77 @@
   }
 
   // ------------ actions ------------
-  async function markGroupReceived(group, buttonEl) {
-    const originalText = buttonEl ? buttonEl.textContent : '';
-    try {
-      if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
+  async function markGroupReceivedAnyway(group, buttonEl) {
+  try {
+    if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
 
-      const receivedIds = [];
-      const recMap = {};
+    const itemIds = [];
+    const statusById = {};
+    const recMap = {};
 
-      for (const it of group.items) {
-        const pid = String(it.pageId || it.id || '');
-        if (!pid) continue;
-        receivedIds.push(pid);
-        recMap[pid] = Number(it.available) || 0;
+    // القواعد المطلوبة:
+    // - لو rem === 0 => Status = Received by operations, rec = avail
+    // - لو rem > 0 && avail > 0 => Status = Partially received by operations, rec = avail
+    // - لو rem > 0 && avail === 0 => متعملش حاجة للعنصر ده (يفضل Missing)
+
+    for (const it of group.items) {
+      const rem = Number(it.remaining || 0);
+      const avail = Number(it.available || 0);
+      const id = it.id;
+      if (!id) continue;
+
+      if (rem === 0) {
+        itemIds.push(id);
+        statusById[id] = 'Received by operations';
+        recMap[id] = avail;
+      } else if (rem > 0 && avail > 0) {
+        itemIds.push(id);
+        statusById[id] = 'Partially received by operations';
+        recMap[id] = avail;
       }
-
-      if (!receivedIds.length) throw new Error('No items');
-
-      await postJSON('/api/logistics/mark-received', { receivedIds, partialIds: [], recMap });
-
-      const recSet = new Set(receivedIds);
-      allItems = allItems.map(r => {
-        const pid = String(r.pageId || r.id || '');
-        if (recSet.has(pid)) {
-          const avail = Number(r.available) || 0;
-          return {
-            ...r,
-            operationsStatus: 'Received by operations',
-            status: 'Received by operations',
-            quantityReceivedByOperations: avail,
-            rec: avail
-          };
-        }
-        return r;
-      });
-
-      render();
-    } catch (e) {
-      console.error(e);
-      alert('Failed to mark as received. Please try again.');
-    } finally {
-      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = originalText || 'Mark Received'; }
+      // rem>0 && avail==0 => skip
     }
-  }
 
-  async function markGroupReceivedAnyway(group, btn) {
-    try {
-      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-
-      const receivedIds = [];
-      const partialIds  = [];
-      const recMap      = {};
-
-      for (const it of group.items) {
-        const pid   = String(it.pageId || it.id || '');
-        if (!pid) continue;
-
-        const rem   = Number(it.remaining) || 0;
-        const avail = Number(it.available) || 0;
-
-        if (rem === 0) {
-          receivedIds.push(pid);
-          recMap[pid] = avail;
-        } else if (rem > 0 && avail > 0) {
-          partialIds.push(pid);
-          recMap[pid] = avail;
-        }
-        // rem>0 && avail==0 => no change
-      }
-
-      if (!receivedIds.length && !partialIds.length) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
-        return;
-      }
-
-      await postJSON('/api/logistics/mark-received', { receivedIds, partialIds, recMap });
-
-      const recSet = new Set(receivedIds);
-      const parSet = new Set(partialIds);
-
-      allItems = allItems.map(r => {
-        const pid = String(r.pageId || r.id || '');
-        if (recSet.has(pid)) {
-          const avail = Number(r.available) || 0;
-          return {
-            ...r,
-            operationsStatus: 'Received by operations',
-            status: 'Received by operations',
-            quantityReceivedByOperations: avail,
-            rec: avail
-          };
-        }
-        if (parSet.has(pid)) {
-          const avail = Number(r.available) || 0;
-          return {
-            ...r,
-            operationsStatus: 'Partially received by operations',
-            status: 'Partially received by operations',
-            quantityReceivedByOperations: avail,
-            rec: avail
-          };
-        }
-        return r;
-      });
-
-      render();
-    } catch (e) {
-      console.error(e);
-      alert('Failed to mark as received. Please try again.');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
+    if (itemIds.length === 0) {
+      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+      alert('Nothing to update for this group.');
+      return;
     }
-  }
 
+    const res = await fetch('/api/logistics/mark-received', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ itemIds, statusById, recMap })
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(()=>'');
+      throw new Error(`Server error ${res.status}: ${t}`);
+    }
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'Unknown error');
+
+    // حدّث الحالة محليًا ثم أعدّ الرسم
+    allItems = allItems.map(r => {
+      const id = r.id;
+      if (!id || !statusById[id]) return r;
+      return {
+        ...r,
+        operationsStatus: statusById[id],
+        status: statusById[id],
+        // خزن rec محليًا لو بتعرضه
+        rec: recMap[id]
+      };
+    });
+
+    render();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to mark as received. Please try again.');
+    if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+  }
+}
   // ------------ render ------------
   function render() {
     if (!grid) return;
