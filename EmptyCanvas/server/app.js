@@ -1284,9 +1284,6 @@ app.get(
       console.error(e);
       res.status(500).json({ error: "Failed to generate PDF" });
     }
-  },
-);
-
 // Components list — requires Create New Order
 app.get(
   "/api/components",
