@@ -945,28 +945,47 @@ app.post(
 // ===== Logistics: mark received / partially received =====
 app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
   try {
-    // لازم يكون عندك app.use(express.json()) في أعلى الملف
     const body = req.body || {};
 
-    // نسمح بالـ pageIds القديمة (كله يتعلم Received) أو الشكل الجديد
-    const receivedIds = (body.receivedIds || body.pageIds || []).map(String);
-    const partialIds  = (body.partialIds  || []).map(String);
+    // نجمع الـ IDs من الشكل القديم والجديد
+    let receivedIds = [];
+    let partialIds  = [];
+
+    // الشكل المتوقَّع الأساسي
+    if (Array.isArray(body.receivedIds) || Array.isArray(body.partialIds) || Array.isArray(body.pageIds)) {
+      receivedIds = (body.receivedIds || body.pageIds || []).map(String).filter(Boolean);
+      partialIds  = (body.partialIds  || []).map(String).filter(Boolean);
+    }
+
+    // ندعم الشكل القديم { updates: [{ id, rem, avail }] }
+    if (Array.isArray(body.updates) && body.updates.length) {
+      for (const u of body.updates) {
+        const pid   = String(u.id || u.pageId || u.page_id || u.notionPageId || "");
+        if (!pid) continue;
+        const rem   = Number(u.rem);
+        const avail = Number(u.avail);
+        if (!Number.isFinite(rem)) continue;
+
+        if (rem <= 0) {
+          receivedIds.push(pid);
+        } else if (rem > 0 && Number.isFinite(avail) && avail > 0) {
+          partialIds.push(pid);
+        }
+        // rem>0 && avail==0 => لا تغيير
+      }
+    }
 
     if (receivedIds.length === 0 && partialIds.length === 0) {
       return res.status(400).json({ ok: false, error: "No ids provided" });
     }
 
-    const updates = [];
-
-    // Helper صغير لتقليل التكرار
     const setStatus = (pid, name) =>
       notion.pages.update({
         page_id: pid,
-        properties: {
-          Status: { select: { name } },
-        },
+        properties: { Status: { select: { name } } },
       });
 
+    const updates = [];
     for (const pid of receivedIds) updates.push(setStatus(pid, "Received by operations"));
     for (const pid of partialIds)  updates.push(setStatus(pid, "Partially received by operations"));
 
@@ -983,56 +1002,6 @@ app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
     return res.status(500).json({ ok: false, error: "Failed to mark received" });
   }
 });
-// 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
-
-// === Mark Received with image (store external URL into Notion Files & media "Receipt Image") ===
-app.post("/api/orders/assigned/mark-received", requireAuth, requirePage("Assigned Schools Requested Orders"), async (req, res) => {
-  try {
-    const { orderIds, filename, dataUrl } = req.body || {};
-    if (!Array.isArray(orderIds) || orderIds.length === 0) {
-      return res.status(400).json({ error: "orderIds required" });
-    }
-    if (!dataUrl) {
-      return res.status(400).json({ error: "image dataUrl required" });
-    }
-    let publicUrl;
-    try {
-      publicUrl = await uploadToBlobFromBase64(dataUrl, filename || "receipt.jpg");
-    } catch (e) {
-      console.error("Blob upload error:", e?.message || e);
-      return res.status(500).json({ error: "Upload failed. Configure BLOB_READ_WRITE_TOKEN in Vercel." });
-    }
-    const props = await getOrdersDBProps();
-    const receiptProp = pickPropName(props, ["Receipt Image","Receipt","Image","ReceiptImage"]) || "Receipt Image";
-    await Promise.all(orderIds.map((id) =>
-      notion.pages.update({
-        page_id: id,
-        properties: {
-          [receiptProp]: { files: [{ name: filename || "receipt", external: { url: publicUrl } }] }
-        }
-      })
-    ));
-    const statusProp = await detectStatusPropName();
-    if (statusProp) {
-      await Promise.all(orderIds.map((id) =>
-        notion.pages.update({
-          page_id: id,
-          properties: { [statusProp]: { select: { name: "Received by operations" } } }
-        })
-      ));
-    }
-    res.json({ success: true, url: publicUrl });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Failed to mark received with image." });
-  }
-});
-
-app.get(
-  "/api/orders/assigned/pdf",
-  requireAuth,
-  requirePage("Assigned Schools Requested Orders"),
-  async (req, res) => {
     // 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
 // يستخدم ids=pageId1,pageId2,...
 app.get(

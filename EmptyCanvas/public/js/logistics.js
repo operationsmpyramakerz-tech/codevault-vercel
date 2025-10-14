@@ -220,45 +220,61 @@
     alert("Failed to mark as received. Please try again.");
   }
 }
+// في تبويب Missing: "Mark Received Anyway"
+async function markGroupReceivedAnyway(group, btn) {
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
-  // === المطلوب هنا ===
-  async function markGroupReceivedAnyway(group, btn) {
-    // 1) نخلي Missing يعرض كامل الطلب طالما فيه rem>0 (ده معمول في render)
-    // 2) على الضغط:
-    //   - rem == 0            => Received by operations
-    //   - rem > 0 && avail>0  => Partially received by operations
-    //   - rem > 0 && avail==0 => بلا تغيير
-    const updates = [];
+    const receivedIds = [];
+    const partialIds  = [];
+
     for (const it of group.items) {
+      const pid   = String(it.pageId || it.page_id || it.notionPageId || it.id || "");
+      if (!pid) continue;
       const rem   = N(it.remaining);
       const avail = N(it.available);
+
       if (rem === 0) {
-        updates.push({ id: it.id, rem: 0 });
+        // مكوّن مكتمل ⇒ Received
+        receivedIds.push(pid);
       } else if (rem > 0 && avail > 0) {
-        updates.push({ id: it.id, rem }); // السيرفر هيفهم إن دي Partial
-      } // rem>0 && avail==0 => skip
+        // ناقص وفيه جزء متاح ⇒ Partially received
+        partialIds.push(pid);
+      }
+      // rem>0 && avail==0 ⇒ نسيبه كما هو
     }
-    if (!updates.length) return;
 
-    try {
-      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-      await postJSON('/api/logistics/mark-received', { updates });
-
-      const m = new Map(updates.map(u => [u.id, u]));
-      allItems = allItems.map(r => {
-        const u = m.get(r.id);
-        if (!u) return r;
-        const next = (N(u.rem) > 0) ? 'Partially received by operations' : 'Received by operations';
-        return { ...r, operationsStatus: next, status: next };
-      });
-      render(); // هيبقى في Missing طول ما فيه rem>0 لأي عنصر
-    } catch (e) {
-      console.error(e);
+    if (receivedIds.length === 0 && partialIds.length === 0) {
       if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
-      alert('Failed to mark as received. Please try again.');
+      return;
     }
-  }
 
+    // ابعت بالشكل المتوافق مع السيرفر
+    await postJSON('/api/logistics/mark-received', { receivedIds, partialIds });
+
+    // حدث الواجهة محليًا
+    const recSet = new Set(receivedIds);
+    const parSet = new Set(partialIds);
+
+    allItems = allItems.map(r => {
+      const pid = String(r.pageId || r.page_id || r.notionPageId || r.id || "");
+      if (recSet.has(pid)) {
+        return { ...r, operationsStatus: "Received by operations",  status: "Received by operations" };
+      }
+      if (parSet.has(pid)) {
+        return { ...r, operationsStatus: "Partially received by operations", status: "Partially received by operations" };
+      }
+      return r;
+    });
+
+    render(); // الطلب سيظل في Missing طالما فيه أي rem>0
+  } catch (e) {
+    console.error(e);
+    alert('Failed to mark as received. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
+  }
+}
   // ------------ render ------------
   function render() {
     if (!grid) return;
