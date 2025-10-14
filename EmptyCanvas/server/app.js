@@ -943,7 +943,6 @@ app.post(
   },
 );
 // --- Logistics: mark-received (Status + Quantity received by operations) ---
-// يدعم status/select ويقبل أسماء الأعمدة من env أو يكتشف تلقائيًا لو ما اتحددتش
 app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
   try {
     const { itemIds = [], statusById = {}, recMap = {} } = req.body || {};
@@ -951,22 +950,17 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'No itemIds' });
     }
 
-    const notion = getNotionClient();
-
-    // ممكن تحدد أسماء الأعمدة من الـ env لو عايز (اختياري)
+    // ممكن تحدد أسماء الأعمدة من الـ env (اختياري)
     const STATUS_PROP_ENV = process.env.NOTION_STATUS_PROP || ''; // مثال: "Status"
-    const REC_PROP_ENV    = process.env.NOTION_REC_PROP    || ''; // مثال: "Quantity received by operations"
+    const REC_PROP_ENV    = process.env.NOTION_REC_PROP    || ''; // "Quantity received by operations"
 
     const findPropName = (props, preferredName, typeWanted, fallbackNames = []) => {
-      // 1) لو اسم متحدد (env) وموجود بالنوع المطلوب
       if (preferredName && props[preferredName] && (!typeWanted || props[preferredName].type === typeWanted)) {
         return preferredName;
       }
-      // 2) جرّب fallback names
       for (const n of fallbackNames) {
         if (props[n] && (!typeWanted || props[n].type === typeWanted)) return n;
       }
-      // 3) لو عايز نوع معين (status/select/number)، دور عليه بأي اسم
       if (typeWanted) {
         const hit = Object.keys(props).find(k => props[k]?.type === typeWanted);
         if (hit) return hit;
@@ -977,14 +971,14 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     const results = [];
 
     for (const pageId of itemIds) {
-      const page = await notion.pages.retrieve({ page_id: pageId });
+      const page  = await notion.pages.retrieve({ page_id: pageId });
       const props = page.properties || {};
 
-      // اكتشاف/تحديد أسماء الأعمدة
+      // نحدّد أسماء الأعمدة على الصفحة نفسها
       const statusPropName = findPropName(
         props,
         STATUS_PROP_ENV,
-        /* typeWanted */ null, // ممكن يكون "select" أو "status"
+        /*typeWanted*/ null, // نسمح select أو status
         ['Status', 'Order Status', 'Operations Status']
       );
       const recPropName = findPropName(
@@ -994,14 +988,14 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
         ['Quantity received by operations', 'Received Qty', 'Rec']
       );
 
-      const nextStatusName = (statusById[pageId] || '').trim();
+      const nextStatusName = String(statusById[pageId] || '').trim();
       const recValue = recMap[pageId];
 
       const updateProps = {};
 
-      // اكتب الـ Status لو متوفر اسم الخاصية واسم الاختيار
+      // اكتب الـ Status إن وُجدت الخاصية والقيمة
       if (nextStatusName && statusPropName && props[statusPropName]) {
-        const t = props[statusPropName].type; // "select" أو "status" أو غيره
+        const t = props[statusPropName].type; // "select" أو "status"
         if (t === 'select') {
           updateProps[statusPropName] = { select: { name: nextStatusName } };
         } else if (t === 'status') {
@@ -1010,11 +1004,7 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
       }
 
       // اكتب رقم الـ Rec لو العمود موجود ورقم صالح
-      if (
-        recPropName &&
-        props[recPropName]?.type === 'number' &&
-        Number.isFinite(+recValue)
-      ) {
+      if (recPropName && props[recPropName]?.type === 'number' && Number.isFinite(+recValue)) {
         updateProps[recPropName] = { number: +recValue };
       }
 
