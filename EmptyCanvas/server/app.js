@@ -942,35 +942,51 @@ app.post(
     }
   },
 );
-// === Logistics: mark received (يغيّر عمود Status إلى "Received by operations") ===
+// --- Mark Received / Partially Received (Notion Status) ---
 app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
+  // الميثود readJson(req) موجودة عندك بالفعل في نفس الملف
+  const { pageIds = [], pageIdsPartial = [] } = await readJson(req);
+
+  if ((!Array.isArray(pageIds) || pageIds.length === 0) &&
+      (!Array.isArray(pageIdsPartial) || pageIdsPartial.length === 0)) {
+    return res.status(400).json({ ok: false, error: "No pageIds provided" });
+  }
+
   try {
-    const { pageIds } = req.body || {};
-    if (!Array.isArray(pageIds) || pageIds.length === 0) {
-      return res.status(400).json({ ok: false, error: "pageIds required" });
+    const jobs = [];
+
+    // استلام كامل
+    for (const pid of pageIds) {
+      if (!pid) continue;
+      jobs.push(notion.pages.update({
+        page_id: String(pid),
+        properties: {
+          Status: { select: { name: "Received by operations" } },
+        },
+      }));
     }
 
-    // لو حابب تثبّت الاسم "Status" حرفيًا، بدل السطرين دول بخاصية Status مباشرة.
-    const statusProp = await detectStatusPropName(); // غالبًا بترجع "Status"
+    // استلام جزئي
+    for (const pid of pageIdsPartial) {
+      if (!pid) continue;
+      jobs.push(notion.pages.update({
+        page_id: String(pid),
+        properties: {
+          Status: { select: { name: "Partially received by operations" } },
+        },
+      }));
+    }
 
-    await Promise.all(
-      pageIds.map((pid) =>
-        notion.pages.update({
-          page_id: String(pid),
-          properties: {
-            [statusProp]: { select: { name: "Received by operations" } },
-          },
-        })
-      )
-    );
-
-    return res.json({ ok: true, updated: pageIds.length });
+    await Promise.all(jobs);
+    return res.json({
+      ok: true,
+      updated: { received: pageIds.length, partial: pageIdsPartial.length },
+    });
   } catch (e) {
     console.error("logistics/mark-received error:", e?.body || e);
     return res.status(500).json({ ok: false, error: "Failed to mark received" });
   }
 });
-
 // 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
 
 // === Mark Received with image (store external URL into Notion Files & media "Receipt Image") ===

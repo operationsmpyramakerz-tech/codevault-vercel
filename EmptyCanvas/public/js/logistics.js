@@ -1,6 +1,6 @@
 // Logistics tabs: Fully prepared / Missing / Partially received / Received / Delivered
 // - Mark Received (in prepared) يستلم الكل
-// - Mark Received Anyway (in missing/partial) يستلم فقط العناصر avail>0 وغير مستلمة
+// - Mark Received Anyway (in missing/partial) يقسم العناصر إلى Received/Partially Received حسب remaining
 
 (function () {
   // ---------- config ----------
@@ -57,6 +57,7 @@
   // ---------- data helpers ----------
   const statusOf    = (it) => S(it.operationsStatus || it.opsStatus || it.status || "").toLowerCase();
   const isReceived  = (it) => statusOf(it) === "received by operations";
+  const isPartial   = (it) => statusOf(it) === "partially received by operations";
   const isDelivered = (it) => statusOf(it) === "delivered";
 
   function normalizeItem(it) {
@@ -109,6 +110,7 @@
     g.total        = g.items.length;
     g.miss         = g.items.filter((x) => N(x.remaining) > 0).length;
     g.anyReceived  = g.items.some(isReceived);
+    g.anyPartial   = g.items.some(isPartial);
     g.allReceived  = g.items.length > 0 && g.items.every(isReceived);
     g.allPrepared  = g.items.every((x) => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x));
   }
@@ -157,22 +159,41 @@
     try {
       if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = "Saving..."; }
 
-      // في missing/partial: استلم فقط العناصر avail>0 وغير مستلمة
-      // في prepared: كل العناصر غير مستلمة أصلاً
-      const eligible = (activeTab === "prepared")
+      // العناصر القابلة للاستلام
+      const candidates = (activeTab === "prepared")
         ? group.items.filter(it => !isReceived(it))
         : group.items.filter(it => !isReceived(it) && N(it.available) > 0);
 
-      const pageIds = eligible.map(i => i.pageId).filter(Boolean);
-      if (!pageIds.length) throw new Error("No eligible items to receive");
+      // تقسيم: كامل vs جزئي (حسب remaining)
+      const toReceivedIds = [];
+      const toPartialIds  = [];
+      for (const it of candidates) {
+        const pid = it.pageId;
+        if (!pid) continue;
+        if (N(it.remaining) > 0) toPartialIds.push(pid);
+        else                     toReceivedIds.push(pid);
+      }
 
-      await postJSON(MARK_RECEIVED_URL, { pageIds });
+      if (toReceivedIds.length === 0 && toPartialIds.length === 0) {
+        throw new Error("No eligible items to receive");
+      }
 
-      const setIds = new Set(pageIds);
+      await postJSON(MARK_RECEIVED_URL, {
+        pageIds: toReceivedIds,
+        pageIdsPartial: toPartialIds,
+      });
+
+      // تحديث محلي للحالة
+      const setReceived = new Set(toReceivedIds.map(String));
+      const setPartial  = new Set(toPartialIds.map(String));
       allItems = allItems.map(r => {
         const rPageId = r.pageId || r.page_id || r.notionPageId || r.notion_page_id || r.id;
-        if (setIds.has(String(rPageId))) {
+        const key = String(rPageId);
+        if (setReceived.has(key)) {
           return { ...r, operationsStatus: "Received by operations", status: "Received by operations" };
+        }
+        if (setPartial.has(key)) {
+          return { ...r, operationsStatus: "Partially received by operations", status: "Partially received by operations" };
         }
         return r;
       });
@@ -196,20 +217,21 @@
 
     const groupsPrepared = groupsAll.filter(g => g.allPrepared);
 
-    // Missing: فيها ناقص، ومافيش ولا عنصر مستلم
+    // Missing: فيها ناقص، ومافيهاش لا Received ولا Partial
     const groupsMissing  = groupsAll.filter(g =>
-      g.items.some(x => N(x.remaining) > 0) && g.items.every(x => !isReceived(x))
+      g.items.some(x => N(x.remaining) > 0) &&
+      g.items.every(x => !isReceived(x) && !isPartial(x))
     );
 
-    // Partially received: فيها ناقص + فيها عناصر مستلمة
+    // Partially received: فيها عنصر Partial أو (ناقص + فيها Received)
     const groupsPartial  = groupsAll.filter(g =>
-      g.items.some(x => N(x.remaining) > 0) && g.items.some(isReceived)
+      g.anyPartial || (g.items.some(x => N(x.remaining) > 0) && g.items.some(isReceived))
     );
 
-    // Received: كل العناصر مستلمة
+    // Received: كل العناصر Received
     const groupsReceived = groupsAll.filter(g => g.allReceived);
 
-    // Delivered (كما هو إن وجد لديك تمييز)
+    // Delivered (لو عندك تعريف للحالة)
     const groupsDelivered = groupsAll
       .map(g => ({ ...g, items: g.items.filter(isDelivered) }))
       .filter(g => g.items.length);
