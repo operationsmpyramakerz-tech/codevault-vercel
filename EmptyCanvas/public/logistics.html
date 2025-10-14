@@ -76,20 +76,28 @@
     </header>
 
     <main class="container-full-width">
-      <!-- Tabs counters (نفس ستايل Storage مع تبويب Missing الجديد) -->
+      <!-- Tabs counters -->
       <div class="stats" id="lg-stats">
         <button id="lg-btn-prepared" class="stat stat--btn" type="button" data-filter="prepared" aria-pressed="false">
           <div class="stat__label">Fully prepared</div>
           <div class="stat__value" id="lg-count-prepared">0</div>
         </button>
+
         <button id="lg-btn-missing" class="stat stat--btn" type="button" data-filter="missing" aria-pressed="false">
           <div class="stat__label">Missing</div>
           <div class="stat__value stat__value--warn" id="lg-count-missing">0</div>
         </button>
+
+        <button id="lg-btn-partial" class="stat stat--btn" type="button" data-filter="partial" aria-pressed="false">
+          <div class="stat__label">Partially received</div>
+          <div class="stat__value" id="lg-count-partial">0</div>
+        </button>
+
         <button id="lg-btn-received" class="stat stat--btn" type="button" data-filter="received" aria-pressed="false">
           <div class="stat__label">Received</div>
           <div class="stat__value stat__value--ok" id="lg-count-received">0</div>
         </button>
+
         <button id="lg-btn-delivered" class="stat stat--btn" type="button" data-filter="delivered" aria-pressed="false">
           <div class="stat__label">Delivered</div>
           <div class="stat__value stat__value--muted" id="lg-count-delivered">0</div>
@@ -97,7 +105,6 @@
       </div>
 
       <div id="assigned-empty" class="muted" style="display:none;">No items.</div>
-      <!-- grid يستخدم نفس كلاس Storage ليتطبق نفس الشكل -->
       <div id="assigned-grid" class="assigned-grid"></div>
     </main>
   </div>

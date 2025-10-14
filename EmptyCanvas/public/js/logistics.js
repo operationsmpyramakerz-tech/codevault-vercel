@@ -1,6 +1,6 @@
-// Logistics tabs (Fully prepared / Missing / Received / Delivered) + counters
-// "Mark Received" في Fully prepared و "Mark Received Anyway" في Missing
-// كلاهما يحدّث Notion Status -> "Received by operations" ثم ينقل الأوردر إلى تبويب Received
+// Logistics tabs: Fully prepared / Missing / Partially received / Received / Delivered
+// - Mark Received (in prepared) يستلم الكل
+// - Mark Received Anyway (in missing/partial) يستلم فقط العناصر avail>0 وغير مستلمة
 
 (function () {
   // ---------- config ----------
@@ -25,7 +25,7 @@
       body: JSON.stringify(body || {}),
     });
     let data = null;
-    try { data = await res.json(); } catch { /* ignore */ }
+    try { data = await res.json(); } catch {}
     if (!res.ok || (data && data.ok === false)) {
       const msg = (data && (data.error || data.details)) || `POST ${url} failed: ${res.status}`;
       throw new Error(msg);
@@ -38,19 +38,20 @@
   const grid        = $("#assigned-grid") || $("#logistics-grid") || $("main");
   const emptyMsg    = $("#assigned-empty") || $("#logistics-empty");
 
-  // tabs & counters
   const btnPrepared  = $("#lg-btn-prepared");
   const btnMissing   = $("#lg-btn-missing");
+  const btnPartial   = $("#lg-btn-partial");
   const btnReceived  = $("#lg-btn-received");
   const btnDelivered = $("#lg-btn-delivered");
 
-  const cPrepared  = $("#lg-count-prepared")  || $("#lg-prepared");
+  const cPrepared  = $("#lg-count-prepared");
   const cMissing   = $("#lg-count-missing");
-  const cReceived  = $("#lg-count-received")  || $("#lg-received");
-  const cDelivered = $("#lg-count-delivered") || $("#lg-delivered");
+  const cPartial   = $("#lg-count-partial");
+  const cReceived  = $("#lg-count-received");
+  const cDelivered = $("#lg-count-delivered");
 
   // ---------- state ----------
-  let allItems  = []; // raw items from /api/orders/assigned
+  let allItems  = [];
   let activeTab = (new URLSearchParams(location.search).get("tab") || "prepared").toLowerCase();
 
   // ---------- data helpers ----------
@@ -64,12 +65,10 @@
     let rem     = it.remaining ?? it.rem;
     rem = rem == null ? Math.max(0, req - avail) : N(rem);
 
-    const pageId = S(
-      it.pageId ?? it.page_id ?? it.notionPageId ?? it.notion_page_id ?? it.id
-    );
+    const pageId = S(it.pageId ?? it.page_id ?? it.notionPageId ?? it.notion_page_id ?? it.id);
 
     return {
-      id: S(it.id ?? pageId), // DOM id
+      id: S(it.id ?? pageId),
       pageId,
       reason: S(it.reason || ""),
       created: S(it.createdTime || it.created_time || it.created || ""),
@@ -109,9 +108,9 @@
   function recomputeGroupStats(g) {
     g.total        = g.items.length;
     g.miss         = g.items.filter((x) => N(x.remaining) > 0).length;
-    g.allPrepared  = g.items.every((x) => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x));
     g.anyReceived  = g.items.some(isReceived);
-    g.anyDelivered = g.items.some(isDelivered);
+    g.allReceived  = g.items.length > 0 && g.items.every(isReceived);
+    g.allPrepared  = g.items.every((x) => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x));
   }
 
   // ---------- API ----------
@@ -123,10 +122,11 @@
   }
 
   // ---------- counters ----------
-  function setCounter(el, val){ if (el) el.textContent = fmt(val); }
-  function updateAllCounters(groupsPrepared, groupsMissing, groupsReceived, groupsDelivered) {
+  const setCounter = (el, val) => { if (el) el.textContent = fmt(val); };
+  function updateAllCounters(groupsPrepared, groupsMissing, groupsPartial, groupsReceived, groupsDelivered) {
     setCounter(cPrepared , groupsPrepared.length);
     setCounter(cMissing  , groupsMissing.length);
+    setCounter(cPartial  , groupsPartial.length);
     setCounter(cReceived , groupsReceived.length);
     setCounter(cDelivered, groupsDelivered.length);
   }
@@ -137,6 +137,7 @@
     [
       [btnPrepared,"prepared"],
       [btnMissing,"missing"],
+      [btnPartial,"partial"],
       [btnReceived,"received"],
       [btnDelivered,"delivered"]
     ].forEach(([b,t])=>{
@@ -156,12 +157,17 @@
     try {
       if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = "Saving..."; }
 
-      const pageIds = group.items.map(i => i.pageId).filter(Boolean);
-      if (!pageIds.length) throw new Error("No pageIds to update");
+      // في missing/partial: استلم فقط العناصر avail>0 وغير مستلمة
+      // في prepared: كل العناصر غير مستلمة أصلاً
+      const eligible = (activeTab === "prepared")
+        ? group.items.filter(it => !isReceived(it))
+        : group.items.filter(it => !isReceived(it) && N(it.available) > 0);
+
+      const pageIds = eligible.map(i => i.pageId).filter(Boolean);
+      if (!pageIds.length) throw new Error("No eligible items to receive");
 
       await postJSON(MARK_RECEIVED_URL, { pageIds });
 
-      // local flip
       const setIds = new Set(pageIds);
       allItems = allItems.map(r => {
         const rPageId = r.pageId || r.page_id || r.notionPageId || r.notion_page_id || r.id;
@@ -190,20 +196,26 @@
 
     const groupsPrepared = groupsAll.filter(g => g.allPrepared);
 
-    // اعرض كل عناصر الطلب، بس اختار الجروبس اللي فيها أي عنصر ناقص
-const groupsMissing = groupsAll
-  .filter(g => g.items.some(x => N(x.remaining) > 0));
+    // Missing: فيها ناقص، ومافيش ولا عنصر مستلم
+    const groupsMissing  = groupsAll.filter(g =>
+      g.items.some(x => N(x.remaining) > 0) && g.items.every(x => !isReceived(x))
+    );
 
-    const groupsReceived = groupsAll
-      .map(g => ({ ...g, items: g.items.filter(isReceived) }))
-      .filter(g => g.items.length);
+    // Partially received: فيها ناقص + فيها عناصر مستلمة
+    const groupsPartial  = groupsAll.filter(g =>
+      g.items.some(x => N(x.remaining) > 0) && g.items.some(isReceived)
+    );
 
+    // Received: كل العناصر مستلمة
+    const groupsReceived = groupsAll.filter(g => g.allReceived);
+
+    // Delivered (كما هو إن وجد لديك تمييز)
     const groupsDelivered = groupsAll
       .map(g => ({ ...g, items: g.items.filter(isDelivered) }))
       .filter(g => g.items.length);
 
     // counters
-    updateAllCounters(groupsPrepared, groupsMissing, groupsReceived, groupsDelivered);
+    updateAllCounters(groupsPrepared, groupsMissing, groupsPartial, groupsReceived, groupsDelivered);
 
     // search
     const filterByQuery = (gs) => {
@@ -220,15 +232,13 @@ const groupsMissing = groupsAll
     const viewSets = {
       prepared : filterByQuery(groupsPrepared),
       missing  : filterByQuery(groupsMissing),
+      partial  : filterByQuery(groupsPartial),
       received : filterByQuery(groupsReceived),
       delivered: filterByQuery(groupsDelivered)
     };
 
     const view = viewSets[activeTab] || [];
-    if (!view.length) {
-      if (emptyMsg) emptyMsg.style.display = "";
-      return;
-    }
+    if (!view.length) { if (emptyMsg) emptyMsg.style.display = ""; return; }
     if (emptyMsg) emptyMsg.style.display = "none";
 
     for (const g of view) {
@@ -240,7 +250,7 @@ const groupsMissing = groupsAll
       let actionsHTML = "";
       if (activeTab === "prepared") {
         actionsHTML = `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`;
-      } else if (activeTab === "missing") {
+      } else if (activeTab === "missing" || activeTab === "partial") {
         actionsHTML = `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received Anyway</button>`;
       }
 
@@ -296,11 +306,11 @@ const groupsMissing = groupsAll
     } catch (e) {
       console.error(e);
       if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
-      [cPrepared,cMissing,cReceived,cDelivered].forEach(el => el && (el.textContent="0"));
+      [cPrepared,cMissing,cPartial,cReceived,cDelivered].forEach(el => el && (el.textContent="0"));
     }
   }
 
-  [[btnPrepared,"prepared"],[btnMissing,"missing"],[btnReceived,"received"],[btnDelivered,"delivered"]]
+  [[btnPrepared,"prepared"],[btnMissing,"missing"],[btnPartial,"partial"],[btnReceived,"received"],[btnDelivered,"delivered"]]
     .forEach(([btn,tab])=>{
       btn && btn.addEventListener("click", ()=>{ setActiveTab(tab); render(); });
     });
