@@ -1,89 +1,83 @@
-// Logistics tabs: Fully prepared / Missing / Partially received / Received / Delivered
-// - Mark Received (in prepared) يستلم الكل
-// - Mark Received Anyway (in missing/partial) يقسم العناصر إلى Received/Partially Received حسب remaining
+/* EmptyCanvas/public/js/logistics.js
+   Logistics page:
+   - Tabs: prepared / missing / partial / received / delivered
+   - "Mark Received" (prepared) & "Mark Received Anyway" (missing)
+   - Status rules:
+       rem == 0  -> "Received by operations"
+       rem  > 0  -> "Partially received by operations"
+*/
 
 (function () {
-  // ---------- config ----------
-  const MARK_RECEIVED_URL = "/api/logistics/mark-received";
-
-  // ---------- helpers ----------
-  const $  = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const N  = (v) => (Number.isFinite(+v) ? +v : 0);
-  const S  = (v) => String(v ?? "");
+  // ------------ helpers ------------
+  const $  = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const N  = (v) => Number.isFinite(+v) ? +v : 0;
+  const S  = (v) => String(v ?? '');
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = (v) => String(N(v));
-  const esc = (s) =>
-    String(s ?? "").replace(/[&<>"']/g, (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
-    );
 
   async function postJSON(url, body) {
     const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify(body || {}),
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body || {})
     });
-    let data = null;
-    try { data = await res.json(); } catch {}
-    if (!res.ok || (data && data.ok === false)) {
-      const msg = (data && (data.error || data.details)) || `POST ${url} failed: ${res.status}`;
-      throw new Error(msg);
+    if (!res.ok) {
+      const t = await res.text().catch(()=> '');
+      throw new Error(`POST ${url} -> ${res.status} ${t}`);
     }
-    return data || {};
+    try { return await res.json(); } catch { return {}; }
   }
 
-  // ---------- DOM refs ----------
-  const searchInput = $("#logisticsSearch") || $("#search") || $('input[type="search"]');
-  const grid        = $("#assigned-grid") || $("#logistics-grid") || $("main");
-  const emptyMsg    = $("#assigned-empty") || $("#logistics-empty");
+  // ------------ DOM refs ------------
+  const searchInput   = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
+  const grid          = $('#logistics-grid') || $('#assigned-grid') || $('main');
+  const emptyMsg      = $('#logistics-empty') || $('#assigned-empty');
 
-  const btnPrepared  = $("#lg-btn-prepared");
-  const btnMissing   = $("#lg-btn-missing");
-  const btnPartial   = $("#lg-btn-partial");
-  const btnReceived  = $("#lg-btn-received");
-  const btnDelivered = $("#lg-btn-delivered");
+  const btnPrepared   = $('#lg-btn-prepared');
+  const btnMissing    = $('#lg-btn-missing');
+  const btnPartial    = $('#lg-btn-partial');
+  const btnReceived   = $('#lg-btn-received');
+  const btnDelivered  = $('#lg-btn-delivered');
 
-  const cPrepared  = $("#lg-count-prepared");
-  const cMissing   = $("#lg-count-missing");
-  const cPartial   = $("#lg-count-partial");
-  const cReceived  = $("#lg-count-received");
-  const cDelivered = $("#lg-count-delivered");
+  const cPrepared   = $('#lg-prepared')  || $('#lg-count-prepared');
+  const cMissing    = $('#lg-missing')   || $('#lg-count-missing');
+  const cPartial    = $('#lg-partial')   || $('#lg-count-partial');
+  const cReceived   = $('#lg-received')  || $('#lg-count-received');
+  const cDelivered  = $('#lg-delivered') || $('#lg-count-delivered');
 
-  // ---------- state ----------
+  // ------------ state ------------
   let allItems  = [];
-  let activeTab = (new URLSearchParams(location.search).get("tab") || "prepared").toLowerCase();
+  let activeTab = (new URLSearchParams(location.search).get('tab') || 'prepared').toLowerCase();
 
-  // ---------- data helpers ----------
-  const statusOf    = (it) => S(it.operationsStatus || it.opsStatus || it.status || "").toLowerCase();
-  const isReceived  = (it) => statusOf(it) === "received by operations";
-  const isPartial   = (it) => statusOf(it) === "partially received by operations";
-  const isDelivered = (it) => statusOf(it) === "delivered";
+  // ------------ normalize & grouping ------------
+  const statusOf = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
+  const isReceived = (it) => statusOf(it) === 'received by operations';
+  const isPartial  = (it) => statusOf(it) === 'partially received by operations';
+  const isDelivered= (it) => statusOf(it) === 'delivered';
 
   function normalizeItem(it) {
     const req   = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
     let rem     = it.remaining ?? it.rem;
-    rem = rem == null ? Math.max(0, req - avail) : N(rem);
-
-    const pageId = S(it.pageId ?? it.page_id ?? it.notionPageId ?? it.notion_page_id ?? it.id);
-
+    rem = (rem == null ? Math.max(0, req - avail) : N(rem));
     return {
-      id: S(it.id ?? pageId),
-      pageId,
-      reason: S(it.reason || ""),
-      created: S(it.createdTime || it.created_time || it.created || ""),
-      productName: S(it.productName ?? it.product_name ?? ""),
+      id: it.id,
+      reason: S(it.reason || ''),
+      created: S(it.createdTime || it.created_time || it.created || ''),
+      productName: S(it.productName ?? it.product_name ?? ''),
       requested: req,
       available: avail,
       remaining: rem,
       status: statusOf(it),
+      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0) // للعرض فقط إن وجد
     };
   }
 
   const groupKeyOf = (it) => {
-    const reason = (it.reason && String(it.reason).trim()) || "No Reason";
-    const day    = (it.created || "").slice(0, 10);
+    const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
+    const day    = (it.created || '').slice(0,10);
     return `grp:${reason}|${day}`;
   };
 
@@ -92,11 +86,11 @@
     for (const raw of list) {
       const it  = normalizeItem(raw);
       const key = groupKeyOf(it);
-      const g   = map.get(key) || {
+      const g = map.get(key) || {
         key,
-        title: it.reason || "No Reason",
+        title: it.reason || 'No Reason',
         subtitle: new Date(it.created || Date.now()).toLocaleString(),
-        items: [],
+        items: []
       };
       g.items.push(it);
       map.set(key, g);
@@ -107,174 +101,152 @@
   }
 
   function recomputeGroupStats(g) {
-    g.total        = g.items.length;
-    g.miss         = g.items.filter((x) => N(x.remaining) > 0).length;
-    g.anyReceived  = g.items.some(isReceived);
-    g.anyPartial   = g.items.some(isPartial);
-    g.allReceived  = g.items.length > 0 && g.items.every(isReceived);
-    g.allPrepared  = g.items.every((x) => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x));
+    g.total       = g.items.length;
+    g.missingCnt  = g.items.filter(x => N(x.remaining) > 0).length;
+    g.allPrepared = g.items.every(x => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x) && !isPartial(x));
+    g.anyMissing  = g.items.some(x => N(x.remaining) > 0 && !isReceived(x) && !isDelivered(x) && !isPartial(x));
+    g.anyPartial  = g.items.some(isPartial);
+    g.anyReceived = g.items.some(isReceived);
   }
 
-  // ---------- API ----------
+  // ------------ API ------------
   async function fetchAssigned() {
-    const res = await fetch("/api/orders/assigned", { cache: "no-store", credentials: "same-origin" });
-    if (!res.ok) throw new Error("Failed to load assigned orders");
+    const res = await fetch('/api/orders/assigned', { cache: 'no-store', credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Failed to load assigned orders');
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   }
 
-  // ---------- counters ----------
-  const setCounter = (el, val) => { if (el) el.textContent = fmt(val); };
-  function updateAllCounters(groupsPrepared, groupsMissing, groupsPartial, groupsReceived, groupsDelivered) {
-    setCounter(cPrepared , groupsPrepared.length);
-    setCounter(cMissing  , groupsMissing.length);
-    setCounter(cPartial  , groupsPartial.length);
-    setCounter(cReceived , groupsReceived.length);
-    setCounter(cDelivered, groupsDelivered.length);
+  // ------------ counters ------------
+  const setCounter = (el, v) => el && (el.textContent = fmt(v));
+
+  function updateAllCounters(sets) {
+    setCounter(cPrepared , sets.prepared.length);
+    setCounter(cMissing  , sets.missing.length);
+    setCounter(cPartial  , sets.partial.length);
+    setCounter(cReceived , sets.received.length);
+    setCounter(cDelivered, sets.delivered.length);
   }
 
-  // ---------- UI tabs ----------
+  // ------------ tab switch ------------
   function setActiveTab(tab) {
     activeTab = tab;
-    [
-      [btnPrepared,"prepared"],
-      [btnMissing,"missing"],
-      [btnPartial,"partial"],
-      [btnReceived,"received"],
-      [btnDelivered,"delivered"]
-    ].forEach(([b,t])=>{
+    const entries = [
+      [btnPrepared ,'prepared'],
+      [btnMissing  ,'missing'],
+      [btnPartial  ,'partial'],
+      [btnReceived ,'received'],
+      [btnDelivered,'delivered'],
+    ];
+    entries.forEach(([b, t])=>{
       if (!b) return;
       const on = (t === tab);
-      b.classList.toggle("active", on);
-      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     const url = new URL(location.href);
-    url.searchParams.set("tab", tab);
-    history.replaceState({}, "", url);
+    url.searchParams.set('tab', tab);
+    history.replaceState({}, '', url);
   }
 
-  // ---------- actions ----------
-  async function markGroupReceived(group, buttonEl) {
-    const prevText = buttonEl ? buttonEl.textContent : "";
+  // ------------ actions ------------
+  // prepared -> mark received (كلها rem==0 بالفعل)
+  async function markGroupReceived(group, btn) {
+    const updates = group.items
+      .filter(it => N(it.available) > 0 || N(it.remaining) === 0)
+      .map(it => ({ id: it.id, rem: N(it.remaining) }));
+
+    if (!updates.length) return;
+
     try {
-      if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = "Saving..."; }
-
-      // العناصر القابلة للاستلام
-      const candidates = (activeTab === "prepared")
-        ? group.items.filter(it => !isReceived(it))
-        : group.items.filter(it => !isReceived(it) && N(it.available) > 0);
-
-      // تقسيم: كامل vs جزئي (حسب remaining)
-      const toReceivedIds = [];
-      const toPartialIds  = [];
-      for (const it of candidates) {
-        const pid = it.pageId;
-        if (!pid) continue;
-        if (N(it.remaining) > 0) toPartialIds.push(pid);
-        else                     toReceivedIds.push(pid);
-      }
-
-      if (toReceivedIds.length === 0 && toPartialIds.length === 0) {
-        throw new Error("No eligible items to receive");
-      }
-
-      await postJSON(MARK_RECEIVED_URL, {
-        pageIds: toReceivedIds,
-        pageIdsPartial: toPartialIds,
-      });
-
-      // تحديث محلي للحالة
-      const setReceived = new Set(toReceivedIds.map(String));
-      const setPartial  = new Set(toPartialIds.map(String));
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+      await postJSON('/api/logistics/mark-received', { updates });
+      const map = new Map(updates.map(u => [u.id, u]));
       allItems = allItems.map(r => {
-        const rPageId = r.pageId || r.page_id || r.notionPageId || r.notion_page_id || r.id;
-        const key = String(rPageId);
-        if (setReceived.has(key)) {
-          return { ...r, operationsStatus: "Received by operations", status: "Received by operations" };
-        }
-        if (setPartial.has(key)) {
-          return { ...r, operationsStatus: "Partially received by operations", status: "Partially received by operations" };
-        }
-        return r;
+        const u = map.get(r.id);
+        if (!u) return r;
+        const next = (N(u.rem) > 0) ? 'Partially received by operations' : 'Received by operations';
+        return { ...r, operationsStatus: next, status: next };
       });
-
       render();
     } catch (e) {
       console.error(e);
-      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = prevText || "Mark Received"; }
-      alert("Failed to mark as received. Please try again.");
+      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received'; }
+      alert('Failed to mark as received. Please try again.');
     }
   }
 
-  // ---------- render ----------
+  // missing -> mark received anyway (يفرز حسب rem)
+  async function markGroupReceivedAnyway(group, btn) {
+    // نحدّث فقط العناصر اللي avail>0 (المتوفر بالفعل)
+    const updates = group.items
+      .filter(it => N(it.available) > 0)
+      .map(it => ({ id: it.id, rem: N(it.remaining) }));
+
+    if (!updates.length) return;
+
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+      await postJSON('/api/logistics/mark-received', { updates });
+      const map = new Map(updates.map(u => [u.id, u]));
+      allItems = allItems.map(r => {
+        const u = map.get(r.id);
+        if (!u) return r;
+        const next = (N(u.rem) > 0) ? 'Partially received by operations' : 'Received by operations';
+        return { ...r, operationsStatus: next, status: next };
+      });
+      render();
+    } catch (e) {
+      console.error(e);
+      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
+      alert('Failed to mark as received. Please try again.');
+    }
+  }
+
+  // ------------ render ------------
   function render() {
     if (!grid) return;
-    grid.innerHTML = "";
+    grid.innerHTML = '';
 
-    const q = (searchInput?.value || "").trim().toLowerCase();
+    const q = (searchInput?.value || '').trim().toLowerCase();
 
     const groupsAll = buildGroups(allItems);
 
-    const groupsPrepared = groupsAll.filter(g => g.allPrepared);
-
-    // Missing: فيها ناقص، ومافيهاش لا Received ولا Partial
-    const groupsMissing  = groupsAll.filter(g =>
-      g.items.some(x => N(x.remaining) > 0) &&
-      g.items.every(x => !isReceived(x) && !isPartial(x))
-    );
-
-    // Partially received: فيها عنصر Partial أو (ناقص + فيها Received)
-    const groupsPartial  = groupsAll.filter(g =>
-      g.anyPartial || (g.items.some(x => N(x.remaining) > 0) && g.items.some(isReceived))
-    );
-
-    // Received: كل العناصر Received
-    const groupsReceived = groupsAll.filter(g => g.allReceived);
-
-    // Delivered (لو عندك تعريف للحالة)
-    const groupsDelivered = groupsAll
-      .map(g => ({ ...g, items: g.items.filter(isDelivered) }))
-      .filter(g => g.items.length);
+    // تقسيم المجموعات حسب التبويب
+    const sets = {
+      prepared : groupsAll.filter(g => g.allPrepared),
+      missing  : groupsAll.map(g => ({...g, items: g.items.filter(x => N(x.remaining) > 0 && !isReceived(x) && !isPartial(x) && !isDelivered(x))})).filter(g => g.items.length),
+      partial  : groupsAll.map(g => ({...g, items: g.items.filter(isPartial)})).filter(g => g.items.length),
+      received : groupsAll.map(g => ({...g, items: g.items.filter(isReceived)})).filter(g => g.items.length),
+      delivered: groupsAll.map(g => ({...g, items: g.items.filter(isDelivered)})).filter(g => g.items.length),
+    };
 
     // counters
-    updateAllCounters(groupsPrepared, groupsMissing, groupsPartial, groupsReceived, groupsDelivered);
+    updateAllCounters(sets);
 
-    // search
-    const filterByQuery = (gs) => {
-      if (!q) return gs;
-      return gs.map(g => ({
-        ...g,
-        items: g.items.filter(it =>
-          it.productName.toLowerCase().includes(q) ||
-          (g.title || "").toLowerCase().includes(q)
-        )
-      })).filter(g => g.items.length);
-    };
+    const view = (sets[activeTab] || []).map(g => {
+      // search filter
+      if (!q) return g;
+      const gi = g.items.filter(it =>
+        it.productName.toLowerCase().includes(q) ||
+        (g.title || '').toLowerCase().includes(q)
+      );
+      return { ...g, items: gi };
+    }).filter(g => g.items.length);
 
-    const viewSets = {
-      prepared : filterByQuery(groupsPrepared),
-      missing  : filterByQuery(groupsMissing),
-      partial  : filterByQuery(groupsPartial),
-      received : filterByQuery(groupsReceived),
-      delivered: filterByQuery(groupsDelivered)
-    };
-
-    const view = viewSets[activeTab] || [];
-    if (!view.length) { if (emptyMsg) emptyMsg.style.display = ""; return; }
-    if (emptyMsg) emptyMsg.style.display = "none";
+    if (!view.length) {
+      if (emptyMsg) emptyMsg.style.display = '';
+      return;
+    }
+    if (emptyMsg) emptyMsg.style.display = 'none';
 
     for (const g of view) {
-      const card = document.createElement("div");
-      card.className = "order-card";
-      card.dataset.key  = g.key;
-      card.dataset.miss = String(g.miss);
+      const card = document.createElement('div');
+      card.className = 'order-card';
+      card.dataset.key = g.key;
 
-      let actionsHTML = "";
-      if (activeTab === "prepared") {
-        actionsHTML = `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received</button>`;
-      } else if (activeTab === "missing" || activeTab === "partial") {
-        actionsHTML = `<button class="btn btn-primary btn-sm" data-act="mark-received">Mark Received Anyway</button>`;
-      }
+      const showPreparedButton = (activeTab === 'prepared');
+      const showMissingButton  = (activeTab === 'missing');
 
       card.innerHTML = `
         <div class="order-card__head">
@@ -288,7 +260,8 @@
           <div class="order-card__right">
             <span class="badge badge--count">Items: ${fmt(g.items.length)}</span>
             <span class="badge badge--missing">Missing: ${fmt(g.items.filter(x=>N(x.remaining)>0).length)}</span>
-            ${actionsHTML}
+            ${ showPreparedButton ? `<button class="btn btn-primary btn-sm" data-act="mr">Mark Received</button>` : '' }
+            ${ showMissingButton  ? `<button class="btn btn-danger  btn-sm" data-act="mra">Mark Received Anyway</button>` : '' }
           </div>
         </div>
         <div class="order-card__items">
@@ -300,26 +273,30 @@
               <div class="item-mid">
                 <div class="num">Req: <strong>${fmt(it.requested)}</strong></div>
                 <div class="num">Avail: <strong data-col="available">${fmt(it.available)}</strong></div>
+                <div class="num">Rec: <strong data-col="rec">${fmt(it.rec)}</strong></div>
                 <div class="num">
                   Rem:
-                  <span class="pill ${N(it.remaining) > 0 ? "pill--danger" : "pill--success"}" data-col="remaining">${fmt(it.remaining)}</span>
+                  <span class="pill ${N(it.remaining) > 0 ? 'pill--danger' : 'pill--success'}"
+                        data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
             </div>
-          `).join("")}
+          `).join('')}
         </div>
       `;
 
-      const btn = card.querySelector('[data-act="mark-received"]');
-      if (btn) btn.addEventListener("click", () => markGroupReceived(g, btn));
+      const btnMr  = card.querySelector('[data-act="mr"]');
+      const btnMra = card.querySelector('[data-act="mra"]');
+      if (btnMr ) btnMr .addEventListener('click', () => markGroupReceived(g, btnMr));
+      if (btnMra) btnMra.addEventListener('click', () => markGroupReceivedAnyway(g, btnMra));
 
       grid.appendChild(card);
     }
 
-    window.feather?.replace?.({ "stroke-width": 2 });
+    window.feather?.replace?.({ 'stroke-width': 2 });
   }
 
-  // ---------- init ----------
+  // ------------ init ------------
   async function load() {
     try {
       const raw = await fetchAssigned();
@@ -328,16 +305,14 @@
     } catch (e) {
       console.error(e);
       if (grid) grid.innerHTML = '<div class="error">Failed to load items.</div>';
-      [cPrepared,cMissing,cPartial,cReceived,cDelivered].forEach(el => el && (el.textContent="0"));
+      [cPrepared,cMissing,cPartial,cReceived,cDelivered].forEach(el => el && (el.textContent='0'));
     }
   }
 
-  [[btnPrepared,"prepared"],[btnMissing,"missing"],[btnPartial,"partial"],[btnReceived,"received"],[btnDelivered,"delivered"]]
-    .forEach(([btn,tab])=>{
-      btn && btn.addEventListener("click", ()=>{ setActiveTab(tab); render(); });
-    });
+  [[btnPrepared,'prepared'],[btnMissing,'missing'],[btnPartial,'partial'],[btnReceived,'received'],[btnDelivered,'delivered']]
+    .forEach(([b,t]) => b && b.addEventListener('click', () => { setActiveTab(t); render(); }));
 
   setActiveTab(activeTab);
-  searchInput && searchInput.addEventListener("input", render);
+  searchInput && searchInput.addEventListener('input', render);
   load();
 })();
