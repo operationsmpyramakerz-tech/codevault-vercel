@@ -942,64 +942,49 @@ app.post(
     }
   },
 );
-// ===== Logistics: mark received / partially received =====
+// === Logistics: mark received (with quantities) ===
 app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
   try {
-    const body = req.body || {};
-
-    // نجمع الـ IDs من الشكل القديم والجديد
-    let receivedIds = [];
-    let partialIds  = [];
-
-    // الشكل المتوقَّع الأساسي
-    if (Array.isArray(body.receivedIds) || Array.isArray(body.partialIds) || Array.isArray(body.pageIds)) {
-      receivedIds = (body.receivedIds || body.pageIds || []).map(String).filter(Boolean);
-      partialIds  = (body.partialIds  || []).map(String).filter(Boolean);
-    }
-
-    // ندعم الشكل القديم { updates: [{ id, rem, avail }] }
-    if (Array.isArray(body.updates) && body.updates.length) {
-      for (const u of body.updates) {
-        const pid   = String(u.id || u.pageId || u.page_id || u.notionPageId || "");
-        if (!pid) continue;
-        const rem   = Number(u.rem);
-        const avail = Number(u.avail);
-        if (!Number.isFinite(rem)) continue;
-
-        if (rem <= 0) {
-          receivedIds.push(pid);
-        } else if (rem > 0 && Number.isFinite(avail) && avail > 0) {
-          partialIds.push(pid);
-        }
-        // rem>0 && avail==0 => لا تغيير
-      }
-    }
-
-    if (receivedIds.length === 0 && partialIds.length === 0) {
-      return res.status(400).json({ ok: false, error: "No ids provided" });
-    }
-
-    const setStatus = (pid, name) =>
-      notion.pages.update({
-        page_id: pid,
-        properties: { Status: { select: { name } } },
-      });
+    const body = await readJson(req);
+    const receivedIds = Array.isArray(body.receivedIds) ? body.receivedIds : [];
+    const partialIds  = Array.isArray(body.partialIds)  ? body.partialIds  : [];
+    const recMap      = body.recMap || {}; // { "<pageId>": <number avail at click> }
 
     const updates = [];
-    for (const pid of receivedIds) updates.push(setStatus(pid, "Received by operations"));
-    for (const pid of partialIds)  updates.push(setStatus(pid, "Partially received by operations"));
+
+    const pushUpdate = (pid, statusName) => {
+      if (!pid) return;
+      const qty = Number.isFinite(+recMap[pid]) ? +recMap[pid] : undefined;
+
+      const properties = {
+        Status: { select: { name: statusName } },
+      };
+      // نسجّل الـ Avail وقت الاستلام في عمود Number: "Quantity received by operations"
+      if (typeof qty === "number" && !Number.isNaN(qty)) {
+        properties["Quantity received by operations"] = { number: qty };
+      }
+
+      updates.push(
+        notion.pages.update({
+          page_id: pid,
+          properties,
+        })
+      );
+    };
+
+    receivedIds.forEach((pid) =>
+      pushUpdate(pid, "Received by operations")
+    );
+    partialIds.forEach((pid) =>
+      pushUpdate(pid, "Partially received by operations")
+    );
 
     await Promise.all(updates);
 
-    return res.json({
-      ok: true,
-      updated: updates.length,
-      received: receivedIds.length,
-      partial: partialIds.length,
-    });
+    res.json({ ok: true, updated: updates.length });
   } catch (e) {
-    console.error("logistics/mark-received error:", e?.body || e);
-    return res.status(500).json({ ok: false, error: "Failed to mark received" });
+    console.error("logistics/mark-received error:", e.body || e);
+    res.status(500).json({ ok: false, error: "Failed to mark received" });
   }
 });
 // 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
