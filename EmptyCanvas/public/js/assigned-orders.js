@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   const fmt=(n)=>String(Number(n||0));
   const esc=(s)=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const isReceivedOps = (it)=> String(it?.status||'').toLowerCase()==='received by operations';
 
   const groupKeyOf=(it)=>{const reason=(it.reason&&String(it.reason).trim())||'No Reason';const bucket=(it.createdTime||'').slice(0,10);return `grp:${reason}|${bucket}`;};
 
@@ -138,12 +139,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!list.length){ empty.style.display=''; return; }
     empty.style.display='none';
 
-    const isAllTab      = currentFilter==='all';       // NEW: Total assigned
+    const isAllTab      = currentFilter==='all';       // Total assigned
     const isMissingTab  = currentFilter==='missing';
     const isPreparedTab = currentFilter==='prepared';
     const isReceivedTab = currentFilter==='received';
 
-    // NEW: اخفاء الأزرار في Total assigned أيضًا
+    // اخفاء الأزرار في All/Prepared/Received
     const hideRowActions  = isAllTab || isPreparedTab || isReceivedTab;
     const hideHeadActions = isAllTab || isPreparedTab || isReceivedTab;
 
@@ -183,7 +184,9 @@ document.addEventListener('DOMContentLoaded',()=>{
           </div>
         </div>
         <div class="order-card__items">
-          ${g.items.map(it=>`
+          ${g.items.map(it=> {
+              const allowItemActions = !hideRowActions && !isReceivedOps(it);
+              return `
             <div class="order-item" id="row-${it.id}">
               <div class="item-left">
                 <div class="item-name">${esc(it.productName||'-')}</div>
@@ -196,7 +199,7 @@ document.addEventListener('DOMContentLoaded',()=>{
                   <span class="pill ${Number(it.remaining)>0?'pill--danger':'pill--success'}" data-col="remaining">${fmt(it.remaining)}</span>
                 </div>
               </div>
-              ${ hideRowActions ? `` : `
+              ${ allowItemActions ? `
               <div class="item-actions">
                 <button class="btn btn-3d btn-3d-green btn-icon btn-sm" data-action="mark" data-id="${it.id}">
                   <i data-feather="check-circle"></i><span>In Stock</span>
@@ -204,9 +207,8 @@ document.addEventListener('DOMContentLoaded',()=>{
                 <button class="btn btn-3d btn-3d-orange btn-icon btn-sm" data-action="partial" data-id="${it.id}">
                   <i data-feather="edit-3"></i><span>Partial / Not In Stock</span>
                 </button>
-              </div>`}
-            </div>
-          `).join('')}
+              </div>` : ``}
+            </div>`; }).join('')}
         </div>`;
       grid.appendChild(card);
     }
