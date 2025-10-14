@@ -1002,6 +1002,56 @@ app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
     return res.status(500).json({ ok: false, error: "Failed to mark received" });
   }
 });
+// 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
+
+// === Mark Received with image (store external URL into Notion Files & media "Receipt Image") ===
+app.post("/api/orders/assigned/mark-received", requireAuth, requirePage("Assigned Schools Requested Orders"), async (req, res) => {
+  try {
+    const { orderIds, filename, dataUrl } = req.body || {};
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ error: "orderIds required" });
+    }
+    if (!dataUrl) {
+      return res.status(400).json({ error: "image dataUrl required" });
+    }
+    let publicUrl;
+    try {
+      publicUrl = await uploadToBlobFromBase64(dataUrl, filename || "receipt.jpg");
+    } catch (e) {
+      console.error("Blob upload error:", e?.message || e);
+      return res.status(500).json({ error: "Upload failed. Configure BLOB_READ_WRITE_TOKEN in Vercel." });
+    }
+    const props = await getOrdersDBProps();
+    const receiptProp = pickPropName(props, ["Receipt Image","Receipt","Image","ReceiptImage"]) || "Receipt Image";
+    await Promise.all(orderIds.map((id) =>
+      notion.pages.update({
+        page_id: id,
+        properties: {
+          [receiptProp]: { files: [{ name: filename || "receipt", external: { url: publicUrl } }] }
+        }
+      })
+    ));
+    const statusProp = await detectStatusPropName();
+    if (statusProp) {
+      await Promise.all(orderIds.map((id) =>
+        notion.pages.update({
+          page_id: id,
+          properties: { [statusProp]: { select: { name: "Received by operations" } } }
+        })
+      ));
+    }
+    res.json({ success: true, url: publicUrl });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to mark received with image." });
+  }
+});
+
+app.get(
+  "/api/orders/assigned/pdf",
+  requireAuth,
+  requirePage("Assigned Schools Requested Orders"),
+  async (req, res) => {
     // 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
 // يستخدم ids=pageId1,pageId2,...
 app.get(
@@ -1284,6 +1334,9 @@ app.get(
       console.error(e);
       res.status(500).json({ error: "Failed to generate PDF" });
     }
+  },
+);
+
 // Components list — requires Create New Order
 app.get(
   "/api/components",
