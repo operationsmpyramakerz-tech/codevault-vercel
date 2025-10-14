@@ -942,47 +942,42 @@ app.post(
     }
   },
 );
-// === Mark Received / Mark Received Anyway ===
-// يقبل شكلين:
-// 1) { updates: [{ id, rem }] }  <-- نوصي به
-//    - rem == 0  -> Received by operations
-//    - rem  > 0  -> Partially received by operations
-// 2) { pageIds: [...], status: "..." }  <-- توافُق للخلف
+// ===== Logistics: mark received / partially received =====
 app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
   try {
-    const body = await readJson(req);
-    const { updates = [], pageIds = [], status } = body || {};
+    // لازم يكون عندك app.use(express.json()) في أعلى الملف
+    const body = req.body || {};
 
-    // الصيغة الحديثة: updates
-    if (Array.isArray(updates) && updates.length) {
-      const ops = updates.map(u => {
-        const st = (Number(u.rem) > 0)
-          ? 'Partially received by operations'
-          : 'Received by operations';
-        return {
-          page_id: u.id,
-          properties: {
-            Status: { select: { name: st } }
-          }
-        };
+    // نسمح بالـ pageIds القديمة (كله يتعلم Received) أو الشكل الجديد
+    const receivedIds = (body.receivedIds || body.pageIds || []).map(String);
+    const partialIds  = (body.partialIds  || []).map(String);
+
+    if (receivedIds.length === 0 && partialIds.length === 0) {
+      return res.status(400).json({ ok: false, error: "No ids provided" });
+    }
+
+    const updates = [];
+
+    // Helper صغير لتقليل التكرار
+    const setStatus = (pid, name) =>
+      notion.pages.update({
+        page_id: pid,
+        properties: {
+          Status: { select: { name } },
+        },
       });
 
-      await batchUpdateNotionPages(ops);
-      return res.json({ ok: true, updated: ops.length });
-    }
+    for (const pid of receivedIds) updates.push(setStatus(pid, "Received by operations"));
+    for (const pid of partialIds)  updates.push(setStatus(pid, "Partially received by operations"));
 
-    // توافُق قديم: pageIds + status
-    if (Array.isArray(pageIds) && pageIds.length) {
-      const st = status || 'Received by operations';
-      const ops = pageIds.map(id => ({
-        page_id: id,
-        properties: { Status: { select: { name: st } } }
-      }));
-      await batchUpdateNotionPages(ops);
-      return res.json({ ok: true, updated: ops.length });
-    }
+    await Promise.all(updates);
 
-    return res.status(400).json({ ok: false, error: "No updates provided" });
+    return res.json({
+      ok: true,
+      updated: updates.length,
+      received: receivedIds.length,
+      partial: partialIds.length,
+    });
   } catch (e) {
     console.error("logistics/mark-received error:", e?.body || e);
     return res.status(500).json({ ok: false, error: "Failed to mark received" });
