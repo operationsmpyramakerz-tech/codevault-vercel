@@ -7,6 +7,7 @@
        * rem == 0                       => Received by operations
        * rem > 0 && avail > 0           => Partially received by operations
        * rem > 0 && avail == 0          => (no change)
+   - Record "Avail" into Notion number field "Quantity received by operations" via recMap
 */
 
 (function () {
@@ -66,6 +67,7 @@
     rem = (rem == null ? Math.max(0, req - avail) : N(rem));
     return {
       id: it.id,
+      pageId: it.pageId || it.page_id || it.notionPageId || it.id, // نحاول كل الأسماء الممكنة
       reason: S(it.reason || ''),
       created: S(it.createdTime || it.created_time || it.created || ''),
       productName: S(it.productName ?? it.product_name ?? ''),
@@ -73,7 +75,7 @@
       available: avail,
       remaining: rem,
       status: statusOf(it),
-      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0) // للعرض لو موجود
+      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0)
     };
   }
 
@@ -153,138 +155,134 @@
 
   // ------------ actions ------------
   async function markGroupReceived(group, buttonEl) {
-  const originalText = buttonEl ? buttonEl.textContent : '';
-  try {
-    if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
+    const originalText = buttonEl ? buttonEl.textContent : '';
+    try {
+      if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
 
-    // كل عناصر الجروب تتحوّل Received، ونسجّل Avail في recMap
-    const receivedIds = [];
-    const recMap = {};
+      const receivedIds = [];
+      const recMap = {};
 
-    for (const it of group.items) {
-      const pid = String(it.pageId || it.page_id || it.notionPageId || it.id || '');
-      if (!pid) continue;
-      receivedIds.push(pid);
-      recMap[pid] = Number(it.available) || 0; // نسجّل الـ Avail
-    }
-
-    if (!receivedIds.length) throw new Error('No items');
-
-    await postJSON('/api/logistics/mark-received', { receivedIds, partialIds: [], recMap });
-
-    // حدّث الحالة محليًا + rec للعرض الفوري
-    const recSet = new Set(receivedIds);
-    allItems = allItems.map(r => {
-      const pid = String(r.pageId || r.page_id || r.notionPageId || r.id || '');
-      if (recSet.has(pid)) {
-        return {
-          ...r,
-          operationsStatus: 'Received by operations',
-          status: 'Received by operations',
-          quantityReceivedByOperations: Number(r.available) || 0,
-          rec: Number(r.available) || 0
-        };
-      }
-      return r;
-    });
-
-    render();
-  } catch (e) {
-    console.error(e);
-    alert('Failed to mark as received. Please try again.');
-  } finally {
-    if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = originalText || 'Mark Received'; }
-  }
-}
-async function markGroupReceivedAnyway(group, btn) {
-  try {
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-
-    const receivedIds = [];
-    const partialIds  = [];
-    const recMap      = {};
-
-    for (const it of group.items) {
-      const pid   = String(it.pageId || it.page_id || it.notionPageId || it.id || '');
-      if (!pid) continue;
-
-      const rem   = Number(it.remaining) || 0;
-      const avail = Number(it.available) || 0;
-
-      if (rem === 0) {
+      for (const it of group.items) {
+        const pid = String(it.pageId || it.id || '');
+        if (!pid) continue;
         receivedIds.push(pid);
-        recMap[pid] = avail;                     // سجل Avail
-      } else if (rem > 0 && avail > 0) {
-        partialIds.push(pid);
-        recMap[pid] = avail;                     // سجل Avail للـ Partial كمان
+        recMap[pid] = Number(it.available) || 0;
       }
-      // rem>0 && avail==0 => لا تغيّر
+
+      if (!receivedIds.length) throw new Error('No items');
+
+      await postJSON('/api/logistics/mark-received', { receivedIds, partialIds: [], recMap });
+
+      const recSet = new Set(receivedIds);
+      allItems = allItems.map(r => {
+        const pid = String(r.pageId || r.id || '');
+        if (recSet.has(pid)) {
+          const avail = Number(r.available) || 0;
+          return {
+            ...r,
+            operationsStatus: 'Received by operations',
+            status: 'Received by operations',
+            quantityReceivedByOperations: avail,
+            rec: avail
+          };
+        }
+        return r;
+      });
+
+      render();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to mark as received. Please try again.');
+    } finally {
+      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = originalText || 'Mark Received'; }
     }
-
-    if (!receivedIds.length && !partialIds.length) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
-      return;
-    }
-
-    await postJSON('/api/logistics/mark-received', { receivedIds, partialIds, recMap });
-
-    // حدّث الواجهة محليًا
-    const recSet = new Set(receivedIds);
-    const parSet = new Set(partialIds);
-
-    allItems = allItems.map(r => {
-      const pid = String(r.pageId || r.page_id || r.notionPageId || r.id || '');
-      if (recSet.has(pid)) {
-        const avail = Number(r.available) || 0;
-        return {
-          ...r,
-          operationsStatus: 'Received by operations',
-          status: 'Received by operations',
-          quantityReceivedByOperations: avail,
-          rec: avail
-        };
-      }
-      if (parSet.has(pid)) {
-        const avail = Number(r.available) || 0;
-        return {
-          ...r,
-          operationsStatus: 'Partially received by operations',
-          status: 'Partially received by operations',
-          quantityReceivedByOperations: avail,
-          rec: avail
-        };
-      }
-      return r;
-    });
-
-    render(); // سيظل الطلب في Missing طالما فيه أي rem>0
-  } catch (e) {
-    console.error(e);
-    alert('Failed to mark as received. Please try again.');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
   }
-}
+
+  async function markGroupReceivedAnyway(group, btn) {
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+      const receivedIds = [];
+      const partialIds  = [];
+      const recMap      = {};
+
+      for (const it of group.items) {
+        const pid   = String(it.pageId || it.id || '');
+        if (!pid) continue;
+
+        const rem   = Number(it.remaining) || 0;
+        const avail = Number(it.available) || 0;
+
+        if (rem === 0) {
+          receivedIds.push(pid);
+          recMap[pid] = avail;
+        } else if (rem > 0 && avail > 0) {
+          partialIds.push(pid);
+          recMap[pid] = avail;
+        }
+        // rem>0 && avail==0 => no change
+      }
+
+      if (!receivedIds.length && !partialIds.length) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
+        return;
+      }
+
+      await postJSON('/api/logistics/mark-received', { receivedIds, partialIds, recMap });
+
+      const recSet = new Set(receivedIds);
+      const parSet = new Set(partialIds);
+
+      allItems = allItems.map(r => {
+        const pid = String(r.pageId || r.id || '');
+        if (recSet.has(pid)) {
+          const avail = Number(r.available) || 0;
+          return {
+            ...r,
+            operationsStatus: 'Received by operations',
+            status: 'Received by operations',
+            quantityReceivedByOperations: avail,
+            rec: avail
+          };
+        }
+        if (parSet.has(pid)) {
+          const avail = Number(r.available) || 0;
+          return {
+            ...r,
+            operationsStatus: 'Partially received by operations',
+            status: 'Partially received by operations',
+            quantityReceivedByOperations: avail,
+            rec: avail
+          };
+        }
+        return r;
+      });
+
+      render();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to mark as received. Please try again.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
+    }
+  }
+
   // ------------ render ------------
   function render() {
     if (!grid) return;
     grid.innerHTML = '';
 
     const q = (searchInput?.value || '').trim().toLowerCase();
-
     const groupsAll = buildGroups(allItems);
 
-    // sets:
     const sets = {
       prepared : groupsAll.filter(g => g.allPrepared),
-      // ⬇️ Missing: لو فيه rem>0 في أي عنصر ⇒ أعرض كل عناصر الجروب (بدون تصفية)
-      missing  : groupsAll.filter(g => g.missingCnt > 0),
+      missing  : groupsAll.filter(g => g.missingCnt > 0), // أعرض كل العناصر لو فيه rem>0
       partial  : groupsAll.map(g => ({...g, items: g.items.filter(it => isPartial(it))})).filter(g => g.items.length),
       received : groupsAll.map(g => ({...g, items: g.items.filter(it => isReceived(it))})).filter(g => g.items.length),
       delivered: groupsAll.map(g => ({...g, items: g.items.filter(it => isDelivered(it))})).filter(g => g.items.length),
     };
 
-    // counters
     updateAllCounters(sets);
 
     const view = (sets[activeTab] || []).map(g => {
@@ -296,10 +294,7 @@ async function markGroupReceivedAnyway(group, btn) {
       return { ...g, items: gi };
     }).filter(g => g.items.length);
 
-    if (!view.length) {
-      if (emptyMsg) emptyMsg.style.display = '';
-      return;
-    }
+    if (!view.length) { if (emptyMsg) emptyMsg.style.display = ''; return; }
     if (emptyMsg) emptyMsg.style.display = 'none';
 
     for (const g of view) {

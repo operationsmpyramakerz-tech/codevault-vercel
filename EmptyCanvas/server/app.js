@@ -942,96 +942,59 @@ app.post(
     }
   },
 );
-// === Logistics: mark received (with quantities) ===
-app.post("/api/logistics/mark-received", requireAuth, async (req, res) => {
+// =================== Logistics: mark-received (with recording Rec) ===================
+const STATUS_PROP = 'Status';
+const REC_PROP    = 'Quantity received by operations';
+
+// helper لقراءة JSON body (لو مش عندك واحد بالفعل)
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); }
+  catch { return {}; }
+}
+
+app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
   try {
-    const body = await readJson(req);
-    const receivedIds = Array.isArray(body.receivedIds) ? body.receivedIds : [];
-    const partialIds  = Array.isArray(body.partialIds)  ? body.partialIds  : [];
-    const recMap      = body.recMap || {}; // { "<pageId>": <number avail at click> }
+    const { receivedIds = [], partialIds = [], recMap = {} } = await readJsonBody(req);
 
-    const updates = [];
+    // دالة تحديث صفحة في Notion
+    const setStatus = async (pageId, statusName) => {
+      if (!pageId) return;
 
-    const pushUpdate = (pid, statusName) => {
-      if (!pid) return;
-      const qty = Number.isFinite(+recMap[pid]) ? +recMap[pid] : undefined;
+      const recVal = Number(recMap[pageId]);
+      const properties = {};
 
-      const properties = {
-        Status: { select: { name: statusName } },
-      };
-      // نسجّل الـ Avail وقت الاستلام في عمود Number: "Quantity received by operations"
-      if (typeof qty === "number" && !Number.isNaN(qty)) {
-        properties["Quantity received by operations"] = { number: qty };
+      // Status (select)
+      properties[STATUS_PROP] = { select: { name: statusName } };
+
+      // Quantity received by operations (number) — نسجل الـ Avail اللي جاي من الواجهة
+      if (Number.isFinite(recVal)) {
+        properties[REC_PROP] = { number: recVal };
       }
 
-      updates.push(
-        notion.pages.update({
-          page_id: pid,
-          properties,
-        })
-      );
+      return notion.pages.update({
+        page_id: pageId,
+        properties
+      });
     };
 
-    receivedIds.forEach((pid) =>
-      pushUpdate(pid, "Received by operations")
-    );
-    partialIds.forEach((pid) =>
-      pushUpdate(pid, "Partially received by operations")
-    );
+    // شغل التحديثات كلها
+    const ops = [];
+    for (const pid of receivedIds) ops.push(setStatus(pid, 'Received by operations'));
+    for (const pid of partialIds)  ops.push(setStatus(pid, 'Partially received by operations'));
 
-    await Promise.all(updates);
+    await Promise.all(ops);
 
-    res.json({ ok: true, updated: updates.length });
+    return res.json({
+      ok: true,
+      updated: { received: receivedIds.length, partial: partialIds.length }
+    });
   } catch (e) {
-    console.error("logistics/mark-received error:", e.body || e);
-    res.status(500).json({ ok: false, error: "Failed to mark received" });
+    console.error('logistics/mark-received error:', e?.body || e);
+    return res.status(500).json({ ok: false, error: 'Failed to mark received' });
   }
 });
-// 4) PDF بالنواقص فقط (remaining > 0) — يدعم ids كـ GET
-
-// === Mark Received with image (store external URL into Notion Files & media "Receipt Image") ===
-app.post("/api/orders/assigned/mark-received", requireAuth, requirePage("Assigned Schools Requested Orders"), async (req, res) => {
-  try {
-    const { orderIds, filename, dataUrl } = req.body || {};
-    if (!Array.isArray(orderIds) || orderIds.length === 0) {
-      return res.status(400).json({ error: "orderIds required" });
-    }
-    if (!dataUrl) {
-      return res.status(400).json({ error: "image dataUrl required" });
-    }
-    let publicUrl;
-    try {
-      publicUrl = await uploadToBlobFromBase64(dataUrl, filename || "receipt.jpg");
-    } catch (e) {
-      console.error("Blob upload error:", e?.message || e);
-      return res.status(500).json({ error: "Upload failed. Configure BLOB_READ_WRITE_TOKEN in Vercel." });
-    }
-    const props = await getOrdersDBProps();
-    const receiptProp = pickPropName(props, ["Receipt Image","Receipt","Image","ReceiptImage"]) || "Receipt Image";
-    await Promise.all(orderIds.map((id) =>
-      notion.pages.update({
-        page_id: id,
-        properties: {
-          [receiptProp]: { files: [{ name: filename || "receipt", external: { url: publicUrl } }] }
-        }
-      })
-    ));
-    const statusProp = await detectStatusPropName();
-    if (statusProp) {
-      await Promise.all(orderIds.map((id) =>
-        notion.pages.update({
-          page_id: id,
-          properties: { [statusProp]: { select: { name: "Received by operations" } } }
-        })
-      ));
-    }
-    res.json({ success: true, url: publicUrl });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Failed to mark received with image." });
-  }
-});
-
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
