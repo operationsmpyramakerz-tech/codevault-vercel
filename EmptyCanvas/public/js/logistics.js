@@ -1,10 +1,12 @@
 /* EmptyCanvas/public/js/logistics.js
-   Logistics page:
+   Logistics:
    - Tabs: prepared / missing / partial / received / delivered
+   - Missing tab shows FULL order items as long as ANY item has rem>0
    - "Mark Received" (prepared) & "Mark Received Anyway" (missing)
-   - Status rules:
-       rem == 0  -> "Received by operations"
-       rem  > 0  -> "Partially received by operations"
+   - Status rules on "Mark Received Anyway":
+       * rem == 0                       => Received by operations
+       * rem > 0 && avail > 0           => Partially received by operations
+       * rem > 0 && avail == 0          => (no change)
 */
 
 (function () {
@@ -52,7 +54,7 @@
   let activeTab = (new URLSearchParams(location.search).get('tab') || 'prepared').toLowerCase();
 
   // ------------ normalize & grouping ------------
-  const statusOf = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
+  const statusOf   = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
   const isReceived = (it) => statusOf(it) === 'received by operations';
   const isPartial  = (it) => statusOf(it) === 'partially received by operations';
   const isDelivered= (it) => statusOf(it) === 'delivered';
@@ -71,7 +73,7 @@
       available: avail,
       remaining: rem,
       status: statusOf(it),
-      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0) // للعرض فقط إن وجد
+      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0) // للعرض لو موجود
     };
   }
 
@@ -104,7 +106,7 @@
     g.total       = g.items.length;
     g.missingCnt  = g.items.filter(x => N(x.remaining) > 0).length;
     g.allPrepared = g.items.every(x => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x) && !isPartial(x));
-    g.anyMissing  = g.items.some(x => N(x.remaining) > 0 && !isReceived(x) && !isDelivered(x) && !isPartial(x));
+    g.anyMissing  = g.missingCnt > 0;
     g.anyPartial  = g.items.some(isPartial);
     g.anyReceived = g.items.some(isReceived);
   }
@@ -150,7 +152,6 @@
   }
 
   // ------------ actions ------------
-  // prepared -> mark received (كلها rem==0 بالفعل)
   async function markGroupReceived(group, btn) {
     const updates = group.items
       .filter(it => N(it.available) > 0 || N(it.remaining) === 0)
@@ -176,26 +177,37 @@
     }
   }
 
-  // missing -> mark received anyway (يفرز حسب rem)
+  // === المطلوب هنا ===
   async function markGroupReceivedAnyway(group, btn) {
-    // نحدّث فقط العناصر اللي avail>0 (المتوفر بالفعل)
-    const updates = group.items
-      .filter(it => N(it.available) > 0)
-      .map(it => ({ id: it.id, rem: N(it.remaining) }));
-
+    // 1) نخلي Missing يعرض كامل الطلب طالما فيه rem>0 (ده معمول في render)
+    // 2) على الضغط:
+    //   - rem == 0            => Received by operations
+    //   - rem > 0 && avail>0  => Partially received by operations
+    //   - rem > 0 && avail==0 => بلا تغيير
+    const updates = [];
+    for (const it of group.items) {
+      const rem   = N(it.remaining);
+      const avail = N(it.available);
+      if (rem === 0) {
+        updates.push({ id: it.id, rem: 0 });
+      } else if (rem > 0 && avail > 0) {
+        updates.push({ id: it.id, rem }); // السيرفر هيفهم إن دي Partial
+      } // rem>0 && avail==0 => skip
+    }
     if (!updates.length) return;
 
     try {
       if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
       await postJSON('/api/logistics/mark-received', { updates });
-      const map = new Map(updates.map(u => [u.id, u]));
+
+      const m = new Map(updates.map(u => [u.id, u]));
       allItems = allItems.map(r => {
-        const u = map.get(r.id);
+        const u = m.get(r.id);
         if (!u) return r;
         const next = (N(u.rem) > 0) ? 'Partially received by operations' : 'Received by operations';
         return { ...r, operationsStatus: next, status: next };
       });
-      render();
+      render(); // هيبقى في Missing طول ما فيه rem>0 لأي عنصر
     } catch (e) {
       console.error(e);
       if (btn) { btn.disabled = false; btn.textContent = 'Mark Received Anyway'; }
@@ -212,20 +224,20 @@
 
     const groupsAll = buildGroups(allItems);
 
-    // تقسيم المجموعات حسب التبويب
+    // sets:
     const sets = {
       prepared : groupsAll.filter(g => g.allPrepared),
-      missing  : groupsAll.map(g => ({...g, items: g.items.filter(x => N(x.remaining) > 0 && !isReceived(x) && !isPartial(x) && !isDelivered(x))})).filter(g => g.items.length),
-      partial  : groupsAll.map(g => ({...g, items: g.items.filter(isPartial)})).filter(g => g.items.length),
-      received : groupsAll.map(g => ({...g, items: g.items.filter(isReceived)})).filter(g => g.items.length),
-      delivered: groupsAll.map(g => ({...g, items: g.items.filter(isDelivered)})).filter(g => g.items.length),
+      // ⬇️ Missing: لو فيه rem>0 في أي عنصر ⇒ أعرض كل عناصر الجروب (بدون تصفية)
+      missing  : groupsAll.filter(g => g.missingCnt > 0),
+      partial  : groupsAll.map(g => ({...g, items: g.items.filter(it => isPartial(it))})).filter(g => g.items.length),
+      received : groupsAll.map(g => ({...g, items: g.items.filter(it => isReceived(it))})).filter(g => g.items.length),
+      delivered: groupsAll.map(g => ({...g, items: g.items.filter(it => isDelivered(it))})).filter(g => g.items.length),
     };
 
     // counters
     updateAllCounters(sets);
 
     const view = (sets[activeTab] || []).map(g => {
-      // search filter
       if (!q) return g;
       const gi = g.items.filter(it =>
         it.productName.toLowerCase().includes(q) ||
