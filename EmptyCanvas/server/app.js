@@ -13,6 +13,9 @@ const ordersDatabaseId = process.env.Products_list;
 const teamMembersDatabaseId = process.env.Team_Members;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
+// ----- Hardbind: Received Quantity property name (Number) -----
+const REC_PROP_HARDBIND = "Quantity received by operations";
+
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -354,6 +357,20 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ error: "Login failed" });
   }
 });
+// === Helper: Received Quantity (number) — used to keep Rec visible on Logistics ===
+async function detectReceivedQtyPropName() {
+  const envName = (process.env.NOTION_REC_PROP || "").trim();
+  const props = await getOrdersDBProps();
+  if (envName && props[envName] && props[envName].type === "number") return envName;
+
+  const candidate = pickPropName(props, [
+    "Quantity received by operations",
+    "Received Qty",
+    "Rec",
+  ]);
+  if (candidate && props[candidate] && props[candidate].type === "number") return candidate;
+  return null;
+}
 
 // Logout
 app.post("/api/logout", (req, res) => {
@@ -2034,6 +2051,11 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     const statusFilter = String(req.query.status || "Prepared");
     const statusProp = await detectStatusPropName();
     const availableProp = await detectAvailableQtyPropName();
+    const receivedProp = await (async()=>{
+      const props = await getOrdersDBProps();
+      if (props[REC_PROP_HARDBIND] && props[REC_PROP_HARDBIND].type === 'number') return REC_PROP_HARDBIND;
+      return await detectReceivedQtyPropName();
+    })();
     const items = [];
     let hasMore = true, cursor;
 
@@ -2060,12 +2082,14 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
         // For Prepared tab we only show fully available
         if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
 
+        const recVal = receivedProp ? Number(props[receivedProp]?.number || 0) : (props[REC_PROP_HARDBIND]?.type === 'number' ? Number(props[REC_PROP_HARDBIND]?.number || 0) : 0);
         items.push({
           id: page.id,
           reason: props.Reason?.title?.[0]?.plain_text || "No Reason",
           productName,
           requested,
           available,
+          quantityReceivedByOperations: recVal,
           status: props[statusProp]?.select?.name || statusFilter,
         });
       }
