@@ -2,78 +2,17 @@ const express = require("express");
 const path = require("path");
 const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
-// --- env helper: read first non-empty env from a list
-function readEnv(...keys) {
-  for (const k of keys) {
-    const v = process.env[k];
-    if (v && String(v).trim()) return String(v).trim();
-  }
-  return "";
-}
 
 const app = express();
 // IMPORTANT for Vercel reverse proxy so secure cookies are honored
 app.set("trust proxy", 1);
-// Initialize Notion Client using Env Vars (with robust fallbacks)
-const env = (key, ...alts) =>
-  process.env[key] ??
-  alts.map((k) => process.env[k]).find((v) => v != null) ??
-  "";
-
-// Notion token
-const notion = new Client({
-  auth: env("Notion_API_Key", "NOTION_API_KEY", "NOTION_TOKEN"),
-});
-
-// Databases (support Production/Preview/Development name variants)
-const componentsDatabaseId  = env("Products_Database", "PRODUCTS_DATABASE", "Components_Database");
-const ordersDatabaseId      = env("Products_list",     "PRODUCTS_LIST",     "Orders_List", "ORDERS_DB_ID");
-const teamMembersDatabaseId = env("Team_Members",      "TEAM_MEMBERS",      "TeamMembers", "TEAM_MEMBERS_DB_ID", "TEAM_MEMBERS_DATABASE_ID");
-const stocktakingDatabaseId = env("School_Stocktaking_DB_ID", "SCHOOL_STOCKTAKING_DB_ID");
-const fundsDatabaseId       = env("Funds", "FUNDS_DB_ID", "FUNDS");
-
-// Helpful warnings in logs if something important is missing
-if (!teamMembersDatabaseId) {
-  console.warn("[env] Team_Members is MISSING. Add it in Vercel → Settings → Environment Variables for the Preview environment too.");
-}
-if (!ordersDatabaseId) {
-  console.warn("[env] Products_list is MISSING. Add it in Vercel env (Preview/Production).");
-}
-// --- Fallback resolvers: get DB IDs by title if env is missing ---
-async function findDbIdByTitle(possibleNames = []) {
-  try {
-    const res = await notion.search({
-      query: "", // list all, then match by title
-      filter: { property: "object", value: "database" },
-      page_size: 100,
-    });
-    const wanted = possibleNames.map((s) => String(s).toLowerCase());
-    for (const db of res.results || []) {
-      const title =
-        (db.title && db.title[0] && db.title[0].plain_text) ||
-        db?.title ||
-        "";
-      if (wanted.includes(String(title).toLowerCase())) {
-        return db.id;
-      }
-    }
-    return null;
-  } catch (e) {
-    console.warn("[fallback] Notion search failed:", e.body || e);
-    return null;
-  }
-}
-
-async function getTeamMembersDbId() {
-  if (teamMembersDatabaseId) return teamMembersDatabaseId;
-  // جرّب عناوين شائعة
-  return await findDbIdByTitle([
-    "Team Members",
-    "Team_Members",
-    "TeamMembers",
-    "Members",
-  ]);
-}
+// Initialize Notion Client using Env Vars
+const notion = new Client({ auth: process.env.Notion_API_Key });
+const componentsDatabaseId = process.env.Products_Database;
+const ordersDatabaseId = process.env.Products_list;
+const teamMembersDatabaseId = process.env.Team_Members;
+const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
+const fundsDatabaseId = process.env.Funds;
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -262,20 +201,6 @@ async function detectStatusPropName() {
   );
 }
 
-// NEW: خاصية Quantity received by operations (number)
-async function detectRecPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, [
-      "Quantity received by operations",
-      "Received Qty",
-      "Rec",
-      "Quantity Received By Operations",
-      "Quantity_received_by_operations"
-    ]) || null
-  );
-}
-
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
@@ -388,18 +313,14 @@ app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
 // Login
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
-
-  // Use env if present, otherwise resolve by title
-  const teamDB = await getTeamMembersDbId();
-  if (!teamDB) {
+  if (!teamMembersDatabaseId) {
     return res
       .status(500)
       .json({ error: "Team_Members database ID is not configured." });
   }
-
   try {
     const response = await notion.databases.query({
-      database_id: teamDB,
+      database_id: teamMembersDatabaseId,
       filter: { property: "Name", title: { equals: username } },
     });
     if (response.results.length === 0) {
@@ -448,15 +369,14 @@ app.post("/api/logout", (req, res) => {
 
 // Account info (returns fresh allowedPages)
 app.get("/api/account", requireAuth, async (req, res) => {
-  const teamDB = await getTeamMembersDbId();
-  if (!teamDB) {
+  if (!teamMembersDatabaseId) {
     return res
       .status(500)
       .json({ error: "Team_Members database ID is not configured." });
   }
   try {
     const response = await notion.databases.query({
-      database_id: teamDB,
+      database_id: teamMembersDatabaseId,
       filter: { property: "Name", title: { equals: req.session.username } },
     });
 
@@ -1022,7 +942,6 @@ app.post(
     }
   },
 );
-
 // --- Logistics: mark-received (Status + Quantity received by operations) ---
 app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
   try {
@@ -1104,7 +1023,6 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     return res.status(500).json({ ok: false, error: 'Failed to mark received' });
   }
 });
-
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
@@ -2116,8 +2034,6 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     const statusFilter = String(req.query.status || "Prepared");
     const statusProp = await detectStatusPropName();
     const availableProp = await detectAvailableQtyPropName();
-    const recProp = await detectRecPropName(); // NEW
-
     const items = [];
     let hasMore = true, cursor;
 
@@ -2141,9 +2057,6 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
         }
         const requested = Number(props["Quantity Requested"]?.number || 0);
         const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
-        const rec = recProp ? Number(props[recProp]?.number || 0) : 0; // NEW
-        const remaining = Math.max(0, requested - available);          // NEW
-
         // For Prepared tab we only show fully available
         if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
 
@@ -2153,10 +2066,7 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
           productName,
           requested,
           available,
-          remaining, // NEW
-          rec,       // NEW
           status: props[statusProp]?.select?.name || statusFilter,
-          createdTime: page.created_time
         });
       }
       hasMore = q.has_more;
