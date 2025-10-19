@@ -20,9 +20,32 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 // --- Health FIRST (before session) so it works even if env is missing ---
+
 app.get("/health", (req, res) => {
   res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
 });
+
+// --- Optional diagnostics (enable with EXPOSE_DIAG=1) ---
+if (process.env.EXPOSE_DIAG === "1") {
+  app.get("/diag", (req, res) => {
+    const keys = [
+      "Notion_API_Key",
+      "Products_Database",
+      "Products_list",
+      "Team_Members",
+      "School_Stocktaking_DB_ID",
+      "Funds",
+      "NOTION_STATUS_PROP",
+      "NOTION_REC_PROP",
+      "SESSION_SECRET",
+      "UPSTASH_REDIS_URL",
+      "BLOB_READ_WRITE_TOKEN",
+      "VERCEL_REGION"
+    ];
+    const present = Object.fromEntries(keys.map(k => [k, !!process.env[k]]));
+    res.json({ present, values: { VERCEL_REGION: process.env.VERCEL_REGION || "unknown" } });
+  });
+}
 
 // Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
