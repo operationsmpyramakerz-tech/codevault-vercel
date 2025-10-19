@@ -1,16 +1,13 @@
 /* EmptyCanvas/public/js/logistics.js
    Logistics:
    - Tabs: prepared / missing / partial / received / delivered
-   - Missing tab shows full order items UNTIL user presses "Mark Received Anyway".
-     After pressing it, items whose status becomes "Received by operations"
-     will be hidden from the Missing tab (others remain).
+   - Missing tab shows FULL order items as long as ANY item has rem>0
    - "Mark Received" (prepared) & "Mark Received Anyway" (missing)
    - Status rules on "Mark Received Anyway":
-       * rem == 0                       => Received by operations (rec = avail)
-       * rem > 0 && avail > 0           => Partially received by operations (rec = avail)
+       * rem == 0                       => Received by operations
+       * rem > 0 && avail > 0           => Partially received by operations
        * rem > 0 && avail == 0          => (no change)
-   - On any receive action we record the current Avail into Notion number
-     field "Quantity received by operations" via `recMap`.
+   - Record "Avail" into Notion number field "Quantity received by operations" via recMap
 */
 
 (function () {
@@ -19,7 +16,7 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const N  = (v) => Number.isFinite(+v) ? +v : 0;
   const S  = (v) => String(v ?? '');
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',\"'\":'&#39;'}[c]));
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = (v) => String(N(v));
 
   async function postJSON(url, body) {
@@ -70,7 +67,7 @@
     rem = (rem == null ? Math.max(0, req - avail) : N(rem));
     return {
       id: it.id,
-      pageId: it.pageId || it.page_id || it.notionPageId || it.id,
+      pageId: it.pageId || it.page_id || it.notionPageId || it.id, // نحاول كل الأسماء الممكنة
       reason: S(it.reason || ''),
       created: S(it.createdTime || it.created_time || it.created || ''),
       productName: S(it.productName ?? it.product_name ?? ''),
@@ -78,7 +75,7 @@
       available: avail,
       remaining: rem,
       status: statusOf(it),
-      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0),
+      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0)
     };
   }
 
@@ -111,6 +108,9 @@
     g.total       = g.items.length;
     g.missingCnt  = g.items.filter(x => N(x.remaining) > 0).length;
     g.allPrepared = g.items.every(x => N(x.remaining) === 0 && !isReceived(x) && !isDelivered(x) && !isPartial(x));
+    g.anyMissing  = g.missingCnt > 0;
+    g.anyPartial  = g.items.some(isPartial);
+    g.anyReceived = g.items.some(isReceived);
   }
 
   // ------------ API ------------
@@ -123,6 +123,7 @@
 
   // ------------ counters ------------
   const setCounter = (el, v) => el && (el.textContent = fmt(v));
+
   function updateAllCounters(sets) {
     setCounter(cPrepared , sets.prepared.length);
     setCounter(cMissing  , sets.missing.length);
@@ -153,87 +154,77 @@
   }
 
   // ------------ actions ------------
-  // Prepared tab: mark whole group as 'Received by operations'
-  async function markGroupReceived(group, buttonEl) {
-    try {
-      if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
-      const itemIds = group.items.map(i => i.id).filter(Boolean);
-      if (!itemIds.length) return;
-
-      const statusById = {};
-      const recMap = {};
-      for (const it of group.items) {
-        if (!it.id) continue;
-        statusById[it.id] = 'Received by operations';
-        recMap[it.id] = N(it.available);
-      }
-
-      const out = await postJSON('/api/logistics/mark-received', { itemIds, statusById, recMap });
-      if (!out.ok) throw new Error(out.error || 'API failed');
-
-      // Update local state
-      allItems = allItems.map(r => {
-        const id = r.id;
-        if (!id || !statusById[id]) return r;
-        return { ...r, operationsStatus: statusById[id], status: statusById[id], rec: recMap[id] };
-      });
-      render();
-    } catch (e) {
-      console.error(e);
-      alert('Failed to mark as received. Please try again.');
-      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received'; }
-    }
-  }
-
-  // Missing tab: smart status depending on rem/avail
   async function markGroupReceivedAnyway(group, buttonEl) {
-    try {
-      if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
+  try {
+    if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
 
-      const itemIds = [];
-      const statusById = {};
-      const recMap = {};
+    const itemIds = [];
+    const statusById = {};
+    const recMap = {};
 
-      for (const it of group.items) {
-        const rem = N(it.remaining);
-        const avail = N(it.available);
-        if (!it.id) continue;
+    // القواعد المطلوبة:
+    // - لو rem === 0 => Status = Received by operations, rec = avail
+    // - لو rem > 0 && avail > 0 => Status = Partially received by operations, rec = avail
+    // - لو rem > 0 && avail === 0 => متعملش حاجة للعنصر ده (يفضل Missing)
 
-        if (rem === 0) {
-          itemIds.push(it.id);
-          statusById[it.id] = 'Received by operations';
-          recMap[it.id] = avail;
-        } else if (rem > 0 && avail > 0) {
-          itemIds.push(it.id);
-          statusById[it.id] = 'Partially received by operations';
-          recMap[it.id] = avail;
-        }
-        // rem>0 && avail==0 => skip (still Missing/Pending)
+    for (const it of group.items) {
+      const rem = Number(it.remaining || 0);
+      const avail = Number(it.available || 0);
+      const id = it.id;
+      if (!id) continue;
+
+      if (rem === 0) {
+        itemIds.push(id);
+        statusById[id] = 'Received by operations';
+        recMap[id] = avail;
+      } else if (rem > 0 && avail > 0) {
+        itemIds.push(id);
+        statusById[id] = 'Partially received by operations';
+        recMap[id] = avail;
       }
-
-      if (!itemIds.length) {
-        if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
-        alert('Nothing to update for this group.');
-        return;
-      }
-
-      const out = await postJSON('/api/logistics/mark-received', { itemIds, statusById, recMap });
-      if (!out.ok) throw new Error(out.error || 'API failed');
-
-      // Local update & re-render (items that became "Received" disappear from Missing tab)
-      allItems = allItems.map(r => {
-        const id = r.id;
-        if (!id || !statusById[id]) return r;
-        return { ...r, operationsStatus: statusById[id], status: statusById[id], rec: recMap[id] };
-      });
-      render();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to mark as received. Please try again.');
-      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+      // rem>0 && avail==0 => skip
     }
-  }
 
+    if (itemIds.length === 0) {
+      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+      alert('Nothing to update for this group.');
+      return;
+    }
+
+    const res = await fetch('/api/logistics/mark-received', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ itemIds, statusById, recMap })
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(()=>'');
+      throw new Error(`Server error ${res.status}: ${t}`);
+    }
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'Unknown error');
+
+    // حدّث الحالة محليًا ثم أعدّ الرسم
+    allItems = allItems.map(r => {
+      const id = r.id;
+      if (!id || !statusById[id]) return r;
+      return {
+        ...r,
+        operationsStatus: statusById[id],
+        status: statusById[id],
+        // خزن rec محليًا لو بتعرضه
+        rec: recMap[id]
+      };
+    });
+
+    render();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to mark as received. Please try again.');
+    if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+  }
+}
   // ------------ render ------------
   function render() {
     if (!grid) return;
@@ -244,10 +235,7 @@
 
     const sets = {
       prepared : groupsAll.filter(g => g.allPrepared),
-      // Keep a group in "missing" while ANY item has rem>0;
-      // But hide items whose status became "Received by operations"
-      // (so they disappear after pressing 'Mark Received Anyway').
-      missing  : groupsAll.filter(g => g.missingCnt > 0),
+      missing  : groupsAll.filter(g => g.missingCnt > 0), // أعرض كل العناصر لو فيه rem>0
       partial  : groupsAll.map(g => ({...g, items: g.items.filter(it => isPartial(it))})).filter(g => g.items.length),
       received : groupsAll.map(g => ({...g, items: g.items.filter(it => isReceived(it))})).filter(g => g.items.length),
       delivered: groupsAll.map(g => ({...g, items: g.items.filter(it => isDelivered(it))})).filter(g => g.items.length),
@@ -256,16 +244,11 @@
     updateAllCounters(sets);
 
     const view = (sets[activeTab] || []).map(g => {
-      let gi = g.items;
-      if (activeTab === 'missing') {
-        gi = g.items.filter(it => !isReceived(it)); // hide received items only in Missing tab
-      }
-      if (q) {
-        gi = gi.filter(it =>
-          it.productName.toLowerCase().includes(q) ||
-          (g.title || '').toLowerCase().includes(q)
-        );
-      }
+      if (!q) return g;
+      const gi = g.items.filter(it =>
+        it.productName.toLowerCase().includes(q) ||
+        (g.title || '').toLowerCase().includes(q)
+      );
       return { ...g, items: gi };
     }).filter(g => g.items.length);
 
