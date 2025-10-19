@@ -212,13 +212,8 @@
 
       const out = await postJSON('/api/logistics/mark-received', { itemIds, statusById, recMap });
       if (!out.ok) throw new Error(out.error || 'Unknown error');
-
-      allItems = allItems.map(r => {
-        const id = r.id;
-        if (!id || !statusById[id]) return r;
-        return { ...r, operationsStatus: statusById[id], status: statusById[id], rec: recMap[id] };
-      });
-
+      // Re-fetch fresh items so Rec mirrors the latest Avail without manual refresh
+      allItems = await fetchAssigned();
       render();
     } catch (err) {
       console.error(err);
