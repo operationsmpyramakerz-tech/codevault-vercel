@@ -996,6 +996,9 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
 
     const results = [];
 
+    // Detect Available quantity property once
+    const availablePropName = await detectAvailableQtyPropName();
+
     for (const pageId of itemIds) {
       const page  = await notion.pages.retrieve({ page_id: pageId });
       const props = page.properties || {};
@@ -1016,7 +1019,9 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
       if (!recPropName && props[REC_PROP_HARDBIND]?.type === 'number') recPropName = REC_PROP_HARDBIND;
 
       const nextStatusName = String(statusById[pageId] || '').trim();
-      const recValue = recMap[pageId];
+      let recValue = recMap[pageId];
+      const availNow = availablePropName ? Number(props?.[availablePropName]?.number ?? NaN) : NaN;
+      if (Number.isFinite(availNow)) recValue = availNow;
 
       const updateProps = {};
 
