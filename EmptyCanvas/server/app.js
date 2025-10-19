@@ -20,9 +20,32 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 // --- Health FIRST (before session) so it works even if env is missing ---
+
 app.get("/health", (req, res) => {
   res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
 });
+
+// --- Optional diagnostics (enable with EXPOSE_DIAG=1) ---
+if (process.env.EXPOSE_DIAG === "1") {
+  app.get("/diag", (req, res) => {
+    const keys = [
+      "Notion_API_Key",
+      "Products_Database",
+      "Products_list",
+      "Team_Members",
+      "School_Stocktaking_DB_ID",
+      "Funds",
+      "NOTION_STATUS_PROP",
+      "NOTION_REC_PROP",
+      "SESSION_SECRET",
+      "UPSTASH_REDIS_URL",
+      "BLOB_READ_WRITE_TOKEN",
+      "VERCEL_REGION"
+    ];
+    const present = Object.fromEntries(keys.map(k => [k, !!process.env[k]]));
+    res.json({ present, values: { VERCEL_REGION: process.env.VERCEL_REGION || "unknown" } });
+  });
+}
 
 // Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
@@ -188,22 +211,6 @@ async function detectAvailableQtyPropName() {
 }
 
 // خاصية Status (select) — لاستخدام زر Mark prepared
-
-
-// خاصية Quantity received by operations (number)
-async function detectReceivedQtyPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, [
-      "Quantity received by operations",
-      "Quantity Received",
-      "Received Qty",
-      "Ops Received",
-      "Received",
-      "Rec"
-    ]) || null
-  );
-}
 async function detectStatusPropName() {
   const props = await getOrdersDBProps();
   return (
@@ -2045,14 +2052,11 @@ async function detectOrderIdPropName() {
 
 
 // ===== Logistics listing — requires Logistics =====
-
 app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res) => {
   try {
     const statusFilter = String(req.query.status || "Prepared");
     const statusProp = await detectStatusPropName();
     const availableProp = await detectAvailableQtyPropName();
-    const recProp = await detectReceivedQtyPropName();
-
     const items = [];
     let hasMore = true, cursor;
 
@@ -2076,8 +2080,6 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
         }
         const requested = Number(props["Quantity Requested"]?.number || 0);
         const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
-        const rec = recProp ? Number(props[recProp]?.number || 0) : 0;
-
         // For Prepared tab we only show fully available
         if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
 
@@ -2088,8 +2090,6 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
           requested,
           available,
           status: props[statusProp]?.select?.name || statusFilter,
-          quantityReceivedByOperations: rec,
-          remaining: Math.max(0, requested - available),
         });
       }
       hasMore = q.has_more;
@@ -2098,15 +2098,15 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     res.set("Cache-Control", "no-store");
     res.json(items);
   } catch (e) {
-    console.error("GET /api/logistics error:", e?.body || e);
-    res.status(500).json({ error: "Failed to load logistics items" });
+    console.error("Logistics list error:", e.body || e);
+    res.status(500).json({ error: "Failed to fetch logistics list" });
   }
 });
 
 
 // === Helper: upload base64 image to Vercel Blob (SDK v2) and return a public URL ===
 async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
-  const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) throw new Error("BLOB_TOKEN_MISSING");
   const m = String(dataUrl || "").match(/^data:(.+?);base64,(.+)$/);
   if (!m) throw new Error("INVALID_DATA_URL");
