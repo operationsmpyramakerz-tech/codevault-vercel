@@ -2102,12 +2102,11 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     res.status(500).json({ error: "Failed to load logistics items" });
   }
 });
-);
 
 
 // === Helper: upload base64 image to Vercel Blob (SDK v2) and return a public URL ===
 async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN;
   if (!token) throw new Error("BLOB_TOKEN_MISSING");
   const m = String(dataUrl || "").match(/^data:(.+?);base64,(.+)$/);
   if (!m) throw new Error("INVALID_DATA_URL");
