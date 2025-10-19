@@ -9,6 +9,7 @@
        * rem > 0 && avail == 0          => (no change)
    - Record "Avail" into Notion number field "Quantity received by operations" via recMap
 */
+
 (function () {
   // ------------ helpers ------------
   const $  = (s, r = document) => r.querySelector(s);
@@ -17,6 +18,7 @@
   const S  = (v) => String(v ?? '');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt = (v) => String(N(v));
+
   async function postJSON(url, body) {
     const res = await fetch(url, {
       method: 'POST',
@@ -30,28 +32,34 @@
     }
     try { return await res.json(); } catch { return {}; }
   }
+
   // ------------ DOM refs ------------
   const searchInput   = $('#logisticsSearch') || $('#search') || $('input[type="search"]');
   const grid          = $('#logistics-grid') || $('#assigned-grid') || $('main');
   const emptyMsg      = $('#logistics-empty') || $('#assigned-empty');
+
   const btnPrepared   = $('#lg-btn-prepared');
   const btnMissing    = $('#lg-btn-missing');
   const btnPartial    = $('#lg-btn-partial');
   const btnReceived   = $('#lg-btn-received');
   const btnDelivered  = $('#lg-btn-delivered');
+
   const cPrepared   = $('#lg-prepared')  || $('#lg-count-prepared');
   const cMissing    = $('#lg-missing')   || $('#lg-count-missing');
   const cPartial    = $('#lg-partial')   || $('#lg-count-partial');
   const cReceived   = $('#lg-received')  || $('#lg-count-received');
   const cDelivered  = $('#lg-delivered') || $('#lg-count-delivered');
+
   // ------------ state ------------
   let allItems  = [];
   let activeTab = (new URLSearchParams(location.search).get('tab') || 'prepared').toLowerCase();
+
   // ------------ normalize & grouping ------------
   const statusOf   = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
   const isReceived = (it) => statusOf(it) === 'received by operations';
   const isPartial  = (it) => statusOf(it) === 'partially received by operations';
   const isDelivered= (it) => statusOf(it) === 'delivered';
+
   function normalizeItem(it) {
     const req   = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
@@ -59,7 +67,7 @@
     rem = (rem == null ? Math.max(0, req - avail) : N(rem));
     return {
       id: it.id,
-      pageId: it.pageId || it.page_id || it.notionPageId || it.id,
+      pageId: it.pageId || it.page_id || it.notionPageId || it.id, // نحاول كل الأسماء الممكنة
       reason: S(it.reason || ''),
       created: S(it.createdTime || it.created_time || it.created || ''),
       productName: S(it.productName ?? it.product_name ?? ''),
@@ -70,11 +78,13 @@
       rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0)
     };
   }
+
   const groupKeyOf = (it) => {
     const reason = (it.reason && String(it.reason).trim()) || 'No Reason';
     const day    = (it.created || '').slice(0,10);
     return `grp:${reason}|${day}`;
   };
+
   function buildGroups(list) {
     const map = new Map();
     for (const raw of list) {
@@ -93,6 +103,7 @@
     arr.forEach(recomputeGroupStats);
     return arr;
   }
+
   function recomputeGroupStats(g) {
     g.total       = g.items.length;
     g.missingCnt  = g.items.filter(x => N(x.remaining) > 0).length;
@@ -101,6 +112,7 @@
     g.anyPartial  = g.items.some(isPartial);
     g.anyReceived = g.items.some(isReceived);
   }
+
   // ------------ API ------------
   async function fetchAssigned() {
     const res = await fetch('/api/orders/assigned', { cache: 'no-store', credentials: 'same-origin' });
@@ -108,8 +120,10 @@
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   }
+
   // ------------ counters ------------
   const setCounter = (el, v) => el && (el.textContent = fmt(v));
+
   function updateAllCounters(sets) {
     setCounter(cPrepared , sets.prepared.length);
     setCounter(cMissing  , sets.missing.length);
@@ -117,6 +131,7 @@
     setCounter(cReceived , sets.received.length);
     setCounter(cDelivered, sets.delivered.length);
   }
+
   // ------------ tab switch ------------
   function setActiveTab(tab) {
     activeTab = tab;
@@ -140,79 +155,94 @@
 
   // ------------ actions ------------
   async function markGroupReceivedAnyway(group, buttonEl) {
-    try {
-      if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
-      const itemIds = [];
-      const statusById = {};
-      const recMap = {};
-      for (const it of group.items) {
-        const rem = Number(it.remaining || 0);
-        const avail = Number(it.available || 0);
-        const id = it.id;
-        if (!id) continue;
-        if (rem === 0) {
-          itemIds.push(id);
-          statusById[id] = 'Received by operations';
-          recMap[id] = avail;
-        } else if (rem > 0 && avail > 0) {
-          itemIds.push(id);
-          statusById[id] = 'Partially received by operations';
-          recMap[id] = avail;
-        }
+  try {
+    if (buttonEl) { buttonEl.disabled = true; buttonEl.textContent = 'Saving...'; }
+
+    const itemIds = [];
+    const statusById = {};
+    const recMap = {};
+
+    // القواعد المطلوبة:
+    // - لو rem === 0 => Status = Received by operations, rec = avail
+    // - لو rem > 0 && avail > 0 => Status = Partially received by operations, rec = avail
+    // - لو rem > 0 && avail === 0 => متعملش حاجة للعنصر ده (يفضل Missing)
+
+    for (const it of group.items) {
+      const rem = Number(it.remaining || 0);
+      const avail = Number(it.available || 0);
+      const id = it.id;
+      if (!id) continue;
+
+      if (rem === 0) {
+        itemIds.push(id);
+        statusById[id] = 'Received by operations';
+        recMap[id] = avail;
+      } else if (rem > 0 && avail > 0) {
+        itemIds.push(id);
+        statusById[id] = 'Partially received by operations';
+        recMap[id] = avail;
       }
-      if (!itemIds.length) {
-        if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
-        alert('Nothing to update for this group.');
-        return;
-      }
-
-      const res = await fetch('/api/logistics/mark-received', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ itemIds, statusById, recMap })
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const out = await res.json();
-      if (!out.ok) throw new Error(out.error || 'Unknown error');
-
-      // تحديث الحالة محليًا
-      allItems = allItems.map(r => {
-        const id = r.id;
-        if (statusById[id]) {
-          r.operationsStatus = statusById[id];
-          r.status = statusById[id];
-        }
-        return r;
-      });
-
-      // إخفاء المكونات فقط من تبويب Missing لو rem = 0
-      if (activeTab === 'missing') {
-        allItems = allItems.filter(r => !(statusById[r.id] === 'Received by operations' && N(r.remaining) === 0));
-      }
-
-      render();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to mark as received. Please try again.');
-      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+      // rem>0 && avail==0 => skip
     }
-  }
 
+    if (itemIds.length === 0) {
+      if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+      alert('Nothing to update for this group.');
+      return;
+    }
+
+    const res = await fetch('/api/logistics/mark-received', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ itemIds, statusById, recMap })
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(()=>'');
+      throw new Error(`Server error ${res.status}: ${t}`);
+    }
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'Unknown error');
+
+    // حدّث الحالة محليًا ثم أعدّ الرسم
+    allItems = allItems.map(r => {
+      const id = r.id;
+      if (!id || !statusById[id]) return r;
+      return {
+        ...r,
+        operationsStatus: statusById[id],
+        status: statusById[id],
+        // خزن rec محليًا لو بتعرضه
+        rec: recMap[id]
+      };
+    });
+
+    render();
+  } catch (err) {
+    console.error(err);
+    alert('Failed to mark as received. Please try again.');
+    if (buttonEl) { buttonEl.disabled = false; buttonEl.textContent = 'Mark Received Anyway'; }
+  }
+}
   // ------------ render ------------
   function render() {
     if (!grid) return;
     grid.innerHTML = '';
+
     const q = (searchInput?.value || '').trim().toLowerCase();
     const groupsAll = buildGroups(allItems);
+
     const sets = {
       prepared : groupsAll.filter(g => g.allPrepared),
-      missing  : groupsAll.filter(g => g.missingCnt > 0),
+      missing  : groupsAll.filter(g => g.missingCnt > 0), // أعرض كل العناصر لو فيه rem>0
       partial  : groupsAll.map(g => ({...g, items: g.items.filter(it => isPartial(it))})).filter(g => g.items.length),
       received : groupsAll.map(g => ({...g, items: g.items.filter(it => isReceived(it))})).filter(g => g.items.length),
       delivered: groupsAll.map(g => ({...g, items: g.items.filter(it => isDelivered(it))})).filter(g => g.items.length),
     };
+
     updateAllCounters(sets);
+
     const view = (sets[activeTab] || []).map(g => {
       if (!q) return g;
       const gi = g.items.filter(it =>
@@ -221,14 +251,18 @@
       );
       return { ...g, items: gi };
     }).filter(g => g.items.length);
+
     if (!view.length) { if (emptyMsg) emptyMsg.style.display = ''; return; }
     if (emptyMsg) emptyMsg.style.display = 'none';
+
     for (const g of view) {
       const card = document.createElement('div');
       card.className = 'order-card';
       card.dataset.key = g.key;
+
       const showPreparedButton = (activeTab === 'prepared');
       const showMissingButton  = (activeTab === 'missing');
+
       card.innerHTML = `
         <div class="order-card__head">
           <div class="order-card__title">
@@ -265,15 +299,19 @@
           `).join('')}
         </div>
       `;
+
       const btnMr  = card.querySelector('[data-act="mr"]');
       const btnMra = card.querySelector('[data-act="mra"]');
       if (btnMr ) btnMr .addEventListener('click', () => markGroupReceived(g, btnMr));
       if (btnMra) btnMra.addEventListener('click', () => markGroupReceivedAnyway(g, btnMra));
+
       grid.appendChild(card);
     }
+
     window.feather?.replace?.({ 'stroke-width': 2 });
   }
 
+  // ------------ init ------------
   async function load() {
     try {
       const raw = await fetchAssigned();
@@ -285,8 +323,10 @@
       [cPrepared,cMissing,cPartial,cReceived,cDelivered].forEach(el => el && (el.textContent='0'));
     }
   }
+
   [[btnPrepared,'prepared'],[btnMissing,'missing'],[btnPartial,'partial'],[btnReceived,'received'],[btnDelivered,'delivered']]
     .forEach(([b,t]) => b && b.addEventListener('click', () => { setActiveTab(t); render(); }));
+
   setActiveTab(activeTab);
   searchInput && searchInput.addEventListener('input', render);
   load();
