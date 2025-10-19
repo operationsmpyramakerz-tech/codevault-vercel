@@ -353,7 +353,22 @@ app.post("/api/login", async (req, res) => {
     console.error("Login error:", error);
     res.status(500).json({ error: "Login failed" });
   }
-});
+}
+// === Helper: Received Quantity (number) — used to keep Rec visible on Logistics ===
+async function detectReceivedQtyPropName() {
+  const envName = (process.env.NOTION_REC_PROP || "").trim();
+  const props = await getOrdersDBProps();
+  if (envName && props[envName] && props[envName].type === "number") return envName;
+
+  const candidate = pickPropName(props, [
+    "Quantity received by operations",
+    "Received Qty",
+    "Rec",
+  ]);
+  if (candidate && props[candidate] && props[candidate].type === "number") return candidate;
+  return null;
+}
+);
 
 // Logout
 app.post("/api/logout", (req, res) => {
@@ -2034,6 +2049,7 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     const statusFilter = String(req.query.status || "Prepared");
     const statusProp = await detectStatusPropName();
     const availableProp = await detectAvailableQtyPropName();
+    const receivedProp = await detectReceivedQtyPropName();
     const items = [];
     let hasMore = true, cursor;
 
