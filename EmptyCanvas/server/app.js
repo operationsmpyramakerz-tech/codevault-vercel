@@ -879,9 +879,17 @@ app.post(
       const requested = Number(page.properties?.["Quantity Requested"]?.number || 0);
       const newAvailable = requested;
 
+      const statusProp = await detectStatusPropName();
+      const updates = { [availableProp]: { number: newAvailable } };
+      if (statusProp) {
+        const t = page.properties?.[statusProp]?.type || 'select';
+        if (t === 'status') updates[statusProp] = { status: { name: 'Prepared' } };
+        else updates[statusProp] = { select: { name: 'Prepared' } };
+      }
+
       await notion.pages.update({
         page_id: orderPageId,
-        properties: { [availableProp]: { number: newAvailable } },
+        properties: updates,
       });
 
       res.json({
@@ -923,9 +931,17 @@ app.post(
       const newAvailable = Math.min(requested, Math.max(0, Math.floor(availNum)));
       const remaining = Math.max(0, requested - newAvailable);
 
+      const statusProp = await detectStatusPropName();
+      const updates = { [availableProp]: { number: newAvailable } };
+      if (statusProp && newAvailable === requested) {
+        const t = page.properties?.[statusProp]?.type || 'select';
+        if (t === 'status') updates[statusProp] = { status: { name: 'Prepared' } };
+        else updates[statusProp] = { select: { name: 'Prepared' } };
+      }
+
       await notion.pages.update({
         page_id: orderPageId,
-        properties: { [availableProp]: { number: newAvailable } },
+        properties: updates,
       });
 
       res.json({ success: true, available: newAvailable, remaining });
