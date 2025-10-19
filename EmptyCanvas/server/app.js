@@ -2,6 +2,14 @@ const express = require("express");
 const path = require("path");
 const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
+// --- env helper: read first non-empty env from a list
+function readEnv(...keys) {
+  for (const k of keys) {
+    const v = process.env[k];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  return "";
+}
 
 const app = express();
 // IMPORTANT for Vercel reverse proxy so secure cookies are honored
@@ -30,6 +38,41 @@ if (!teamMembersDatabaseId) {
 }
 if (!ordersDatabaseId) {
   console.warn("[env] Products_list is MISSING. Add it in Vercel env (Preview/Production).");
+}
+// --- Fallback resolvers: get DB IDs by title if env is missing ---
+async function findDbIdByTitle(possibleNames = []) {
+  try {
+    const res = await notion.search({
+      query: "", // list all, then match by title
+      filter: { property: "object", value: "database" },
+      page_size: 100,
+    });
+    const wanted = possibleNames.map((s) => String(s).toLowerCase());
+    for (const db of res.results || []) {
+      const title =
+        (db.title && db.title[0] && db.title[0].plain_text) ||
+        db?.title ||
+        "";
+      if (wanted.includes(String(title).toLowerCase())) {
+        return db.id;
+      }
+    }
+    return null;
+  } catch (e) {
+    console.warn("[fallback] Notion search failed:", e.body || e);
+    return null;
+  }
+}
+
+async function getTeamMembersDbId() {
+  if (teamMembersDatabaseId) return teamMembersDatabaseId;
+  // جرّب عناوين شائعة
+  return await findDbIdByTitle([
+    "Team Members",
+    "Team_Members",
+    "TeamMembers",
+    "Members",
+  ]);
 }
 
 // Middleware
@@ -345,14 +388,18 @@ app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
 // Login
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
-  if (!teamMembersDatabaseId) {
+
+  // Use env if present, otherwise resolve by title
+  const teamDB = await getTeamMembersDbId();
+  if (!teamDB) {
     return res
       .status(500)
       .json({ error: "Team_Members database ID is not configured." });
   }
+
   try {
     const response = await notion.databases.query({
-      database_id: teamMembersDatabaseId,
+      database_id: teamDB,
       filter: { property: "Name", title: { equals: username } },
     });
     if (response.results.length === 0) {
@@ -401,14 +448,15 @@ app.post("/api/logout", (req, res) => {
 
 // Account info (returns fresh allowedPages)
 app.get("/api/account", requireAuth, async (req, res) => {
-  if (!teamMembersDatabaseId) {
+  const teamDB = await getTeamMembersDbId();
+  if (!teamDB) {
     return res
       .status(500)
       .json({ error: "Team_Members database ID is not configured." });
   }
   try {
     const response = await notion.databases.query({
-      database_id: teamMembersDatabaseId,
+      database_id: teamDB,
       filter: { property: "Name", title: { equals: req.session.username } },
     });
 
