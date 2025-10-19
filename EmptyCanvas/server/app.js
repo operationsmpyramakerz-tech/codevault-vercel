@@ -8,11 +8,17 @@ const app = express();
 app.set("trust proxy", 1);
 // Initialize Notion Client using Env Vars
 const notion = new Client({ auth: process.env.Notion_API_Key });
-const componentsDatabaseId = process.env.Products_Database;
-const ordersDatabaseId = process.env.Products_list;
-const teamMembersDatabaseId = process.env.Team_Members;
-const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
-const fundsDatabaseId = process.env.Funds;
+const componentsDatabaseId = process.env.Products_Database || process.env.PRODUCTS_DATABASE;
+const ordersDatabaseId     = process.env.Products_list    || process.env.PRODUCTS_LIST;
+// Allow aliases so login doesn't fail if the name differs
+let teamMembersDatabaseId  = process.env.Team_Members
+                          || process.env.TEAM_MEMBERS
+                          || process.env.TeamMembers
+                          || process.env.TEAM_MEMBERS_DB_ID
+                          || process.env.TeamMembersDB
+                          || process.env.TEAM_MEMBERS_DATABASE_ID;
+const stocktakingDatabaseId= process.env.School_Stocktaking_DB_ID || process.env.STOCKTAKING_DB_ID || process.env.SCHOOL_STOCKTAKING_DB_ID;
+const fundsDatabaseId      = process.env.Funds || process.env.FUNDS_DB_ID || process.env.FUNDS_DATABASE_ID;
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -20,32 +26,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 // --- Health FIRST (before session) so it works even if env is missing ---
-
 app.get("/health", (req, res) => {
   res.json({ ok: true, region: process.env.VERCEL_REGION || "unknown" });
 });
-
-// --- Optional diagnostics (enable with EXPOSE_DIAG=1) ---
-if (process.env.EXPOSE_DIAG === "1") {
-  app.get("/diag", (req, res) => {
-    const keys = [
-      "Notion_API_Key",
-      "Products_Database",
-      "Products_list",
-      "Team_Members",
-      "School_Stocktaking_DB_ID",
-      "Funds",
-      "NOTION_STATUS_PROP",
-      "NOTION_REC_PROP",
-      "SESSION_SECRET",
-      "UPSTASH_REDIS_URL",
-      "BLOB_READ_WRITE_TOKEN",
-      "VERCEL_REGION"
-    ];
-    const present = Object.fromEntries(keys.map(k => [k, !!process.env[k]]));
-    res.json({ present, values: { VERCEL_REGION: process.env.VERCEL_REGION || "unknown" } });
-  });
-}
 
 // Sessions (Redis/Upstash) — added after /health
 const { sessionMiddleware } = require("./session-redis");
@@ -337,9 +320,16 @@ app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   if (!teamMembersDatabaseId) {
-    return res
-      .status(500)
-      .json({ error: "Team_Members database ID is not configured." });
+    try {
+      const resp = await notion.search({ query: "Team", filter: { property: "object", value: "database" }, page_size: 10 });
+      const norm = (s) => String(s||"").toLowerCase().trim();
+      const candidates = ["Team Members","Team_Members","Members","Team"].map(norm);
+      const hit = (resp.results||[]).find(db => candidates.includes(norm(db.title?.[0]?.plain_text||"")));
+      if (hit && hit.id) teamMembersDatabaseId = hit.id;
+    } catch {}
+    if (!teamMembersDatabaseId) {
+      return res.status(500).json({ error: "Team_Members database ID is not configured." });
+    }
   }
   try {
     const response = await notion.databases.query({
