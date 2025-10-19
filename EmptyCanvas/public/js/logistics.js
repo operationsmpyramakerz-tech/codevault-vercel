@@ -176,16 +176,21 @@
       const out = await res.json();
       if (!out.ok) throw new Error(out.error || 'Unknown error');
 
-      // تحديث الحالة محليًا ثم إخفاء العناصر rem=0 من missing فقط
-      allItems = allItems.filter(r => {
+      // تحديث الحالة محليًا
+      allItems = allItems.map(r => {
         const id = r.id;
-        const rem = N(r.remaining);
-        if (activeTab === 'missing' && statusById[id] === 'Received by operations' && rem === 0)
-          return false; // اخفي المكونات اللي rem=0
-        if (statusById[id])
+        if (statusById[id]) {
           r.operationsStatus = statusById[id];
-        return true;
+          r.status = statusById[id];
+        }
+        return r;
       });
+
+      // إخفاء المكونات فقط من تبويب Missing لو rem = 0
+      if (activeTab === 'missing') {
+        allItems = allItems.filter(r => !(statusById[r.id] === 'Received by operations' && N(r.remaining) === 0));
+      }
+
       render();
     } catch (err) {
       console.error(err);
