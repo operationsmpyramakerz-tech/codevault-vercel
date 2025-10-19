@@ -201,6 +201,20 @@ async function detectStatusPropName() {
   );
 }
 
+// NEW: خاصية Quantity received by operations (number)
+async function detectRecPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, [
+      "Quantity received by operations",
+      "Received Qty",
+      "Rec",
+      "Quantity Received By Operations",
+      "Quantity_received_by_operations"
+    ]) || null
+  );
+}
+
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
@@ -942,6 +956,7 @@ app.post(
     }
   },
 );
+
 // --- Logistics: mark-received (Status + Quantity received by operations) ---
 app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
   try {
@@ -1023,6 +1038,7 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     return res.status(500).json({ ok: false, error: 'Failed to mark received' });
   }
 });
+
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
@@ -2034,6 +2050,8 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     const statusFilter = String(req.query.status || "Prepared");
     const statusProp = await detectStatusPropName();
     const availableProp = await detectAvailableQtyPropName();
+    const recProp = await detectRecPropName(); // NEW
+
     const items = [];
     let hasMore = true, cursor;
 
@@ -2057,6 +2075,9 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
         }
         const requested = Number(props["Quantity Requested"]?.number || 0);
         const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
+        const rec = recProp ? Number(props[recProp]?.number || 0) : 0; // NEW
+        const remaining = Math.max(0, requested - available);          // NEW
+
         // For Prepared tab we only show fully available
         if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
 
@@ -2066,7 +2087,10 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
           productName,
           requested,
           available,
+          remaining, // NEW
+          rec,       // NEW
           status: props[statusProp]?.select?.name || statusFilter,
+          createdTime: page.created_time
         });
       }
       hasMore = q.has_more;
