@@ -353,7 +353,7 @@ app.post("/api/login", async (req, res) => {
     console.error("Login error:", error);
     res.status(500).json({ error: "Login failed" });
   }
-}
+});
 // === Helper: Received Quantity (number) — used to keep Rec visible on Logistics ===
 async function detectReceivedQtyPropName() {
   const envName = (process.env.NOTION_REC_PROP || "").trim();
@@ -368,7 +368,6 @@ async function detectReceivedQtyPropName() {
   if (candidate && props[candidate] && props[candidate].type === "number") return candidate;
   return null;
 }
-);
 
 // Logout
 app.post("/api/logout", (req, res) => {
@@ -2076,12 +2075,14 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
         // For Prepared tab we only show fully available
         if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
 
+        const recVal = receivedProp ? Number(props[receivedProp]?.number || 0) : 0;
         items.push({
           id: page.id,
           reason: props.Reason?.title?.[0]?.plain_text || "No Reason",
           productName,
           requested,
           available,
+          quantityReceivedByOperations: recVal,
           status: props[statusProp]?.select?.name || statusFilter,
         });
       }
