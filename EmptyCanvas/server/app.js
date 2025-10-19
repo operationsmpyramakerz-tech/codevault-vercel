@@ -188,6 +188,22 @@ async function detectAvailableQtyPropName() {
 }
 
 // خاصية Status (select) — لاستخدام زر Mark prepared
+
+
+// خاصية Quantity received by operations (number)
+async function detectReceivedQtyPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, [
+      "Quantity received by operations",
+      "Quantity Received",
+      "Received Qty",
+      "Ops Received",
+      "Received",
+      "Rec"
+    ]) || null
+  );
+}
 async function detectStatusPropName() {
   const props = await getOrdersDBProps();
   return (
@@ -2029,11 +2045,14 @@ async function detectOrderIdPropName() {
 
 
 // ===== Logistics listing — requires Logistics =====
+
 app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res) => {
   try {
     const statusFilter = String(req.query.status || "Prepared");
     const statusProp = await detectStatusPropName();
     const availableProp = await detectAvailableQtyPropName();
+    const recProp = await detectReceivedQtyPropName();
+
     const items = [];
     let hasMore = true, cursor;
 
@@ -2057,6 +2076,8 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
         }
         const requested = Number(props["Quantity Requested"]?.number || 0);
         const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
+        const rec = recProp ? Number(props[recProp]?.number || 0) : 0;
+
         // For Prepared tab we only show fully available
         if (statusFilter === "Prepared" && requested > 0 && available < requested) continue;
 
@@ -2067,6 +2088,8 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
           requested,
           available,
           status: props[statusProp]?.select?.name || statusFilter,
+          quantityReceivedByOperations: rec,
+          remaining: Math.max(0, requested - available),
         });
       }
       hasMore = q.has_more;
@@ -2075,10 +2098,11 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
     res.set("Cache-Control", "no-store");
     res.json(items);
   } catch (e) {
-    console.error("Logistics list error:", e.body || e);
-    res.status(500).json({ error: "Failed to fetch logistics list" });
+    console.error("GET /api/logistics error:", e?.body || e);
+    res.status(500).json({ error: "Failed to load logistics items" });
   }
 });
+);
 
 
 // === Helper: upload base64 image to Vercel Blob (SDK v2) and return a public URL ===
