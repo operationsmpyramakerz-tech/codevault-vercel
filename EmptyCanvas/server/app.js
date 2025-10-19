@@ -785,6 +785,12 @@ app.get(
       const assignedProp = await detectAssignedPropName();
       const availableProp = await detectAvailableQtyPropName(); // قد يكون null
       const statusProp   = await detectStatusPropName();        // غالبًا "Status"
+      // Received Quantity property (Number)
+      const receivedProp = (await (async()=>{
+        const props = await getOrdersDBProps();
+        if (props[REC_PROP_HARDBIND] && props[REC_PROP_HARDBIND].type === "number") return REC_PROP_HARDBIND;
+        return await detectReceivedQtyPropName();
+      })());
 
       const items = [];
       let hasMore = true;
@@ -822,6 +828,7 @@ app.get(
           const remaining = Math.max(0, requested - available);
           const reason = props.Reason?.title?.[0]?.plain_text || "No Reason";
           const status = statusProp ? (props[statusProp]?.select?.name || "") : "";
+          const recVal = receivedProp ? Number(props[receivedProp]?.number || 0) : 0;
 
           items.push({
             id: page.id,
@@ -829,6 +836,8 @@ app.get(
             requested,
             available,
             remaining,
+            quantityReceivedByOperations: recVal,
+            rec: recVal,
             createdTime: page.created_time,
             reason,
             status,
@@ -967,20 +976,32 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
       return res.status(400).json({ ok: false, error: 'No itemIds' });
     }
 
-    // ممكن تحدد أسماء الأعمدة من الـ env (اختياري)
-    const STATUS_PROP_ENV = process.env.NOTION_STATUS_PROP || ''; // مثال: "Status"
-    const REC_PROP_ENV    = process.env.NOTION_REC_PROP    || ''; // "Quantity received by operations"
+    const STATUS_PROP_ENV = (process.env.NOTION_STATUS_PROP || '').trim(); // e.g. "Status"
+    const REQ_PROP_ENV    = (process.env.NOTION_REQ_PROP    || '').trim(); // e.g. "Quantity Requested"
+    const REC_PROP_ENV    = (process.env.NOTION_REC_PROP    || '').trim(); // "Quantity received by operations"
+    const AVAIL_PROP_ENV  = (process.env.NOTION_AVAIL_PROP  || '').trim(); // e.g. "Available"
 
-    const findPropName = (props, preferredName, typeWanted, fallbackNames = []) => {
+    // Prefer your exact column name if present in the file's scope
+    const REC_HARDBIND = (typeof REC_PROP_HARDBIND !== 'undefined' && REC_PROP_HARDBIND)
+      ? REC_PROP_HARDBIND
+      : (REC_PROP_ENV || 'Quantity received by operations');
+
+    const pickProp = (props, preferredName, typeWanted, aliases = [], regexHint = null) => {
       if (preferredName && props[preferredName] && (!typeWanted || props[preferredName].type === typeWanted)) {
         return preferredName;
       }
-      for (const n of fallbackNames) {
-        if (props[n] && (!typeWanted || props[n].type === typeWanted)) return n;
+      for (const n of aliases) {
+        if (n && props[n] && (!typeWanted || props[n].type === typeWanted)) return n;
+      }
+      if (regexHint) {
+        const rx = new RegExp(regexHint, 'i');
+        for (const k of Object.keys(props || {})) {
+          if ((!typeWanted || props[k]?.type === typeWanted) && rx.test(k)) return k;
+        }
       }
       if (typeWanted) {
-        const hit = Object.keys(props).find(k => props[k]?.type === typeWanted);
-        if (hit) return hit;
+        const any = Object.keys(props || {}).find(k => props[k]?.type === typeWanted);
+        if (any) return any;
       }
       return null;
     };
@@ -988,41 +1009,74 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     const results = [];
 
     for (const pageId of itemIds) {
+      // Get fresh properties
       const page  = await notion.pages.retrieve({ page_id: pageId });
-      const props = page.properties || {};
+      const props = page?.properties || {};
 
-      // نحدّد أسماء الأعمدة على الصفحة نفسها
-      const statusPropName = findPropName(
+      const statusPropName = pickProp(
         props,
         STATUS_PROP_ENV,
-        /*typeWanted*/ null, // نسمح select أو status
+        null,
         ['Status', 'Order Status', 'Operations Status']
       );
-      const recPropName = findPropName(
+      const requestedPropName = pickProp(
         props,
-        REC_PROP_ENV,
+        REQ_PROP_ENV,
         'number',
-        ['Quantity received by operations', 'Received Qty', 'Rec']
+        ['Quantity Requested', 'Requested Qty', 'Req', 'Request Qty'],
+        '(request|req)'
+      );
+      const availablePropName = pickProp(
+        props,
+        AVAIL_PROP_ENV,
+        'number',
+        ['Available', 'Quantity Available', 'Avail'],
+        '(avail|available)'
+      );
+      let recPropName = pickProp(
+        props,
+        REC_HARDBIND,
+        'number',
+        ['Quantity received by operations', 'Received Qty', 'Received Quantity', 'Quantity Received', 'Rec', 'REC'],
+        '(received|rec\b)'
       );
 
-      const nextStatusName = String(statusById[pageId] || '').trim();
-      const recValue = recMap[pageId];
+      const reqNow   = Number(props?.[requestedPropName]?.number ?? NaN);
+      const availNow = Number(props?.[availablePropName]?.number ?? NaN);
+
+      // Rec mirrors the latest Available. If no available column, fall back to recMap
+      let recValue = Number(recMap[pageId]);
+      if (Number.isFinite(availNow)) recValue = availNow;
+
+      const missing = (Number.isFinite(reqNow) && Number.isFinite(availNow))
+        ? Math.max(0, reqNow - availNow)
+        : NaN;
+
+      // Rule: req = avail AND rec < req AND missing = 0 => move to Prepared
+      const forceFullyPrepared =
+        Number.isFinite(reqNow) && Number.isFinite(availNow) &&
+        reqNow === availNow && Number.isFinite(recValue) && recValue < reqNow && missing === 0;
 
       const updateProps = {};
 
-      // اكتب الـ Status إن وُجدت الخاصية والقيمة
+      // Write Rec
+      if (Number.isFinite(recValue)) {
+        if (recPropName && props[recPropName]?.type === 'number') {
+          updateProps[recPropName] = { number: recValue };
+        } else if (props['Quantity received by operations']?.type === 'number') {
+          updateProps['Quantity received by operations'] = { number: recValue };
+        }
+      }
+
+      // Write Status
+      const nextStatusName = forceFullyPrepared ? 'Prepared' : String(statusById[pageId] || '').trim();
       if (nextStatusName && statusPropName && props[statusPropName]) {
-        const t = props[statusPropName].type; // "select" أو "status"
+        const t = props[statusPropName].type; // "select" or "status"
         if (t === 'select') {
           updateProps[statusPropName] = { select: { name: nextStatusName } };
         } else if (t === 'status') {
           updateProps[statusPropName] = { status: { name: nextStatusName } };
         }
-      }
-
-      // اكتب رقم الـ Rec لو العمود موجود ورقم صالح
-      if (recPropName && props[recPropName]?.type === 'number' && Number.isFinite(+recValue)) {
-        updateProps[recPropName] = { number: +recValue };
       }
 
       if (Object.keys(updateProps).length === 0) {
@@ -1031,7 +1085,7 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
       }
 
       await notion.pages.update({ page_id: pageId, properties: updateProps });
-      results.push({ pageId, ok: true });
+      results.push({ pageId, ok: true, forcedFullyPrepared: !!forceFullyPrepared });
     }
 
     return res.json({ ok: true, updated: results });

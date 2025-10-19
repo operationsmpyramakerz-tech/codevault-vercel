@@ -212,13 +212,16 @@
 
       const out = await postJSON('/api/logistics/mark-received', { itemIds, statusById, recMap });
       if (!out.ok) throw new Error(out.error || 'Unknown error');
-
-      allItems = allItems.map(r => {
-        const id = r.id;
-        if (!id || !statusById[id]) return r;
-        return { ...r, operationsStatus: statusById[id], status: statusById[id], rec: recMap[id] };
-      });
-
+      // Re-fetch fresh items so Rec mirrors the latest Avail immediately
+      allItems = await fetchAssigned();
+      // Enforce client-side move to Fully Prepared if rule holds
+      for (const it of allItems) {
+        const req = Number(it.requested || 0);
+        const avail = Number(it.available || 0);
+        const rec = Number((it.quantityReceivedByOperations ?? it.rec ?? 0));
+        const missing = Math.max(0, req - avail);
+        if (req === avail && rec < req && missing === 0) { it.status = 'Fully Prepared'; }
+      }
       render();
     } catch (err) {
       console.error(err);
