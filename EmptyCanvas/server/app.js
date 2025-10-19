@@ -785,6 +785,12 @@ app.get(
       const assignedProp = await detectAssignedPropName();
       const availableProp = await detectAvailableQtyPropName(); // قد يكون null
       const statusProp   = await detectStatusPropName();        // غالبًا "Status"
+      // Received Quantity property (Number)
+      const receivedProp = (await (async()=>{
+        const props = await getOrdersDBProps();
+        if (props[REC_PROP_HARDBIND] && props[REC_PROP_HARDBIND].type === "number") return REC_PROP_HARDBIND;
+        return await detectReceivedQtyPropName();
+      })());
 
       const items = [];
       let hasMore = true;
@@ -822,6 +828,7 @@ app.get(
           const remaining = Math.max(0, requested - available);
           const reason = props.Reason?.title?.[0]?.plain_text || "No Reason";
           const status = statusProp ? (props[statusProp]?.select?.name || "") : "";
+          const recVal = receivedProp ? Number(props[receivedProp]?.number || 0) : 0;
 
           items.push({
             id: page.id,
@@ -829,6 +836,8 @@ app.get(
             requested,
             available,
             remaining,
+            quantityReceivedByOperations: recVal,
+            rec: recVal,
             createdTime: page.created_time,
             reason,
             status,
@@ -998,12 +1007,13 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
         /*typeWanted*/ null, // نسمح select أو status
         ['Status', 'Order Status', 'Operations Status']
       );
-      const recPropName = findPropName(
+      let recPropName = findPropName(
         props,
         REC_PROP_ENV,
         'number',
         ['Quantity received by operations', 'Received Qty', 'Rec']
       );
+      if (!recPropName && props[REC_PROP_HARDBIND]?.type === 'number') recPropName = REC_PROP_HARDBIND;
 
       const nextStatusName = String(statusById[pageId] || '').trim();
       const recValue = recMap[pageId];
