@@ -6,13 +6,31 @@ const PDFDocument = require("pdfkit"); // PDF
 const app = express();
 // IMPORTANT for Vercel reverse proxy so secure cookies are honored
 app.set("trust proxy", 1);
-// Initialize Notion Client using Env Vars
-const notion = new Client({ auth: process.env.Notion_API_Key });
-const componentsDatabaseId = process.env.Products_Database;
-const ordersDatabaseId = process.env.Products_list;
-const teamMembersDatabaseId = process.env.Team_Members;
-const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
-const fundsDatabaseId = process.env.Funds;
+// Initialize Notion Client using Env Vars (with robust fallbacks)
+const env = (key, ...alts) =>
+  process.env[key] ??
+  alts.map((k) => process.env[k]).find((v) => v != null) ??
+  "";
+
+// Notion token
+const notion = new Client({
+  auth: env("Notion_API_Key", "NOTION_API_KEY", "NOTION_TOKEN"),
+});
+
+// Databases (support Production/Preview/Development name variants)
+const componentsDatabaseId  = env("Products_Database", "PRODUCTS_DATABASE", "Components_Database");
+const ordersDatabaseId      = env("Products_list",     "PRODUCTS_LIST",     "Orders_List", "ORDERS_DB_ID");
+const teamMembersDatabaseId = env("Team_Members",      "TEAM_MEMBERS",      "TeamMembers", "TEAM_MEMBERS_DB_ID", "TEAM_MEMBERS_DATABASE_ID");
+const stocktakingDatabaseId = env("School_Stocktaking_DB_ID", "SCHOOL_STOCKTAKING_DB_ID");
+const fundsDatabaseId       = env("Funds", "FUNDS_DB_ID", "FUNDS");
+
+// Helpful warnings in logs if something important is missing
+if (!teamMembersDatabaseId) {
+  console.warn("[env] Team_Members is MISSING. Add it in Vercel → Settings → Environment Variables for the Preview environment too.");
+}
+if (!ordersDatabaseId) {
+  console.warn("[env] Products_list is MISSING. Add it in Vercel env (Preview/Production).");
+}
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
