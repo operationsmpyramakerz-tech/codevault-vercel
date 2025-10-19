@@ -1052,7 +1052,7 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
         ? Math.max(0, reqNow - availNow)
         : NaN;
 
-      // Rule: req = avail AND rec < req AND missing = 0 => move to Fully Prepared
+      // Rule: req = avail AND rec < req AND missing = 0 => move to Prepared
       const forceFullyPrepared =
         Number.isFinite(reqNow) && Number.isFinite(availNow) &&
         reqNow === availNow && Number.isFinite(recValue) && recValue < reqNow && missing === 0;
@@ -1069,7 +1069,7 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
       }
 
       // Write Status
-      const nextStatusName = forceFullyPrepared ? 'Fully Prepared' : String(statusById[pageId] || '').trim();
+      const nextStatusName = forceFullyPrepared ? 'Prepared' : String(statusById[pageId] || '').trim();
       if (nextStatusName && statusPropName && props[statusPropName]) {
         const t = props[statusPropName].type; // "select" or "status"
         if (t === 'select') {
