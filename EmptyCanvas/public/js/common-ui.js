@@ -164,12 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Init
   applyInitial();
   ensureSVOrdersLink();
-  const early = getCachedAllowedPages && getCachedAllowedPages();
-if (Array.isArray(early) && early.length) {
-  const hasDecisionForSV = early.some(n => String(n).toLowerCase().trim() === 's.v schools orders');
-  if (hasDecisionForSV) applyAllowedPages(early);
-}
-     // ★ ensure link exists before we apply allowed pages
+// ★ ensure link exists before we apply allowed pages
   ensureGreetingAndPages();
 
   window.addEventListener('user:updated', () => {
