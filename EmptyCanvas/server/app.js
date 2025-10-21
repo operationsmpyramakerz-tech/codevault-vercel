@@ -2228,61 +2228,70 @@ app.get("/orders/sv-orders", requireAuth, requirePage("S.V schools orders"), (re
 
 // ====== API: list S.V orders for current user ======
 app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
-  try {
-    const userQuery = await notion.databases.query({
-      database_id: teamMembersDatabaseId,
-      filter: { property: "Name", title: { equals: req.session.username } },
+try {
+  const userQuery = await notion.databases.query({
+    database_id: teamMembersDatabaseId,
+    filter: { property: "Name", title: { equals: req.session.username } },
+  });
+  if (userQuery.results.length === 0) return res.status(404).json({ error: "User not found" });
+  const userId = userQuery.results[0].id;
+
+  const svRelProp    = await detectSVSchoolsPropName();        // "S.V Schools" (Relation)
+  const reqQtyProp   = await detectRequestedQtyPropName();     // "Quantity Requested" (Number)
+  const approvalProp = await detectSVApprovalPropName();       // "S.V Approval" (Select/Status)
+  const teamsProp    = await detectOrderTeamsMembersPropName(); // "Teams Members" (Relation)
+
+  const items = [];
+  let hasMore = true, startCursor;
+
+  while (hasMore) {
+    const resp = await notion.databases.query({
+      database_id: ordersDatabaseId,
+      start_cursor: startCursor,
+      filter: {
+        and: [
+          { property: svRelProp,  relation: { contains: userId } },
+          { property: teamsProp,  relation: { contains: userId } }
+        ]
+      },
+      sorts: [{ timestamp: "created_time", direction: "descending" }],
     });
-    if (userQuery.results.length === 0) return res.status(404).json({ error: "User not found" });
-    const userId = userQuery.results[0].id;
 
-    const svRelProp = await detectSVSchoolsPropName();
-    const reqQtyProp = await detectRequestedQtyPropName();
-    const approvalProp = await detectSVApprovalPropName();
+    for (const page of resp.results) {
+      const props = page.properties || {};
 
-    const items = [];
-    let hasMore = true, startCursor;
-
-    while (hasMore) {
-      const resp = await notion.databases.query({
-        database_id: ordersDatabaseId,
-        start_cursor: startCursor,
-        filter: { property: svRelProp, relation: { contains: userId } },
-        sorts: [{ timestamp: "created_time", direction: "descending" }],
-      });
-      for (const page of resp.results) {
-        const props = page.properties || {};
-        // product name from Product relation if present
-        let productName = "Item";
-        const productRel = props.Product?.relation;
-        if (Array.isArray(productRel) && productRel.length) {
-          try {
-            const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
-            productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-          } catch {}
-        } else {
-          productName = props.Name?.title?.[0]?.plain_text || productName;
-        }
-
-        items.push({
-          id: page.id,
-          reason: props.Reason?.title?.[0]?.plain_text || "",
-          productName,
-          quantity: Number(props[reqQtyProp]?.number || 0),
-          approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || "",
-          createdTime: page.created_time,
-        });
+      // Resolve product name
+      let productName = "Item";
+      const productRel = props.Product?.relation;
+      if (Array.isArray(productRel) && productRel.length) {
+        try {
+          const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+          productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+        } catch {}
+      } else {
+        productName = props.Name?.title?.[0]?.plain_text || productName;
       }
-      hasMore = resp.has_more;
-      startCursor = resp.next_cursor;
+
+      items.push({
+        id: page.id,
+        reason: props.Reason?.title?.[0]?.plain_text || "",
+        productName,
+        quantity: Number(props[reqQtyProp]?.number || 0),
+        approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || "",
+        createdTime: page.created_time,
+      });
     }
 
-    res.set("Cache-Control","no-store");
-    return res.json(items);
-  } catch (e) {
-    console.error("GET /api/sv-orders error:", e?.body || e);
-    return res.status(500).json({ error: "Failed to load S.V orders" });
+    hasMore = resp.has_more;
+    startCursor = resp.next_cursor;
   }
+
+  res.set("Cache-Control", "no-store");
+  return res.json(items);
+} catch (e) {
+  console.error("GET /api/sv-orders error:", e?.body || e);
+  return res.status(500).json({ error: "Failed to load S.V orders" });
+}
 });
 
 // ====== API: update quantity (number only) ======
