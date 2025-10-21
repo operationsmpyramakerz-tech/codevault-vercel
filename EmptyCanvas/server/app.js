@@ -53,6 +53,7 @@ const ALL_PAGES = [
   "Stocktaking",
   "Funds",
   "Logistics",
+  "S.V schools orders",
 ];
 
 const norm = (s) => String(s || "").trim().toLowerCase();
@@ -79,7 +80,11 @@ function normalizePages(names = []) {
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
   if (set.has("logistics")) out.push("Logistics");
+  if (set.has("s.v schools orders") || set.has("sv schools orders")) {
+  out.push("S.V schools orders");
+}
   return out;
+  
 }
 
 // توسيع الأسماء للواجهة حتى لا يحصل تضارب aliases
@@ -99,6 +104,9 @@ function expandAllowedForUI(list = []) {
   if (set.has("Logistics")) {
     set.add("Logistics");
   }
+  if (set.has("S.V schools orders")) {
+  set.add("S.V schools orders");
+}
   return Array.from(set);
 }
 
@@ -125,7 +133,8 @@ function extractAllowedPages(props = {}) {
   const names = Array.isArray(candidates)
     ? candidates.map((x) => x?.name).filter(Boolean)
     : [];
-  const allowed = normalizePages(names);
+  const allowed = 
+  izePages(names);
   return allowed;
 }
 
@@ -136,6 +145,8 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Create New Order")) return "/orders/new";
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
+  if (allowed.includes("Logistics")) return "/logistics";
+  if (allowed.includes("S.V schools orders")) return "/orders/sv-orders";
   return "/login";
 }
 
@@ -201,6 +212,34 @@ async function detectStatusPropName() {
       "Prepared Status",
       "state",
     ]) || "Status"
+  );
+}
+// --- S.V helpers (place with other detect* helpers) ---
+
+// Relation: "S.V Schools"
+async function detectSVSchoolsPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, ["S.V Schools", "SV Schools", "S.V schools", "S V Schools"]) ||
+    "S.V Schools"
+  );
+}
+
+// Select/Status: "S.V Approval" with options "Approved" / "Rejected"
+async function detectSVApprovalPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, ["S.V Approval", "SV Approval"]) ||
+    "S.V Approval"
+  );
+}
+
+// Number: requested quantity (used by the Edit action)
+async function detectRequestedQtyPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, ["Quantity Requested", "Requested Qty", "Req"]) ||
+    "Quantity Requested"
   );
 }
 
@@ -310,6 +349,15 @@ app.get("/funds", requireAuth, requirePage("Funds"), (req, res) => {
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "logistics.html"));
 });
+// S.V schools orders page
+app.get(
+  "/orders/sv-orders",
+  requireAuth,
+  requirePage("S.V schools orders"),
+  (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "sv-orders.html"));
+  }
+);;
 
 // --- API Routes ---
 
@@ -357,6 +405,123 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ error: "Login failed" });
   }
 });
+app.get(
+  "/api/sv-orders",
+  requireAuth,
+  requirePage("S.V schools orders"),
+  async (req, res) => {
+    try {
+      const userId = await getCurrentUserPageId(req.session.username);
+      if (!userId) return res.status(404).json({ error: "User not found." });
+
+      const svRelProp   = await detectSVSchoolsPropName();
+      const reqQtyProp  = await detectRequestedQtyPropName();
+      const approvalProp= await detectSVApprovalPropName();
+
+      const items = [];
+      let hasMore = true, startCursor;
+
+      while (hasMore) {
+        const resp = await notion.databases.query({
+          database_id: ordersDatabaseId,
+          start_cursor: startCursor,
+          filter: { property: svRelProp, relation: { contains: userId } },
+          sorts: [{ timestamp: "created_time", direction: "descending" }],
+        });
+
+        for (const page of resp.results) {
+          const props = page.properties || {};
+
+          // Product name
+          let productName = "Unknown Product";
+          const productRel = props.Product?.relation;
+          if (Array.isArray(productRel) && productRel.length) {
+            try {
+              const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+              productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+            } catch {}
+          }
+
+          items.push({
+            id: page.id,
+            reason: props.Reason?.title?.[0]?.plain_text || "No Reason",
+            productName,
+            quantity: Number(props[reqQtyProp]?.number || 0),
+            approval: props[approvalProp]?.select?.name || "",  // S.V Approval
+            createdTime: page.created_time,
+          });
+        }
+
+        hasMore = resp.has_more;
+        startCursor = resp.next_cursor;
+      }
+
+      res.set("Cache-Control", "no-store");
+      res.json(items);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to load S.V schools orders" });
+    }
+  }
+);
+// Edit quantity (number only)
+app.post(
+  "/api/sv-orders/:id/quantity",
+  requireAuth,
+  requirePage("S.V schools orders"),
+  async (req, res) => {
+    try {
+      const pageId = req.params.id;
+      const value = Number((req.body?.value ?? "").toString().trim());
+      if (!pageId) return res.status(400).json({ error: "Missing id" });
+      if (!Number.isFinite(value) || value < 0) {
+        return res.status(400).json({ error: "Quantity must be a non-negative number" });
+      }
+
+      const reqQtyProp = await detectRequestedQtyPropName();
+      await notion.pages.update({
+        page_id: pageId,
+        properties: { [reqQtyProp]: { number: Math.floor(value) } },
+      });
+      res.json({ ok: true });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to update quantity" });
+    }
+  }
+);
+// approve and reject S.V order
+app.post(
+  "/api/sv-orders/:id/approval",
+  requireAuth,
+  requirePage("S.V schools orders"),
+  async (req, res) => {
+    try {
+      const pageId = req.params.id;
+      const decision = String(req.body?.decision || "").trim();
+      if (!pageId) return res.status(400).json({ error: "Missing id" });
+      if (!["Approved", "Rejected"].includes(decision)) {
+        return res.status(400).json({ error: "decision must be Approved or Rejected" });
+      }
+
+      const approvalProp = await detectSVApprovalPropName();
+      const propType = (await notion.pages.retrieve({ page_id: pageId }))
+        ?.properties?.[approvalProp]?.type || "select";
+
+      await notion.pages.update({
+        page_id: pageId,
+        properties:
+          propType === "status"
+            ? { [approvalProp]: { status: { name: decision } } }
+            : { [approvalProp]: { select: { name: decision } } },
+      });
+      res.json({ ok: true });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to update approval" });
+    }
+  }
+);
 // === Helper: Received Quantity (number) — used to keep Rec visible on Logistics ===
 async function detectReceivedQtyPropName() {
   const envName = (process.env.NOTION_REC_PROP || "").trim();
