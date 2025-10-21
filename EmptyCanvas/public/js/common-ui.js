@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'schools requested orders':  'a[href="/orders/requested"]',
     'assigned schools requested orders': 'a[href="/orders/assigned"]',
     'funds': 'a[href="/funds"]',
-    's.v schools orders': 'a[href="/orders/sv-orders"]',
+    // ★ NEW:
+    's.v schools orders':        'a[href="/orders/sv-orders"]'
   };
   const toKey = (s) => String(s || '').trim().toLowerCase();
 
@@ -51,6 +52,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const n = (name || '').trim();
     document.querySelectorAll('[data-username]').forEach(el => el.textContent = n || 'User');
   };
+
+  // ★ Inject the S.V link once so it exists for show/hide
+  function ensureSVOrdersLink() {
+    const nav = document.querySelector('.sidebar .nav-list');
+    if (!nav) return;
+    if (nav.querySelector('a[href="/orders/sv-orders"]')) return; // already inserted
+
+    const li = document.createElement('li');
+    const a  = document.createElement('a');
+    a.className = 'nav-link';
+    a.href = '/orders/sv-orders';
+    a.style.display = 'none'; // hidden until allowed
+    a.innerHTML = `<i data-feather="award"></i><span class="nav-label">S.V schools orders</span>`;
+    li.appendChild(a);
+    nav.appendChild(li);
+    if (window.feather) feather.replace();
+  }
 
   // لا نطبق الكاش القديم قبل جلب /api/account لتجنّب الإخفاء الخاطئ
   // const early = getCachedAllowedPages(); if (early) applyAllowedPages(early);
@@ -146,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Init
   applyInitial();
+  ensureSVOrdersLink();     // ★ ensure link exists before we apply allowed pages
   ensureGreetingAndPages();
 
   window.addEventListener('user:updated', () => {
