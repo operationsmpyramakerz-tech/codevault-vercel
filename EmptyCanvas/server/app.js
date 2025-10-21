@@ -79,12 +79,9 @@ function normalizePages(names = []) {
   if (set.has("create new order")) out.push("Create New Order");
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
-  if (set.has("logistics")) out.push("Logistics");
-  if (set.has("s.v schools orders") || set.has("sv schools orders")) {
-  out.push("S.V schools orders");
-}
+  if (set.has("logistics")) out.push("Logistics");  if (set.has("s.v schools orders") || set.has("sv schools orders")) out.push("S.V schools orders");
+
   return out;
-  
 }
 
 // توسيع الأسماء للواجهة حتى لا يحصل تضارب aliases
@@ -104,9 +101,6 @@ function expandAllowedForUI(list = []) {
   if (set.has("Logistics")) {
     set.add("Logistics");
   }
-  if (set.has("S.V schools orders")) {
-  set.add("S.V schools orders");
-}
   return Array.from(set);
 }
 
@@ -144,8 +138,6 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Create New Order")) return "/orders/new";
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
-  if (allowed.includes("Logistics")) return "/logistics";
-  if (allowed.includes("S.V schools orders")) return "/orders/sv-orders";
   return "/login";
 }
 
@@ -214,50 +206,6 @@ async function detectStatusPropName() {
   );
 }
 
-// === Helper: always compute fresh allowed pages for a username ===
-async function getAllowedPagesForUser(username) {
-  try {
-    if (!username) return [];
-    const memberPageId = await getCurrentUserPageId(username);
-    if (!memberPageId) return [];
-    const page = await notion.pages.retrieve({ page_id: memberPageId });
-    const allowed = extractAllowedPages((page && page.properties) || {});
-    return Array.isArray(allowed) ? allowed : [];
-  } catch (e) {
-    console.error("getAllowedPagesForUser error:", e && e.body ? e.body : e);
-    return [];
-  }
-}
-
-// --- S.V helpers (place with other detect* helpers) ---
-
-// Relation: "S.V Schools"
-async function detectSVSchoolsPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, ["S.V Schools", "SV Schools", "S.V schools", "S V Schools"]) ||
-    "S.V Schools"
-  );
-}
-
-// Select/Status: "S.V Approval" with options "Approved" / "Rejected"
-async function detectSVApprovalPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, ["S.V Approval", "SV Approval"]) ||
-    "S.V Approval"
-  );
-}
-
-// Number: requested quantity (used by the Edit action)
-async function detectRequestedQtyPropName() {
-  const props = await getOrdersDBProps();
-  return (
-    pickPropName(props, ["Quantity Requested", "Requested Qty", "Req"]) ||
-    "Quantity Requested"
-  );
-}
-
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
@@ -265,27 +213,11 @@ function requireAuth(req, res, next) {
 }
 
 // Page-Access middleware
-
-function requirePage(requiredName) {
-  const reqKey = String(requiredName || '').toLowerCase();
-  return async (req, res, next) => {
-    try {
-      const sess = req.session || {};
-      const current = Array.isArray(sess.allowedPages) ? sess.allowedPages : [];
-      const hasInSession = current.some(p => String(p).toLowerCase() === reqKey);
-      if (hasInSession) return next();
-
-      // Session may be stale: refresh from Notion
-      const fresh = await getAllowedPagesForUser(sess.username);
-      req.session.allowedPages = fresh;
-      const ok = fresh.some(p => String(p).toLowerCase() === reqKey);
-      if (ok) return next();
-
-      return res.status(403).send('Not allowed');
-    } catch (e) {
-      console.error('requirePage live check failed:', e && e.body ? e.body : e);
-      return res.status(403).send('Not allowed');
-    }
+function requirePage(pageName) {
+  return (req, res, next) => {
+    const allowed = req.session?.allowedPages || ALL_PAGES;
+    if (allowed.includes(pageName)) return next();
+    return res.redirect(firstAllowedPath(allowed));
   };
 }
 
@@ -380,15 +312,6 @@ app.get("/funds", requireAuth, requirePage("Funds"), (req, res) => {
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "logistics.html"));
 });
-// S.V schools orders page
-app.get(
-  "/orders/sv-orders",
-  requireAuth,
-  requirePage("S.V schools orders"),
-  (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "public", "sv-orders.html"));
-  }
-);;
 
 // --- API Routes ---
 
@@ -436,123 +359,6 @@ app.post("/api/login", async (req, res) => {
     res.status(500).json({ error: "Login failed" });
   }
 });
-app.get(
-  "/api/sv-orders",
-  requireAuth,
-  requirePage("S.V schools orders"),
-  async (req, res) => {
-    try {
-      const userId = await getCurrentUserPageId(req.session.username);
-      if (!userId) return res.status(404).json({ error: "User not found." });
-
-      const svRelProp   = await detectSVSchoolsPropName();
-      const reqQtyProp  = await detectRequestedQtyPropName();
-      const approvalProp= await detectSVApprovalPropName();
-
-      const items = [];
-      let hasMore = true, startCursor;
-
-      while (hasMore) {
-        const resp = await notion.databases.query({
-          database_id: ordersDatabaseId,
-          start_cursor: startCursor,
-          filter: { property: svRelProp, relation: { contains: userId } },
-          sorts: [{ timestamp: "created_time", direction: "descending" }],
-        });
-
-        for (const page of resp.results) {
-          const props = page.properties || {};
-
-          // Product name
-          let productName = "Unknown Product";
-          const productRel = props.Product?.relation;
-          if (Array.isArray(productRel) && productRel.length) {
-            try {
-              const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
-              productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-            } catch {}
-          }
-
-          items.push({
-            id: page.id,
-            reason: props.Reason?.title?.[0]?.plain_text || "No Reason",
-            productName,
-            quantity: Number(props[reqQtyProp]?.number || 0),
-            approval: props[approvalProp]?.select?.name || "",  // S.V Approval
-            createdTime: page.created_time,
-          });
-        }
-
-        hasMore = resp.has_more;
-        startCursor = resp.next_cursor;
-      }
-
-      res.set("Cache-Control", "no-store");
-      res.json(items);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to load S.V schools orders" });
-    }
-  }
-);
-// Edit quantity (number only)
-app.post(
-  "/api/sv-orders/:id/quantity",
-  requireAuth,
-  requirePage("S.V schools orders"),
-  async (req, res) => {
-    try {
-      const pageId = req.params.id;
-      const value = Number((req.body?.value ?? "").toString().trim());
-      if (!pageId) return res.status(400).json({ error: "Missing id" });
-      if (!Number.isFinite(value) || value < 0) {
-        return res.status(400).json({ error: "Quantity must be a non-negative number" });
-      }
-
-      const reqQtyProp = await detectRequestedQtyPropName();
-      await notion.pages.update({
-        page_id: pageId,
-        properties: { [reqQtyProp]: { number: Math.floor(value) } },
-      });
-      res.json({ ok: true });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to update quantity" });
-    }
-  }
-);
-// approve and reject S.V order
-app.post(
-  "/api/sv-orders/:id/approval",
-  requireAuth,
-  requirePage("S.V schools orders"),
-  async (req, res) => {
-    try {
-      const pageId = req.params.id;
-      const decision = String(req.body?.decision || "").trim();
-      if (!pageId) return res.status(400).json({ error: "Missing id" });
-      if (!["Approved", "Rejected"].includes(decision)) {
-        return res.status(400).json({ error: "decision must be Approved or Rejected" });
-      }
-
-      const approvalProp = await detectSVApprovalPropName();
-      const propType = (await notion.pages.retrieve({ page_id: pageId }))
-        ?.properties?.[approvalProp]?.type || "select";
-
-      await notion.pages.update({
-        page_id: pageId,
-        properties:
-          propType === "status"
-            ? { [approvalProp]: { status: { name: decision } } }
-            : { [approvalProp]: { select: { name: decision } } },
-      });
-      res.json({ ok: true });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to update approval" });
-    }
-  }
-);
 // === Helper: Received Quantity (number) — used to keep Rec visible on Logistics ===
 async function detectReceivedQtyPropName() {
   const envName = (process.env.NOTION_REC_PROP || "").trim();
@@ -581,20 +387,46 @@ app.post("/api/logout", (req, res) => {
 });
 
 // Account info (returns fresh allowedPages)
-
-app.get('/api/account', requireAuth, async (req, res) => {
+app.get("/api/account", requireAuth, async (req, res) => {
+  if (!teamMembersDatabaseId) {
+    return res
+      .status(500)
+      .json({ error: "Team_Members database ID is not configured." });
+  }
   try {
-    const username = req.session.username;
-    const freshAllowed = await getAllowedPagesForUser(username);
-    req.session.allowedPages = freshAllowed;
-    res.set('Cache-Control', 'no-store');
-    return res.json({
-      username,
-      allowedPages: freshAllowed
+    const response = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: req.session.username } },
     });
-  } catch (err) {
-    console.error('GET /api/account error:', err);
-    return res.status(500).json({ error: 'Failed to load account' });
+
+    if (response.results.length === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const user = response.results[0];
+    const p = user.properties;
+
+    const freshAllowed = extractAllowedPages(p);
+    req.session.allowedPages = freshAllowed;
+    const allowedUI = expandAllowedForUI(freshAllowed);
+
+    const data = {
+      name: p?.Name?.title?.[0]?.plain_text || "",
+      username: req.session.username || "",
+      department: p?.Department?.select?.name || "",
+      position: p?.Position?.select?.name || "",
+      phone: p?.Phone?.phone_number || "",
+      email: p?.Email?.email || "",
+      employeeCode: p?.["Employee Code"]?.number ?? null,
+      password: p?.Password?.number ?? null,
+      allowedPages: allowedUI,
+    };
+
+    res.set("Cache-Control", "no-store");
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching account from Notion:", error.body || error);
+    res.status(500).json({ error: "Failed to fetch account info." });
   }
 });
 
@@ -2365,4 +2197,130 @@ async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
 }
 
 // Export Express app for Vercel
+
+// ====== S.V schools orders: helpers ======
+async function detectSVSchoolsPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, ["S.V Schools","SV Schools","S V Schools","S.V schools"]) ||
+    "S.V Schools"
+  );
+}
+async function detectSVApprovalPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, ["S.V Approval","SV Approval"]) ||
+    "S.V Approval"
+  );
+}
+async function detectRequestedQtyPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, ["Quantity Requested","Requested Qty","Req"]) ||
+    "Quantity Requested"
+  );
+}
+
+// ====== Page route: S.V schools orders ======
+app.get("/orders/sv-orders", requireAuth, requirePage("S.V schools orders"), (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "sv-orders.html"));
+});
+
+// ====== API: list S.V orders for current user ======
+app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
+  try {
+    const userQuery = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: req.session.username } },
+    });
+    if (userQuery.results.length === 0) return res.status(404).json({ error: "User not found" });
+    const userId = userQuery.results[0].id;
+
+    const svRelProp = await detectSVSchoolsPropName();
+    const reqQtyProp = await detectRequestedQtyPropName();
+    const approvalProp = await detectSVApprovalPropName();
+
+    const items = [];
+    let hasMore = true, startCursor;
+
+    while (hasMore) {
+      const resp = await notion.databases.query({
+        database_id: ordersDatabaseId,
+        start_cursor: startCursor,
+        filter: { property: svRelProp, relation: { contains: userId } },
+        sorts: [{ timestamp: "created_time", direction: "descending" }],
+      });
+      for (const page of resp.results) {
+        const props = page.properties || {};
+        // product name from Product relation if present
+        let productName = "Item";
+        const productRel = props.Product?.relation;
+        if (Array.isArray(productRel) && productRel.length) {
+          try {
+            const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+            productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+          } catch {}
+        } else {
+          productName = props.Name?.title?.[0]?.plain_text || productName;
+        }
+
+        items.push({
+          id: page.id,
+          reason: props.Reason?.title?.[0]?.plain_text || "",
+          productName,
+          quantity: Number(props[reqQtyProp]?.number || 0),
+          approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || "",
+          createdTime: page.created_time,
+        });
+      }
+      hasMore = resp.has_more;
+      startCursor = resp.next_cursor;
+    }
+
+    res.set("Cache-Control","no-store");
+    return res.json(items);
+  } catch (e) {
+    console.error("GET /api/sv-orders error:", e?.body || e);
+    return res.status(500).json({ error: "Failed to load S.V orders" });
+  }
+});
+
+// ====== API: update quantity (number only) ======
+app.post("/api/sv-orders/:id/quantity", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
+  try {
+    const pageId = req.params.id;
+    const value = Number((req.body?.value ?? "").toString().trim());
+    if (!pageId) return res.status(400).json({ error: "Missing id" });
+    if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: "Invalid quantity" });
+
+    const reqQtyProp = await detectRequestedQtyPropName();
+    await notion.pages.update({ page_id: pageId, properties: { [reqQtyProp]: { number: Math.floor(value) } } });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("POST /api/sv-orders/:id/quantity error:", e?.body || e);
+    return res.status(500).json({ error: "Failed to update quantity" });
+  }
+});
+
+// ====== API: approve/reject (S.V Approval select or status) ======
+app.post("/api/sv-orders/:id/approval", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
+  try {
+    const pageId = req.params.id;
+    const decision = String(req.body?.decision || "").trim();
+    if (!pageId) return res.status(400).json({ error: "Missing id" });
+    if (!["Approved","Rejected"].includes(decision)) return res.status(400).json({ error: "decision must be Approved or Rejected" });
+
+    const approvalProp = await detectSVApprovalPropName();
+    const page = await notion.pages.retrieve({ page_id: pageId });
+    const t = page.properties?.[approvalProp]?.type || "select";
+    const propVal = (t === "status") ? { status: { name: decision } } : { select: { name: decision } };
+
+    await notion.pages.update({ page_id: pageId, properties: { [approvalProp]: propVal } });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("POST /api/sv-orders/:id/approval error:", e?.body || e);
+    return res.status(500).json({ error: "Failed to update approval" });
+  }
+});
+
 module.exports = app;
