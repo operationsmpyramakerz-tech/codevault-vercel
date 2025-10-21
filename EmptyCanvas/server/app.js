@@ -133,8 +133,7 @@ function extractAllowedPages(props = {}) {
   const names = Array.isArray(candidates)
     ? candidates.map((x) => x?.name).filter(Boolean)
     : [];
-  const allowed = 
-  izePages(names);
+  const allowed = normalizePages(names);
   return allowed;
 }
 
