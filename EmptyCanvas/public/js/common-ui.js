@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     'requested orders':          'a[href="/orders/requested"]',
     'schools requested orders':  'a[href="/orders/requested"]',
     'assigned schools requested orders': 'a[href="/orders/assigned"]',
-    'funds': 'a[href="/funds"]'
+    'funds': 'a[href="/funds"]',
+    's.v schools orders': 'a[href="/orders/sv-orders"]',
   };
   const toKey = (s) => String(s || '').trim().toLowerCase();
 
