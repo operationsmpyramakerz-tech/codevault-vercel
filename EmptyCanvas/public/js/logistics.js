@@ -58,6 +58,11 @@
   const isReceived = (it) => statusOf(it) === 'received by operations';
   const isPartial  = (it) => statusOf(it) === 'partially received by operations';
   const isDelivered= (it) => statusOf(it) === 'delivered';
+// Treat 'Prepared' (and synonyms) as prepared status
+const isPrepared = (it) => {
+  const s = statusOf(it);
+  return s === 'prepared' || s === 'fully prepared' || s === 'prepared by operations';
+};
 
   function normalizeItem(it) {
     const req   = N(it.requested ?? it.req);
@@ -239,7 +244,13 @@
     const groupsAll = buildGroups(allItems);
 
     const sets = {
-      prepared : groupsAll.filter(g => g.allPrepared),
+      prepared : groupsAll
+        .map(g => ({
+          ...g,
+          // Show only the items that are prepared by status, or match the old rule (rem===0 and not received/partial/delivered)
+          items: g.items.filter(it => isPrepared(it) || (Number(it.remaining||0)===0 && !isReceived(it) && !isDelivered(it) && !isPartial(it)))
+        }))
+        .filter(g => g.items.length),
 
       // ✅ Missing: نظهر الطلبات التي فيها rem>0، لكن
       // نُخفي العناصر التي أصبحت "Received by operations"
