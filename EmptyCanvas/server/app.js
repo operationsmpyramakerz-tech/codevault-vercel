@@ -213,6 +213,22 @@ async function detectStatusPropName() {
     ]) || "Status"
   );
 }
+
+// === Helper: always compute fresh allowed pages for a username ===
+async function getAllowedPagesForUser(username) {
+  try {
+    if (!username) return [];
+    const memberPageId = await getCurrentUserPageId(username);
+    if (!memberPageId) return [];
+    const page = await notion.pages.retrieve({ page_id: memberPageId });
+    const allowed = extractAllowedPages((page && page.properties) || {});
+    return Array.isArray(allowed) ? allowed : [];
+  } catch (e) {
+    console.error("getAllowedPagesForUser error:", e && e.body ? e.body : e);
+    return [];
+  }
+}
+
 // --- S.V helpers (place with other detect* helpers) ---
 
 // Relation: "S.V Schools"
@@ -249,11 +265,27 @@ function requireAuth(req, res, next) {
 }
 
 // Page-Access middleware
-function requirePage(pageName) {
-  return (req, res, next) => {
-    const allowed = req.session?.allowedPages || ALL_PAGES;
-    if (allowed.includes(pageName)) return next();
-    return res.redirect(firstAllowedPath(allowed));
+
+function requirePage(requiredName) {
+  const reqKey = String(requiredName || '').toLowerCase();
+  return async (req, res, next) => {
+    try {
+      const sess = req.session || {};
+      const current = Array.isArray(sess.allowedPages) ? sess.allowedPages : [];
+      const hasInSession = current.some(p => String(p).toLowerCase() === reqKey);
+      if (hasInSession) return next();
+
+      // Session may be stale: refresh from Notion
+      const fresh = await getAllowedPagesForUser(sess.username);
+      req.session.allowedPages = fresh;
+      const ok = fresh.some(p => String(p).toLowerCase() === reqKey);
+      if (ok) return next();
+
+      return res.status(403).send('Not allowed');
+    } catch (e) {
+      console.error('requirePage live check failed:', e && e.body ? e.body : e);
+      return res.status(403).send('Not allowed');
+    }
   };
 }
 
@@ -549,46 +581,20 @@ app.post("/api/logout", (req, res) => {
 });
 
 // Account info (returns fresh allowedPages)
-app.get("/api/account", requireAuth, async (req, res) => {
-  if (!teamMembersDatabaseId) {
-    return res
-      .status(500)
-      .json({ error: "Team_Members database ID is not configured." });
-  }
+
+app.get('/api/account', requireAuth, async (req, res) => {
   try {
-    const response = await notion.databases.query({
-      database_id: teamMembersDatabaseId,
-      filter: { property: "Name", title: { equals: req.session.username } },
-    });
-
-    if (response.results.length === 0) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    const user = response.results[0];
-    const p = user.properties;
-
-    const freshAllowed = extractAllowedPages(p);
+    const username = req.session.username;
+    const freshAllowed = await getAllowedPagesForUser(username);
     req.session.allowedPages = freshAllowed;
-    const allowedUI = expandAllowedForUI(freshAllowed);
-
-    const data = {
-      name: p?.Name?.title?.[0]?.plain_text || "",
-      username: req.session.username || "",
-      department: p?.Department?.select?.name || "",
-      position: p?.Position?.select?.name || "",
-      phone: p?.Phone?.phone_number || "",
-      email: p?.Email?.email || "",
-      employeeCode: p?.["Employee Code"]?.number ?? null,
-      password: p?.Password?.number ?? null,
-      allowedPages: allowedUI,
-    };
-
-    res.set("Cache-Control", "no-store");
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching account from Notion:", error.body || error);
-    res.status(500).json({ error: "Failed to fetch account info." });
+    res.set('Cache-Control', 'no-store');
+    return res.json({
+      username,
+      allowedPages: freshAllowed
+    });
+  } catch (err) {
+    console.error('GET /api/account error:', err);
+    return res.status(500).json({ error: 'Failed to load account' });
   }
 });
 

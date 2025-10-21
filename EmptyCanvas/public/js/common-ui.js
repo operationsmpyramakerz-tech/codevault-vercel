@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const a  = document.createElement('a');
     a.className = 'nav-link';
     a.href = '/orders/sv-orders';
+    a.style.display = 'none'; // hidden until allowed
     a.innerHTML = `<i data-feather="award"></i><span class="nav-label">S.V schools orders</span>`;
     li.appendChild(a);
     nav.appendChild(li);
@@ -77,7 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cached) renderGreeting(cached);
 
     try {
-      const res = await fetch('/api/account', { credentials: 'same-origin', cache: 'no-store' });
+      const early = (typeof getCachedAllowedPages==='function' && getCachedAllowedPages()); if (early) applyAllowedPages(early);
+  const res = await fetch('/api/account', { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
 
