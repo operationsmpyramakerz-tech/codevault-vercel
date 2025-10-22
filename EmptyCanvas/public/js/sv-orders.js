@@ -1,5 +1,4 @@
-
-/*! sv-orders.js : S.V schools orders (grouped by request + tabs) */
+/*! sv-orders.js : S.V schools orders (one order per card, professional layout) */
 (() => {
   "use strict";
 
@@ -34,7 +33,11 @@
     return Number.isFinite(n) ? n : 0;
   };
   const fmtDate = (d) => {
-    try { return new Date(d).toLocaleString(); } catch { return d || ""; }
+    try { 
+      const dt = new Date(d);
+      if (!isNaN(+dt)) return dt.toLocaleString();
+      return d || "";
+    } catch { return d || ""; }
   };
   const escapeHTML = (s) =>
     String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;")
@@ -52,7 +55,7 @@
   const searchInput = $("#svSearch");
   const tabsWrap    = $("#svTabs");
 
-  // ---- UI: tabs ----
+  // ---- tabs (keep URL in sync) ----
   function setActiveTab() {
     if (!tabsWrap) return;
     $$("#svTabs a.tab-portfolio").forEach(a => {
@@ -60,7 +63,6 @@
       const active = tab === TAB;
       a.classList.toggle("active", active);
       a.setAttribute("aria-selected", active ? "true" : "false");
-      // ensure the href always carries the right query
       try {
         const u = new URL(a.getAttribute("href"), location.origin);
         u.searchParams.set("tab", a.dataset.tab || "not-started");
@@ -102,17 +104,15 @@
     });
   }
 
-  // ---- grouping ----
-  function groupByReason(items) {
+  // ---- grouping: one order per card (group by request/reason) ----
+  function groupByOrder(items) {
     function groupKey(it) {
-      // prefer stable IDs from API if available
       const id =
         it.reasonId || it.requestId || it.groupId || it.orderId ||
         it.parentId || it.req_id || it.orderPageId || it.reason_page_id ||
         it.pageId || it.page_id;
       if (id) return `id:${id}`;
 
-      // fallback to (reason text + created time) to avoid merging different requests
       const txt = String(it.reason || it.requestReason || "No Reason").trim().toLowerCase();
       const created = it.reasonCreated || it.createdAt || it.created_time || it.createdTime || "";
       return `txt:${txt}|${String(created).slice(0,19)}`;
@@ -134,53 +134,63 @@
         if (g0 > d) g.firstCreated = d.toISOString();
       } catch {}
     }
-    // newest first
     return Array.from(groups.values())
       .sort((a,b) => new Date(b.firstCreated) - new Date(a.firstCreated));
   }
 
-  // ---- badges ----
+  // ---- badges (unified) ----
   function badgeForApproval(status) {
     const s = String(status || "").toLowerCase();
-    if (s === "approved") return `<span class="pill pill-success">Approved</span>`;
-    if (s === "rejected") return `<span class="pill pill-danger">Rejected</span>`;
-    return `<span class="pill">Not Started</span>`;
+    if (s === "approved") return `<span class="badge badge--approved">Approved</span>`;
+    if (s === "rejected") return `<span class="badge badge--rejected">Rejected</span>`;
+    return `<span class="badge badge--notstarted">Not Started</span>`;
   }
 
-  // ---- render ----
-  function renderGroupCard(group) {
-    const chips = `
-      <span class="pill">${group.items.length} ${group.items.length===1?"Item":"Items"}</span>
-      <span class="pill">${fmtDate(group.firstCreated)}</span>
-    `;
-
-    const rows = group.items.map(it => {
-      const qty = N(it.quantity);
-      return `
-      <div class="sv-item-row" data-id="${it.id}">
-        <div class="row-left">
+  // ---- UI templates ----
+  function renderItemRow(it) {
+    const qty = Math.max(0, N(it.quantity));
+    return `
+      <div class="order-item-card" data-id="${it.id}">
+        <div class="order-item__left">
           <div class="name">${escapeHTML(it.productName || it.item || "Unnamed")}</div>
-          <div class="sub muted">Qty: <strong>${qty}</strong></div>
+          <div class="muted">Qty: <strong>${qty}</strong></div>
         </div>
-        <div class="row-right">
+        <div class="order-item__right">
           <div class="approval">${badgeForApproval(it.approval)}</div>
           <div class="btn-group">
-            <button class="btn btn-light btn-xs sv-edit" data-id="${it.id}"><i data-feather="edit-2"></i> Edit</button>
-            <button class="btn btn-success btn-xs sv-approve" data-id="${it.id}"><i data-feather="check"></i> Approve</button>
-            <button class="btn btn-danger  btn-xs sv-reject"  data-id="${it.id}"><i data-feather="x"></i> Reject</button>
+            <button class="btn btn-warning btn-xs sv-edit"    data-id="${it.id}" title="Edit qty"><i data-feather="edit-2"></i> Edit</button>
+            <button class="btn btn-success btn-xs sv-approve" data-id="${it.id}" title="Approve"><i data-feather="check"></i> Approve</button>
+            <button class="btn btn-danger  btn-xs sv-reject"  data-id="${it.id}" title="Reject"><i data-feather="x"></i> Reject</button>
           </div>
         </div>
+      </div>
+    `.trim();
+  }
+
+  function renderOrderCard(group) {
+    const meta = `
+      <div class="meta">
+        <span class="badge badge--qty">${group.items.length} ${group.items.length===1?"Item":"Items"}</span>
+        <span class="badge">${fmtDate(group.firstCreated)}</span>
       </div>`;
-    }).join("");
+
+    const items = group.items.map(renderItemRow).join("");
 
     return `
-    <div class="card sv-group">
-      <div class="group-header">
-        <div class="title">${escapeHTML(group.reason || "No Reason")}</div>
-        <div class="badges">${chips}</div>
-      </div>
-      <div class="group-items">${rows}</div>
-    </div>`;
+      <article class="order-card single">
+        <div class="order-head">
+          <div class="head-left">
+            <h3 class="order-title">${escapeHTML(group.reason || "No Reason")}</h3>
+            ${meta}
+          </div>
+          <!-- Right side intentionally empty (Assigned/Unassigned badge hidden) -->
+          <div class="order-actions"></div>
+        </div>
+        <div class="order-items">
+          ${items}
+        </div>
+      </article>
+    `.trim();
   }
 
   function render() {
@@ -201,8 +211,8 @@
       return;
     }
 
-    const groups = groupByReason(filtered);
-    container.innerHTML = groups.map(renderGroupCard).join("");
+    const groups = groupByOrder(filtered);
+    container.innerHTML = groups.map(renderOrderCard).join("");
     window.feather && feather.replace();
   }
 
@@ -235,7 +245,7 @@
     window.scrollTo(0, y);
   }
 
-  // ---- qty modal (fallback to prompt if missing) ----
+  // ---- qty modal ----
   let qtyModal, qtyInput, qtySaveBtn, qtyCloseBtn, qtyCancelBtn, qtyEditingId=null;
 
   function openQtyModal(id) {
@@ -250,7 +260,6 @@
     qtyCancelBtn = document.getElementById("svQtyCancel");
 
     if (!qtyModal || !qtyInput || !qtySaveBtn) {
-      // fallback prompt
       const v = window.prompt("Enter quantity:", String(currentVal));
       if (v != null) saveQuantity(id, v);
       return;
@@ -279,12 +288,12 @@
       const id = btn.getAttribute("data-id");
       if (!id) return;
 
-      if (btn.classList.contains("sv-edit"))   return openQtyModal(id);
+      if (btn.classList.contains("sv-edit"))    return openQtyModal(id);
       if (btn.classList.contains("sv-approve")) return approve(id, "Approved");
       if (btn.classList.contains("sv-reject"))  return approve(id, "Rejected");
     });
 
-    // qty modal buttons (if modal exists)
+    // qty modal buttons
     qtyModal     = document.getElementById("svQtyModal");
     qtyInput     = document.getElementById("svQtyInput");
     qtySaveBtn   = document.getElementById("svQtySave");
@@ -310,10 +319,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
-    // mark version in console to confirm file really loaded
-    console.log("[sv-orders] loaded v: group-by-request");
     setActiveTab();
     wireEvents();
     await loadList();
+    console.log("%cSV-ORDERS UI → one-card-per-order (PRO)", "color:#16A34A;font-weight:700;");
   });
 })();
