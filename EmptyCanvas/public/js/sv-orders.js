@@ -74,18 +74,20 @@
 
   // ---------- tabs visual active state ----------
   function setActiveTab() {
-    if (!tabsWrap) return;
-    $$("#svTabs .tab-chip").forEach(a => {
-      const match = (a.dataset.tab || "").toLowerCase() === TAB;
-      a.classList.toggle("active", match);
-      // Ensure href keeps the tab param stable (in case markup was copied without it)
-      try {
-        const u = new URL(a.getAttribute("href", 2), location.origin);
-        u.searchParams.set("tab", a.dataset.tab || "not-started");
-        a.setAttribute("href", u.pathname + "?" + u.searchParams.toString());
-      } catch {}
-    });
-  }
+  const chips = document.querySelectorAll('#svTabs .tab-chip');
+  chips.forEach(ch => {
+    const isActive = (ch.dataset.tab || '').toLowerCase() === TAB;
+    ch.classList.toggle('active', isActive);
+    ch.setAttribute('aria-selected', isActive ? 'true' : 'false');
+
+    // keep ?tab stable even if markup was copied without it
+    try {
+      const u = new URL(ch.getAttribute('href'), location.origin);
+      u.searchParams.set('tab', ch.dataset.tab || 'not-started');
+      ch.setAttribute('href', u.pathname + '?' + u.searchParams.toString());
+    } catch {}
+  });
+}
 
   // ---------- fetch & render ----------
   async function loadList() {
