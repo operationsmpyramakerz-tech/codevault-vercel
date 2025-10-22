@@ -2359,5 +2359,97 @@ app.post("/api/sv-orders/:id/approval", requireAuth, requirePage("S.V schools or
     return res.status(500).json({ error: "Failed to update approval" });
   }
 });
+// ====== API: list S.V orders with tabs (Not Started / Approved / Rejected) ======
+app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
+  try {
+    // Map ?tab to S.V Approval label
+    const tab = String(req.query.tab || "").toLowerCase();
+    let label = "Not Started";
+    if (tab === "approved") label = "Approved";
+    else if (tab === "rejected") label = "Rejected";
+
+    // Identify current Team Member (by session username)
+    const userQuery = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: req.session.username } },
+    });
+    if (!userQuery.results.length) return res.status(404).json({ error: "User not found" });
+    const userId = userQuery.results[0].id;
+
+    // Resolve property names on Orders DB
+    const reqQtyProp    = await detectRequestedQtyPropName();
+    const approvalProp  = await detectSVApprovalPropName();
+    const teamsProp     = await detectOrderTeamsMembersPropName();
+    let   svRelProp     = await detectSVSchoolsPropName();
+
+    const ordersProps   = await getOrdersDBProps();
+    const approvalType  = ordersProps[approvalProp]?.type || "select";
+    if (!ordersProps[svRelProp] || ordersProps[svRelProp].type !== "relation") {
+      svRelProp = null; // if relation missing in schema, ignore
+    }
+
+    // Build Notion filter
+    const andFilter = [
+      { property: teamsProp, relation: { contains: userId } },
+    ];
+    if (svRelProp) {
+      andFilter.push({ property: svRelProp, relation: { contains: userId } });
+    }
+    if (label) {
+      if (approvalType === "status") {
+        andFilter.push({ property: approvalProp, status: { equals: label } });
+      } else {
+        andFilter.push({ property: approvalProp, select: { equals: label } });
+      }
+    }
+
+    const items = [];
+    let hasMore = true;
+    let startCursor = undefined;
+
+    while (hasMore) {
+      const resp = await notion.databases.query({
+        database_id: ordersDatabaseId,
+        start_cursor: startCursor,
+        filter: { and: andFilter },
+        sorts: [{ timestamp: "created_time", direction: "descending" }],
+      });
+
+      for (const page of resp.results) {
+        const props = page.properties || {};
+
+        // Product name from relation if present
+        let productName = "Item";
+        const productRel = props.Product?.relation;
+        if (Array.isArray(productRel) && productRel.length) {
+          try {
+            const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
+            productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
+          } catch {}
+        } else {
+          productName = props.Name?.title?.[0]?.plain_text || productName;
+        }
+
+        items.push({
+          id: page.id,
+          reason: props.Reason?.title?.[0]?.plain_text || "",
+          productName,
+          quantity: Number(props[reqQtyProp]?.number || 0),
+          approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || "",
+          createdTime: page.created_time,
+        });
+      }
+
+      hasMore = resp.has_more;
+      startCursor = resp.next_cursor;
+    }
+
+    res.set("Cache-Control", "no-store");
+    return res.json(items);
+  } catch (e) {
+    console.error("GET /api/sv-orders error:", e?.body || e);
+    return res.status(500).json({ error: "Failed to load S.V orders" });
+  }
+});
 
 module.exports = app;
