@@ -1,4 +1,4 @@
-/*! sv-orders.js : S.V schools orders (one order per card, professional layout) */
+/*! sv-orders.js : S.V schools orders — one order per card + inline quantity popover */
 (() => {
   "use strict";
 
@@ -8,7 +8,7 @@
 
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
-  const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
+  const on = (el, ev, fn, opts) => el && el.addEventListener(ev, fn, opts);
 
   const http = {
     async get(url) {
@@ -153,7 +153,7 @@
       <div class="order-item-card" data-id="${it.id}">
         <div class="order-item__left">
           <div class="name">${escapeHTML(it.productName || it.item || "Unnamed")}</div>
-          <div class="muted">Qty: <strong>${qty}</strong></div>
+          <div class="muted">Qty: <strong data-role="qty-val">${qty}</strong></div>
         </div>
         <div class="order-item__right">
           <div class="approval">${badgeForApproval(it.approval)}</div>
@@ -183,7 +183,6 @@
             <h3 class="order-title">${escapeHTML(group.reason || "No Reason")}</h3>
             ${meta}
           </div>
-          <!-- Right side intentionally empty (Assigned/Unassigned badge hidden) -->
           <div class="order-actions"></div>
         </div>
         <div class="order-items">
@@ -216,7 +215,103 @@
     window.feather && feather.replace();
   }
 
-  // ---- actions ----
+  // ---- qty popover (inline dropdown) ----
+  let popEl = null;
+  let popForId = null;
+  function destroyPopover() {
+    if (popEl?.parentNode) popEl.parentNode.removeChild(popEl);
+    popEl = null;
+    popForId = null;
+    window.removeEventListener("click", onDocClick, true);
+    window.removeEventListener("keydown", onEsc, true);
+    window.removeEventListener("resize", destroyPopover);
+    window.removeEventListener("scroll", destroyPopover, true);
+  }
+  function onDocClick(e) {
+    if (!popEl) return;
+    if (popEl.contains(e.target)) return;
+    const editBtn = document.querySelector(`.sv-edit[data-id="${popForId}"]`);
+    if (editBtn && editBtn.contains(e.target)) return;
+    destroyPopover();
+  }
+  function onEsc(e) {
+    if (e.key === "Escape") destroyPopover();
+  }
+
+  function placePopoverNear(btn) {
+    const r = btn.getBoundingClientRect();
+    const x = Math.min(window.innerWidth - 260, Math.max(8, r.right - 220));
+    const y = Math.min(window.innerHeight - 140, r.bottom + 8);
+    popEl.style.left = `${x + window.scrollX}px`;
+    popEl.style.top  = `${y + window.scrollY}px`;
+  }
+
+  async function openQtyPopover(btn, id) {
+    // toggle if same id
+    if (popEl && popForId === id) {
+      destroyPopover();
+      return;
+    }
+    destroyPopover();
+    popForId = id;
+
+    // current quantity
+    const row = btn.closest(".order-item-card");
+    const currentQtyNode = row?.querySelector('[data-role="qty-val"]');
+    const currentVal = currentQtyNode ? N(currentQtyNode.textContent) : 0;
+
+    popEl = document.createElement("div");
+    popEl.className = "sv-qty-popover";
+    popEl.innerHTML = `
+      <div class="sv-qty-popover__arrow"></div>
+      <div class="sv-qty-popover__body">
+        <div class="sv-qty-row">
+          <button class="sv-qty-btn sv-qty-dec" type="button" aria-label="Decrease">−</button>
+          <input class="sv-qty-input" type="number" min="0" step="1" value="${currentVal}" />
+          <button class="sv-qty-btn sv-qty-inc" type="button" aria-label="Increase">+</button>
+        </div>
+        <div class="sv-qty-actions">
+          <button class="btn btn-success btn-xs sv-qty-save">Save</button>
+          <button class="btn btn-danger btn-xs sv-qty-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(popEl);
+    placePopoverNear(btn);
+
+    const input  = popEl.querySelector(".sv-qty-input");
+    const decBtn = popEl.querySelector(".sv-qty-dec");
+    const incBtn = popEl.querySelector(".sv-qty-inc");
+    const saveBtn= popEl.querySelector(".sv-qty-save");
+    const cancel = popEl.querySelector(".sv-qty-cancel");
+
+    input.focus();
+    input.select();
+
+    on(decBtn, "click", () => { input.value = Math.max(0, N(input.value) - 1); input.dispatchEvent(new Event("input")); });
+    on(incBtn, "click", () => { input.value = Math.max(0, N(input.value) + 1); input.dispatchEvent(new Event("input")); });
+    on(input, "keydown", (e) => { if (e.key === "Enter") saveBtn.click(); });
+    on(saveBtn, "click", async () => {
+      const v = Math.max(0, Math.floor(N(input.value)));
+      try {
+        await http.post(`/api/sv-orders/${encodeURIComponent(id)}/quantity`, { value: v });
+        // immediate UI feedback
+        if (currentQtyNode) currentQtyNode.textContent = String(v);
+        toastOK("Quantity updated.");
+        destroyPopover();
+      } catch (e) {
+        toastERR("Failed to update quantity.");
+      }
+    });
+    on(cancel, "click", destroyPopover);
+
+    window.addEventListener("click", onDocClick, true);
+    window.addEventListener("keydown", onEsc, true);
+    window.addEventListener("resize", destroyPopover);
+    window.addEventListener("scroll", destroyPopover, true);
+  }
+
+  // ---- approve/reject wrappers ----
   async function approve(id, decision) {
     try {
       await http.post(`/api/sv-orders/${encodeURIComponent(id)}/approval`, { decision });
@@ -228,54 +323,10 @@
     }
   }
 
-  async function saveQuantity(id, value) {
-    try {
-      await http.post(`/api/sv-orders/${encodeURIComponent(id)}/quantity`, { value: N(value) });
-      toastOK("Quantity updated.");
-      await reloadAfterAction();
-    } catch (e) {
-      console.error(e);
-      toastERR("Failed to update quantity.");
-    }
-  }
-
   async function reloadAfterAction() {
     const y = window.scrollY;
     await loadList();
     window.scrollTo(0, y);
-  }
-
-  // ---- qty modal ----
-  let qtyModal, qtyInput, qtySaveBtn, qtyCloseBtn, qtyCancelBtn, qtyEditingId=null;
-
-  function openQtyModal(id) {
-    qtyEditingId = id;
-    const current = allItems.find(x => x.id === id);
-    const currentVal = current ? N(current.quantity) : 0;
-
-    qtyModal = document.getElementById("svQtyModal");
-    qtyInput = document.getElementById("svQtyInput");
-    qtySaveBtn = document.getElementById("svQtySave");
-    qtyCloseBtn = document.getElementById("svQtyClose");
-    qtyCancelBtn = document.getElementById("svQtyCancel");
-
-    if (!qtyModal || !qtyInput || !qtySaveBtn) {
-      const v = window.prompt("Enter quantity:", String(currentVal));
-      if (v != null) saveQuantity(id, v);
-      return;
-    }
-
-    qtyInput.value = currentVal;
-    qtyModal.classList.add("show");
-    qtyModal.setAttribute("aria-hidden","false");
-    setTimeout(() => qtyInput.focus(), 30);
-  }
-  function closeQtyModal() {
-    qtyEditingId = null;
-    if (qtyModal) {
-      qtyModal.classList.remove("show");
-      qtyModal.setAttribute("aria-hidden","true");
-    }
   }
 
   // ---- wire ----
@@ -288,40 +339,19 @@
       const id = btn.getAttribute("data-id");
       if (!id) return;
 
-      if (btn.classList.contains("sv-edit"))    return openQtyModal(id);
+      if (btn.classList.contains("sv-edit"))    { ev.preventDefault(); ev.stopPropagation(); return openQtyPopover(btn, id); }
       if (btn.classList.contains("sv-approve")) return approve(id, "Approved");
       if (btn.classList.contains("sv-reject"))  return approve(id, "Rejected");
     });
-
-    // qty modal buttons
-    qtyModal     = document.getElementById("svQtyModal");
-    qtyInput     = document.getElementById("svQtyInput");
-    qtySaveBtn   = document.getElementById("svQtySave");
-    qtyCloseBtn  = document.getElementById("svQtyClose");
-    qtyCancelBtn = document.getElementById("svQtyCancel");
-
-    on(qtyCloseBtn, "click", closeQtyModal);
-    on(qtyCancelBtn,"click", closeQtyModal);
-    on(qtyModal, "click", (e) => { if (e.target === qtyModal) closeQtyModal(); });
-    on(qtyInput, "keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (qtyEditingId) saveQuantity(qtyEditingId, qtyInput.value);
-        closeQtyModal();
-      }
-    });
-    on(qtySaveBtn, "click", () => {
-      if (!qtyEditingId) return;
-      const v = Math.max(0, Math.floor(N(qtyInput.value)));
-      saveQuantity(qtyEditingId, v);
-      closeQtyModal();
-    });
   }
 
-  document.addEventListener("DOMContentLoaded", async () => {
+  // ---- initial render ----
+  function mount() {
     setActiveTab();
     wireEvents();
-    await loadList();
-    console.log("%cSV-ORDERS UI → one-card-per-order (PRO)", "color:#16A34A;font-weight:700;");
-  });
+    loadList();
+    console.log("%cSV-ORDERS UI → QTY popover enabled", "color:#16A34A;font-weight:700;");
+  }
+
+  document.addEventListener("DOMContentLoaded", mount);
 })();
