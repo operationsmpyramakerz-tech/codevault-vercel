@@ -2320,3 +2320,83 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   .portfolio-tabs{ flex-wrap:wrap; gap:8px; }
   .tab-portfolio{ min-width:unset; padding:10px 14px 8px; font-size:.95rem; }
 }
+/* === Unified Buttons for S.V Orders === */
+.btn {
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+/* Approve – Green */
+.btn-success {
+  background-color: #16A34A; /* Tailwind green-600 */
+  color: #fff;
+}
+.btn-success:hover {
+  background-color: #15803D; /* green-700 */
+}
+
+/* Reject – Red */
+.btn-danger {
+  background-color: #DC2626; /* red-600 */
+  color: #fff;
+}
+.btn-danger:hover {
+  background-color: #B91C1C; /* red-700 */
+}
+
+/* Edit – Yellow */
+.btn-warning {
+  background-color: #EAB308; /* yellow-500 */
+  color: #fff;
+}
+.btn-warning:hover {
+  background-color: #CA8A04; /* yellow-600 */
+}
+
+/* === Unified Badge Colors (same as Requested Orders) === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+/* Status color variations */
+.badge--approved {
+  background-color: #DCFCE7;
+  border-color: #86EFAC;
+  color: #166534;
+}
+.badge--rejected {
+  background-color: #FEE2E2;
+  border-color: #FCA5A5;
+  color: #991B1B;
+}
+.badge--pending,
+.badge--notstarted {
+  background-color: #F3F4F6;
+  border-color: #E5E7EB;
+  color: #374151;
+}
+
+/* Consistent shadow & card layout (for S.V Orders match) */
+.order-card.request-card {
+  background-color: #fff;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.order-card.request-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
