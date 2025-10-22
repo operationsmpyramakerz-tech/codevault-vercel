@@ -2252,3 +2252,71 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   #svTabs{ flex-wrap:wrap; gap:.4rem; }
   #svTabs .tab-chip{ --tab-pad-x:.75rem; --tab-pad-y:.5rem; font-size:.9rem; }
 }
+/* ==================== Portfolio Tabs ==================== */
+.portfolio-tabs{
+  display:flex; gap:12px; align-items:flex-end;
+  padding:6px 10px 0;
+  background:transparent;
+  margin:10px 0 0;
+}
+
+/* Base tab (looks like a folder tab) */
+.tab-portfolio{
+  position:relative;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:12px 18px 10px;
+  min-width:140px;
+  border:1px solid #DAE3F0;
+  border-bottom:none;
+  border-radius:14px 14px 0 0;
+  background:#EEF2F8;
+  color:#5A6B84; font-weight:700;
+  text-decoration:none; user-select:none;
+  transition:transform .15s ease, box-shadow .2s ease, background .2s ease, color .2s ease, border-color .2s ease;
+}
+
+/* Subtle bevel highlight at top */
+.tab-portfolio::before{
+  content:"";
+  position:absolute; left:10px; right:10px; top:6px; height:8px;
+  background:linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0));
+  border-radius:8px;
+  pointer-events:none;
+}
+
+/* Hover */
+.tab-portfolio:hover{
+  background:#E7EDF7; color:#3B4C67;
+}
+
+/* Active tab pops forward and attaches to panel */
+.tab-portfolio.active{
+  background:#FFFFFF; color:#1E2A3B;
+  border-color:#BFD0F7;
+  transform:translateY(-6px);
+  z-index:2;
+  box-shadow:0 10px 22px rgba(63,90,140,.08), 0 2px 0 #FFFFFF inset;
+}
+
+/* Focus ring */
+.tab-portfolio:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(76,125,255,.35);
+}
+
+/* Panel that tabs sit on */
+.portfolio-panel{
+  position:relative;
+  margin-top:-6px;           /* pull panel under active tab bottom edge */
+  background:#FFFFFF;
+  border:1px solid #BFD0F7;
+  border-radius:16px;
+  padding:18px;
+  box-shadow:0 10px 24px rgba(31,41,55,.06);
+}
+
+/* Responsive tweaks */
+@media (max-width: 700px){
+  .portfolio-tabs{ flex-wrap:wrap; gap:8px; }
+  .tab-portfolio{ min-width:unset; padding:10px 14px 8px; font-size:.95rem; }
+}
