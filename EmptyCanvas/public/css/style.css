@@ -2529,3 +2529,46 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   .order-item-card { flex-direction: column; align-items: flex-start; gap: 6px; }
   .order-item__right { margin-left: 0; }
 }
+/* === S.V Orders: page side gutters (left/right spacing) === */
+/* Works even if wrappers differ; scoped to the page that contains #sv-list */
+:root {
+  --sv-gutter-sm: 12px;
+  --sv-gutter-md: 20px;
+  --sv-gutter-lg: 28px;
+}
+
+/* Fallback: add padding directly on the list container */
+#sv-list {
+  box-sizing: border-box;
+  padding-inline: var(--sv-gutter-sm);
+}
+
+/* If the list sits inside a section/panel, add the same gutters there too */
+section:has(#sv-list),
+main:has(#sv-list) {
+  box-sizing: border-box;
+  padding-inline: var(--sv-gutter-sm);
+}
+
+/* Keep the tabs/search aligned with the same gutters if present */
+#svTabs {
+  padding-inline: var(--sv-gutter-sm);
+}
+
+/* Scale gutters with screen size */
+@media (min-width: 768px) {
+  #sv-list,
+  section:has(#sv-list),
+  main:has(#sv-list),
+  #svTabs {
+    padding-inline: var(--sv-gutter-md);
+  }
+}
+@media (min-width: 1280px) {
+  #sv-list,
+  section:has(#sv-list),
+  main:has(#sv-list),
+  #svTabs {
+    padding-inline: var(--sv-gutter-lg);
+  }
+}
