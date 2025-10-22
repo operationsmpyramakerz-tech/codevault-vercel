@@ -121,20 +121,20 @@
           <h1 class="page-title">S.V schools orders</h1>
         </div>
 
-        <!-- TABS: Not Started / Approved / Rejected -->
-        <div id="svTabs" class="tabs status-tabs" style="gap:.5rem; display:flex; flex-wrap:wrap; margin:.5rem 0 1rem;">
-          <a class="tab-chip" data-tab="not-started" href="/orders/sv-orders?tab=not-started">Not Started</a>
-          <a class="tab-chip" data-tab="approved"    href="/orders/sv-orders?tab=approved">Approved</a>
-          <a class="tab-chip" data-tab="rejected"    href="/orders/sv-orders?tab=rejected">Rejected</a>
-        </div>
-      </header>
+      <!-- Tabs -->
+<div id="svTabs" class="portfolio-tabs" role="tablist" aria-label="S.V Approval">
+  <a class="tab-portfolio" data-tab="not-started" role="tab" aria-selected="true"
+     href="/orders/sv-orders?tab=not-started">Not Started</a>
+  <a class="tab-portfolio" data-tab="approved" role="tab" aria-selected="false"
+     href="/orders/sv-orders?tab=approved">Approved</a>
+  <a class="tab-portfolio" data-tab="rejected" role="tab" aria-selected="false"
+     href="/orders/sv-orders?tab=rejected">Rejected</a>
+</div>
 
-      <main class="container-full-width">
-        <section class="card">
-          <div id="sv-list">
-            <p><i class="loading-icon" data-feather="loader"></i> Loading S.V schools orders...</p>
-          </div>
-        </section>
+<!-- Panel (wrap your list) -->
+<section class="portfolio-panel">
+  <div id="sv-list"></div>
+</section>
       </main>
     </div>
   </div>
