@@ -1,4 +1,4 @@
-/*! sv-orders.js : S.V schools orders — one order per card + inline quantity popover */
+/*! sv-orders.js : S.V schools orders — qty popover (stable) */
 (() => {
   "use strict";
 
@@ -55,7 +55,6 @@
   const searchInput = $("#svSearch");
   const tabsWrap    = $("#svTabs");
 
-  // ---- tabs (keep URL in sync) ----
   function setActiveTab() {
     if (!tabsWrap) return;
     $$("#svTabs a.tab-portfolio").forEach(a => {
@@ -71,7 +70,6 @@
     });
   }
 
-  // ---- fetch list ----
   async function loadList() {
     loading = true; render();
     try {
@@ -90,7 +88,6 @@
     }
   }
 
-  // ---- search ----
   function applyFilter() {
     const q = (searchInput?.value || "").trim().toLowerCase();
     if (!q) { filtered = allItems.slice(); return; }
@@ -104,7 +101,6 @@
     });
   }
 
-  // ---- grouping: one order per card (group by request/reason) ----
   function groupByOrder(items) {
     function groupKey(it) {
       const id =
@@ -112,12 +108,10 @@
         it.parentId || it.req_id || it.orderPageId || it.reason_page_id ||
         it.pageId || it.page_id;
       if (id) return `id:${id}`;
-
       const txt = String(it.reason || it.requestReason || "No Reason").trim().toLowerCase();
       const created = it.reasonCreated || it.createdAt || it.created_time || it.createdTime || "";
       return `txt:${txt}|${String(created).slice(0,19)}`;
     }
-
     const groups = new Map();
     for (const it of items) {
       const key = groupKey(it);
@@ -138,7 +132,6 @@
       .sort((a,b) => new Date(b.firstCreated) - new Date(a.firstCreated));
   }
 
-  // ---- badges (unified) ----
   function badgeForApproval(status) {
     const s = String(status || "").toLowerCase();
     if (s === "approved") return `<span class="badge badge--approved">Approved</span>`;
@@ -146,7 +139,6 @@
     return `<span class="badge badge--notstarted">Not Started</span>`;
   }
 
-  // ---- UI templates ----
   function renderItemRow(it) {
     const qty = Math.max(0, N(it.quantity));
     return `
@@ -173,9 +165,7 @@
         <span class="badge badge--qty">${group.items.length} ${group.items.length===1?"Item":"Items"}</span>
         <span class="badge">${fmtDate(group.firstCreated)}</span>
       </div>`;
-
     const items = group.items.map(renderItemRow).join("");
-
     return `
       <article class="order-card single">
         <div class="order-head">
@@ -185,16 +175,13 @@
           </div>
           <div class="order-actions"></div>
         </div>
-        <div class="order-items">
-          ${items}
-        </div>
+        <div class="order-items">${items}</div>
       </article>
     `.trim();
   }
 
   function render() {
     if (!container) return;
-
     if (loading) {
       container.innerHTML = `<p class="muted"><i data-feather="loader" class="loading-icon"></i> Loading…</p>`;
       window.feather && feather.replace();
@@ -209,34 +196,31 @@
       window.feather && feather.replace();
       return;
     }
-
     const groups = groupByOrder(filtered);
     container.innerHTML = groups.map(renderOrderCard).join("");
     window.feather && feather.replace();
   }
 
-  // ---- qty popover (inline dropdown) ----
+  // ---- qty popover (stable) ----
   let popEl = null;
   let popForId = null;
+  let popAnchor = null;
+
   function destroyPopover() {
     if (popEl?.parentNode) popEl.parentNode.removeChild(popEl);
     popEl = null;
     popForId = null;
-    window.removeEventListener("click", onDocClick, true);
-    window.removeEventListener("keydown", onEsc, true);
-    window.removeEventListener("resize", destroyPopover);
-    window.removeEventListener("scroll", destroyPopover, true);
+    popAnchor = null;
+    document.removeEventListener("pointerdown", onDocPointerDown, true);
+    document.removeEventListener("keydown", onEsc, true);
   }
-  function onDocClick(e) {
+  function onDocPointerDown(e) {
     if (!popEl) return;
-    if (popEl.contains(e.target)) return;
-    const editBtn = document.querySelector(`.sv-edit[data-id="${popForId}"]`);
-    if (editBtn && editBtn.contains(e.target)) return;
+    if (popEl.contains(e.target)) return;        // inside popover
+    if (popAnchor && popAnchor.contains(e.target)) return; // on the anchor button
     destroyPopover();
   }
-  function onEsc(e) {
-    if (e.key === "Escape") destroyPopover();
-  }
+  function onEsc(e) { if (e.key === "Escape") destroyPopover(); }
 
   function placePopoverNear(btn) {
     const r = btn.getBoundingClientRect();
@@ -248,12 +232,10 @@
 
   async function openQtyPopover(btn, id) {
     // toggle if same id
-    if (popEl && popForId === id) {
-      destroyPopover();
-      return;
-    }
+    if (popEl && popForId === id) { destroyPopover(); return; }
     destroyPopover();
     popForId = id;
+    popAnchor = btn;
 
     // current quantity
     const row = btn.closest(".order-item-card");
@@ -299,59 +281,48 @@
         if (currentQtyNode) currentQtyNode.textContent = String(v);
         toastOK("Quantity updated.");
         destroyPopover();
-      } catch (e) {
-        toastERR("Failed to update quantity.");
-      }
+      } catch (e) { toastERR("Failed to update quantity."); }
     });
     on(cancel, "click", destroyPopover);
 
-    window.addEventListener("click", onDocClick, true);
-    window.addEventListener("keydown", onEsc, true);
-    window.addEventListener("resize", destroyPopover);
-    window.addEventListener("scroll", destroyPopover, true);
+    // Attach outside-click after the current event loop so the opening click doesn't immediately close it
+    setTimeout(() => {
+      document.addEventListener("pointerdown", onDocPointerDown, true);
+      document.addEventListener("keydown", onEsc, true);
+    }, 0);
   }
 
-  // ---- approve/reject wrappers ----
   async function approve(id, decision) {
     try {
       await http.post(`/api/sv-orders/${encodeURIComponent(id)}/approval`, { decision });
       toastOK(`Marked as ${decision}.`);
-      await reloadAfterAction();
+      const y = window.scrollY;
+      await loadList();
+      window.scrollTo(0, y);
     } catch (e) {
       console.error(e);
       toastERR(`Failed to set ${decision}.`);
     }
   }
 
-  async function reloadAfterAction() {
-    const y = window.scrollY;
-    await loadList();
-    window.scrollTo(0, y);
-  }
-
-  // ---- wire ----
   function wireEvents() {
     on(searchInput, "input", () => { applyFilter(); render(); });
-
     on(container, "click", (ev) => {
       const btn = ev.target.closest("button");
       if (!btn) return;
       const id = btn.getAttribute("data-id");
       if (!id) return;
 
-      if (btn.classList.contains("sv-edit"))    { ev.preventDefault(); ev.stopPropagation(); return openQtyPopover(btn, id); }
-      if (btn.classList.contains("sv-approve")) return approve(id, "Approved");
-      if (btn.classList.contains("sv-reject"))  return approve(id, "Rejected");
+      if (btn.classList.contains("sv-edit"))    { ev.preventDefault(); ev.stopPropagation(); openQtyPopover(btn, id); }
+      else if (btn.classList.contains("sv-approve")) approve(id, "Approved");
+      else if (btn.classList.contains("sv-reject"))  approve(id, "Rejected");
     });
   }
 
-  // ---- initial render ----
-  function mount() {
+  document.addEventListener("DOMContentLoaded", async () => {
     setActiveTab();
     wireEvents();
-    loadList();
-    console.log("%cSV-ORDERS UI → QTY popover enabled", "color:#16A34A;font-weight:700;");
-  }
-
-  document.addEventListener("DOMContentLoaded", mount);
+    await loadList();
+    console.log("%cSV-ORDERS UI → qty popover (stable)", "color:#16A34A;font-weight:700;");
+  });
 })();
