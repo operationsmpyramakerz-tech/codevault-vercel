@@ -2221,6 +2221,24 @@ async function detectRequestedQtyPropName() {
   );
 }
 
+// Detect the "Teams Members" relation column on the Orders DB
+async function detectOrderTeamsMembersPropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, [
+      "Teams Members",
+      "Team Members",
+      "Teams_Members",
+      "Teams members",
+      "Members",
+      "Created by",
+      "User",
+      "Owner"
+    ]) || "Teams Members"
+  );
+}
+
+
 // ====== Page route: S.V schools orders ======
 app.get("/orders/sv-orders", requireAuth, requirePage("S.V schools orders"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "sv-orders.html"));
@@ -2229,39 +2247,50 @@ app.get("/orders/sv-orders", requireAuth, requirePage("S.V schools orders"), (re
 // ====== API: list S.V orders for current user ======
 app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
 try {
+  // Identify the current Team Member page
   const userQuery = await notion.databases.query({
     database_id: teamMembersDatabaseId,
-    filter: { property: "Name", title: { equals: req.session.username } },
+    filter: { property: 'Name', title: { equals: req.session.username } },
   });
-  if (userQuery.results.length === 0) return res.status(404).json({ error: "User not found" });
+  if (!userQuery.results.length) return res.status(404).json({ error: 'User not found' });
   const userId = userQuery.results[0].id;
 
-  const svRelProp    = await detectSVSchoolsPropName();        // "S.V Schools" (Relation)
-  const reqQtyProp   = await detectRequestedQtyPropName();     // "Quantity Requested" (Number)
-  const approvalProp = await detectSVApprovalPropName();       // "S.V Approval" (Select/Status)
-  const teamsProp    = await detectOrderTeamsMembersPropName(); // "Teams Members" (Relation)
+  // Resolve property names on Orders DB (Products_list)
+  const reqQtyProp    = await detectRequestedQtyPropName();
+  const approvalProp  = await detectSVApprovalPropName();
+  const teamsProp     = await detectOrderTeamsMembersPropName();
+  let   svRelProp     = await detectSVSchoolsPropName();
+
+  // Verify S.V relation actually exists & is a relation; otherwise null it
+  const ordersProps = await getOrdersDBProps();
+  if (!ordersProps[svRelProp] || ordersProps[svRelProp].type !== 'relation') {
+    svRelProp = null;
+  }
 
   const items = [];
   let hasMore = true, startCursor;
 
+  // Primary filter: Teams Members contains current user (this exists per your DB)
   while (hasMore) {
     const resp = await notion.databases.query({
       database_id: ordersDatabaseId,
       start_cursor: startCursor,
-      filter: {
-        and: [
-          { property: svRelProp,  relation: { contains: userId } },
-          { property: teamsProp,  relation: { contains: userId } }
-        ]
-      },
-      sorts: [{ timestamp: "created_time", direction: "descending" }],
+      filter: { property: teamsProp, relation: { contains: userId } },
+      sorts: [{ timestamp: 'created_time', direction: 'descending' }],
     });
 
     for (const page of resp.results) {
       const props = page.properties || {};
 
-      // Resolve product name
-      let productName = "Item";
+      // If S.V Schools relation exists, enforce it in code too
+      if (svRelProp) {
+        const svArr = props[svRelProp]?.relation;
+        const svHasUser = Array.isArray(svArr) && svArr.some(r => r && r.id === userId);
+        if (!svHasUser) continue;
+      }
+
+      // Product name (from Product relation if present)
+      let productName = 'Item';
       const productRel = props.Product?.relation;
       if (Array.isArray(productRel) && productRel.length) {
         try {
@@ -2274,10 +2303,10 @@ try {
 
       items.push({
         id: page.id,
-        reason: props.Reason?.title?.[0]?.plain_text || "",
+        reason: props.Reason?.title?.[0]?.plain_text || '',
         productName,
         quantity: Number(props[reqQtyProp]?.number || 0),
-        approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || "",
+        approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || '',
         createdTime: page.created_time,
       });
     }
@@ -2286,15 +2315,14 @@ try {
     startCursor = resp.next_cursor;
   }
 
-  res.set("Cache-Control", "no-store");
+  res.set('Cache-Control', 'no-store');
   return res.json(items);
 } catch (e) {
-  console.error("GET /api/sv-orders error:", e?.body || e);
-  return res.status(500).json({ error: "Failed to load S.V orders" });
+  console.error('GET /api/sv-orders error:', e?.body || e);
+  return res.status(500).json({ error: 'Failed to load S.V orders' });
 }
 });
-
-// ====== API: update quantity (number only) ======
+    // ====== API: update quantity (number only) ======
 app.post("/api/sv-orders/:id/quantity", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
   try {
     const pageId = req.params.id;
