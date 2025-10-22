@@ -2339,26 +2339,6 @@ app.post("/api/sv-orders/:id/quantity", requireAuth, requirePage("S.V schools or
   }
 });
 
-// ====== API: approve/reject (S.V Approval select or status) ======
-app.post("/api/sv-orders/:id/approval", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
-  try {
-    const pageId = req.params.id;
-    const decision = String(req.body?.decision || "").trim();
-    if (!pageId) return res.status(400).json({ error: "Missing id" });
-    if (!["Approved","Rejected"].includes(decision)) return res.status(400).json({ error: "decision must be Approved or Rejected" });
-
-    const approvalProp = await detectSVApprovalPropName();
-    const page = await notion.pages.retrieve({ page_id: pageId });
-    const t = page.properties?.[approvalProp]?.type || "select";
-    const propVal = (t === "status") ? { status: { name: decision } } : { select: { name: decision } };
-
-    await notion.pages.update({ page_id: pageId, properties: { [approvalProp]: propVal } });
-    return res.json({ ok: true });
-  } catch (e) {
-    console.error("POST /api/sv-orders/:id/approval error:", e?.body || e);
-    return res.status(500).json({ error: "Failed to update approval" });
-  }
-});
 // ====== API: list S.V orders with tabs (Not Started / Approved / Rejected) ======
 app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
   try {
