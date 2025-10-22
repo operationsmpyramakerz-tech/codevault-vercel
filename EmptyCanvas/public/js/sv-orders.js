@@ -1,242 +1,215 @@
 
-/* =========================================================================
-   sv-orders.js — S.V schools orders page
-   - Tabs (?tab=not-started|approved|rejected)
-   - Group cards by Reason (one card per Reason)
-   - Edit quantity / Approve / Reject
-   ========================================================================= */
-
-(function () {
+/*! sv-orders.js : S.V schools orders (grouped by request + tabs) */
+(() => {
   "use strict";
 
-  // --------- read current tab from URL ---------
+  // ---- helpers ----
   const qs = new URLSearchParams(location.search);
-  const TAB = (qs.get("tab") || "not-started").toLowerCase(); // not-started | approved | rejected
+  const TAB = (qs.get("tab") || "not-started").toLowerCase();
 
-  // ---------- small http helpers (fallback to fetch if common-ui not loaded) ----------
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
+
   const http = {
     async get(url) {
-      if (typeof window.getJSON === "function") return await window.getJSON(url);
-      const r = await fetch(url, { credentials: "include" });
-      if (!r.ok) throw new Error(`GET ${url} failed: ${r.status}`);
-      return await r.json();
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
+      return await res.json();
     },
     async post(url, body) {
-      if (typeof window.postJSON === "function") return await window.postJSON(url, body);
-      const r = await fetch(url, {
+      const res = await fetch(url, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body || {}),
       });
-      if (!r.ok) {
-        const t = await r.text();
-        throw new Error(`POST ${url} failed: ${r.status}\n${t}`);
-      }
-      try { return await r.json(); } catch { return { ok: true }; }
+      if (!res.ok) throw new Error(`POST ${url} → ${res.status}`);
+      try { return await res.json(); } catch { return { ok:true }; }
     },
   };
 
-  // ---------- state ----------
-  let allItems = [];    // full list from server
-  let filtered = [];    // search-filtered
-  let loading = false;
-
-  let qtyModal = null;
-  let qtyInput = null;
-  let qtyCloseBtn = null;
-  let qtyCancelBtn = null;
-  let qtySaveBtn = null;
-  let qtyEditingId = null;
-
-  // ---------- DOM ----------
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const on = (el, ev, fn) => el && el.addEventListener(ev, fn);
-
-  const container = $("#sv-list");
-  const searchInput = $("#svSearch");
-  const tabsWrap = $("#svTabs");
-
-  // ---------- utils ----------
   const N = (x) => {
     const n = Number(x);
     return Number.isFinite(n) ? n : 0;
   };
-  const fmtDate = (dt) => {
-    if (typeof window.formatDate === "function") return window.formatDate(dt);
-    try {
-      const d = new Date(dt);
-      return d.toLocaleString();
-    } catch {
-      return dt || "";
-    }
+  const fmtDate = (d) => {
+    try { return new Date(d).toLocaleString(); } catch { return d || ""; }
   };
-  const toastOK = (msg) => (window.toast ? window.toast.success(msg) : alert(msg));
-  const toastERR = (msg) => (window.toast ? window.toast.error(msg) : alert(msg));
+  const escapeHTML = (s) =>
+    String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;")
+                   .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-  // ---------- tabs visual active state ----------
+  const toastOK  = (m) => (window.toast ? window.toast.success(m) : console.log("[OK]", m));
+  const toastERR = (m) => (window.toast ? window.toast.error(m)   : console.error("[ERR]", m));
+
+  // ---- state/els ----
+  let allItems = [];
+  let filtered = [];
+  let loading = false;
+
+  const container   = $("#sv-list");
+  const searchInput = $("#svSearch");
+  const tabsWrap    = $("#svTabs");
+
+  // ---- UI: tabs ----
   function setActiveTab() {
     if (!tabsWrap) return;
-    $$("#svTabs .tab-portfolio, #svTabs .tab-chip").forEach((a) => {
-      const tabName = (a.dataset.tab || "").toLowerCase();
-      const isActive = tabName === TAB;
-      a.classList.toggle("active", isActive);
-      a.setAttribute("aria-selected", isActive ? "true" : "false");
-      // keep ?tab stable even if markup was copied without it
+    $$("#svTabs a.tab-portfolio").forEach(a => {
+      const tab = (a.dataset.tab || "").toLowerCase();
+      const active = tab === TAB;
+      a.classList.toggle("active", active);
+      a.setAttribute("aria-selected", active ? "true" : "false");
+      // ensure the href always carries the right query
       try {
         const u = new URL(a.getAttribute("href"), location.origin);
         u.searchParams.set("tab", a.dataset.tab || "not-started");
-        a.setAttribute("href", u.pathname + "?" + u.searchParams.toString());
+        a.href = u.pathname + "?" + u.searchParams.toString();
       } catch {}
     });
   }
 
-  // ---------- fetch & render ----------
+  // ---- fetch list ----
   async function loadList() {
-    loading = true;
-    render();
+    loading = true; render();
     try {
-      const data = await http.get(`/api/sv-orders?tab=${encodeURIComponent(TAB)}`);
+      const url = `/api/sv-orders?tab=${encodeURIComponent(TAB)}`;
+      const data = await http.get(url);
       allItems = Array.isArray(data) ? data : [];
       applyFilter();
     } catch (e) {
-      console.error(e);
-      toastERR("Failed to load S.V schools orders.");
+      console.error("loadList()", e);
+      toastERR("Failed to load S.V orders.");
+      allItems = [];
+      filtered = [];
     } finally {
       loading = false;
       render();
     }
   }
 
+  // ---- search ----
   function applyFilter() {
-    const q = (searchInput && searchInput.value || "").toLowerCase().trim();
-    if (!q) {
-      filtered = allItems.slice();
-    } else {
-      filtered = allItems.filter((it) => {
-        const hay = [
-          it.productName || "",
-          it.reason || "",
-          it.approval || "",
-        ]
-          .join(" ")
-          .toLowerCase();
-        return hay.includes(q);
-      });
-    }
+    const q = (searchInput?.value || "").trim().toLowerCase();
+    if (!q) { filtered = allItems.slice(); return; }
+    filtered = allItems.filter(it => {
+      const hay = [
+        it.reason || it.requestReason || "",
+        it.productName || it.item || "",
+        it.approval || ""
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
   }
 
-  function badgeForApproval(status) {
-    const s = String(status || "").toLowerCase();
-    if (s === "approved")
-      return `<span class="pill pill-success" title="S.V Approval">Approved</span>`;
-    if (s === "rejected")
-      return `<span class="pill pill-danger" title="S.V Approval">Rejected</span>`;
-    return `<span class="pill" title="S.V Approval">Not Started</span>`;
-  }
-
-  // ---------- grouping by reason ----------
+  // ---- grouping ----
   function groupByReason(items) {
+    function groupKey(it) {
+      // prefer stable IDs from API if available
+      const id =
+        it.reasonId || it.requestId || it.groupId || it.orderId ||
+        it.parentId || it.req_id || it.orderPageId || it.reason_page_id ||
+        it.pageId || it.page_id;
+      if (id) return `id:${id}`;
+
+      // fallback to (reason text + created time) to avoid merging different requests
+      const txt = String(it.reason || it.requestReason || "No Reason").trim().toLowerCase();
+      const created = it.reasonCreated || it.createdAt || it.created_time || it.createdTime || "";
+      return `txt:${txt}|${String(created).slice(0,19)}`;
+    }
+
     const groups = new Map();
     for (const it of items) {
-      const key = (it.reason || "No Reason").trim().toLowerCase();
-      if (!groups.has(key)) groups.set(key, { reason: it.reason || "No Reason", items: [], firstCreated: it.createdTime });
+      const key = groupKey(it);
+      if (!groups.has(key)) groups.set(key, {
+        reason: it.reason || it.requestReason || "No Reason",
+        items: [],
+        firstCreated: it.createdTime || it.created_at || it.createdAt || ""
+      });
       const g = groups.get(key);
       g.items.push(it);
       try {
-        if (new Date(it.createdTime) < new Date(g.firstCreated)) g.firstCreated = it.createdTime;
+        const d = new Date(it.createdTime || it.created_at || it.createdAt || 0);
+        const g0 = new Date(g.firstCreated || 0);
+        if (g0 > d) g.firstCreated = d.toISOString();
       } catch {}
     }
-    const arr = Array.from(groups.values());
-    arr.sort((a, b) => new Date(b.firstCreated) - new Date(a.firstCreated));
-    return arr;
+    // newest first
+    return Array.from(groups.values())
+      .sort((a,b) => new Date(b.firstCreated) - new Date(a.firstCreated));
   }
 
+  // ---- badges ----
+  function badgeForApproval(status) {
+    const s = String(status || "").toLowerCase();
+    if (s === "approved") return `<span class="pill pill-success">Approved</span>`;
+    if (s === "rejected") return `<span class="pill pill-danger">Rejected</span>`;
+    return `<span class="pill">Not Started</span>`;
+  }
+
+  // ---- render ----
   function renderGroupCard(group) {
-    const count = group.items.length;
     const chips = `
-      <span class="pill">${count} ${count === 1 ? "Item" : "Items"}</span>
+      <span class="pill">${group.items.length} ${group.items.length===1?"Item":"Items"}</span>
       <span class="pill">${fmtDate(group.firstCreated)}</span>
     `;
 
-    const rows = group.items
-      .map((it) => {
-        const qty = N(it.quantity);
-        const approval = it.approval || "";
-        return `
-          <div class="sv-item-row" data-id="${it.id}">
-            <div class="row-left">
-              <div class="name">${escapeHTML(it.productName || "Unnamed product")}</div>
-              <div class="sub muted">Qty: <strong>${qty}</strong></div>
-            </div>
-            <div class="row-right">
-              <div class="approval">${badgeForApproval(approval)}</div>
-              <div class="btn-group">
-                <button class="btn btn-light btn-xs sv-edit" data-id="${it.id}" aria-label="Edit quantity">
-                  <i data-feather="edit-2"></i> Edit
-                </button>
-                <button class="btn btn-success btn-xs sv-approve" data-id="${it.id}">
-                  <i data-feather="check"></i> Approve
-                </button>
-                <button class="btn btn-danger btn-xs sv-reject" data-id="${it.id}">
-                  <i data-feather="x"></i> Reject
-                </button>
-              </div>
-            </div>
+    const rows = group.items.map(it => {
+      const qty = N(it.quantity);
+      return `
+      <div class="sv-item-row" data-id="${it.id}">
+        <div class="row-left">
+          <div class="name">${escapeHTML(it.productName || it.item || "Unnamed")}</div>
+          <div class="sub muted">Qty: <strong>${qty}</strong></div>
+        </div>
+        <div class="row-right">
+          <div class="approval">${badgeForApproval(it.approval)}</div>
+          <div class="btn-group">
+            <button class="btn btn-light btn-xs sv-edit" data-id="${it.id}"><i data-feather="edit-2"></i> Edit</button>
+            <button class="btn btn-success btn-xs sv-approve" data-id="${it.id}"><i data-feather="check"></i> Approve</button>
+            <button class="btn btn-danger  btn-xs sv-reject"  data-id="${it.id}"><i data-feather="x"></i> Reject</button>
           </div>
-        `;
-      })
-      .join("");
+        </div>
+      </div>`;
+    }).join("");
 
     return `
-      <div class="card sv-group">
-        <div class="group-header">
-          <div class="title">${escapeHTML(group.reason || "No Reason")}</div>
-          <div class="badges">${chips}</div>
-        </div>
-        <div class="group-items">
-          ${rows}
-        </div>
+    <div class="card sv-group">
+      <div class="group-header">
+        <div class="title">${escapeHTML(group.reason || "No Reason")}</div>
+        <div class="badges">${chips}</div>
       </div>
-    `;
+      <div class="group-items">${rows}</div>
+    </div>`;
   }
 
   function render() {
     if (!container) return;
 
     if (loading) {
-      container.innerHTML =
-        `<p class="muted"><i data-feather="loader" class="loading-icon"></i> Loading S.V schools orders…</p>`;
-      if (window.feather) feather.replace();
+      container.innerHTML = `<p class="muted"><i data-feather="loader" class="loading-icon"></i> Loading…</p>`;
+      window.feather && feather.replace();
       return;
     }
-
     if (!filtered.length) {
-      container.innerHTML =
-        `<div class="empty-state">
-          <i data-feather="inbox"></i>
-          <div>No orders to review</div>
-          <small class="muted">You’ll see any requests linked to you via the “S.V Schools” relation.</small>
-        </div>`;
-      if (window.feather) feather.replace();
+      container.innerHTML = `<div class="empty-state">
+        <i data-feather="inbox"></i>
+        <div>No orders to review</div>
+        <small class="muted">Linked to you via “S.V Schools”.</small>
+      </div>`;
+      window.feather && feather.replace();
       return;
     }
 
-    // --- group items by reason and render one card per reason
     const groups = groupByReason(filtered);
-    const html = groups.map(renderGroupCard).join("");
-
-    container.innerHTML = html;
-    if (window.feather) feather.replace();
+    container.innerHTML = groups.map(renderGroupCard).join("");
+    window.feather && feather.replace();
   }
 
-  // ---------- actions ----------
+  // ---- actions ----
   async function approve(id, decision) {
     try {
-      await http.post(`/api/sv-orders/${encodeURIComponent(id)}/approval`, {
-        decision,
-      });
+      await http.post(`/api/sv-orders/${encodeURIComponent(id)}/approval`, { decision });
       toastOK(`Marked as ${decision}.`);
       await reloadAfterAction();
     } catch (e) {
@@ -247,9 +220,7 @@
 
   async function saveQuantity(id, value) {
     try {
-      await http.post(`/api/sv-orders/${encodeURIComponent(id)}/quantity`, {
-        value: Number(value),
-      });
+      await http.post(`/api/sv-orders/${encodeURIComponent(id)}/quantity`, { value: N(value) });
       toastOK("Quantity updated.");
       await reloadAfterAction();
     } catch (e) {
@@ -259,76 +230,74 @@
   }
 
   async function reloadAfterAction() {
-    const scrollY = window.scrollY;
+    const y = window.scrollY;
     await loadList();
-    window.scrollTo(0, scrollY);
+    window.scrollTo(0, y);
   }
 
-  // ---------- edit modal ----------
+  // ---- qty modal (fallback to prompt if missing) ----
+  let qtyModal, qtyInput, qtySaveBtn, qtyCloseBtn, qtyCancelBtn, qtyEditingId=null;
+
   function openQtyModal(id) {
     qtyEditingId = id;
-    const current = allItems.find((x) => x.id === id);
-    if (qtyInput) qtyInput.value = current ? N(current.quantity) : 0;
+    const current = allItems.find(x => x.id === id);
+    const currentVal = current ? N(current.quantity) : 0;
 
-    if (qtyModal) {
-      qtyModal.classList.add("show");
-      qtyModal.setAttribute("aria-hidden", "false");
-      setTimeout(() => qtyInput && qtyInput.focus(), 50);
+    qtyModal = document.getElementById("svQtyModal");
+    qtyInput = document.getElementById("svQtyInput");
+    qtySaveBtn = document.getElementById("svQtySave");
+    qtyCloseBtn = document.getElementById("svQtyClose");
+    qtyCancelBtn = document.getElementById("svQtyCancel");
+
+    if (!qtyModal || !qtyInput || !qtySaveBtn) {
+      // fallback prompt
+      const v = window.prompt("Enter quantity:", String(currentVal));
+      if (v != null) saveQuantity(id, v);
+      return;
     }
+
+    qtyInput.value = currentVal;
+    qtyModal.classList.add("show");
+    qtyModal.setAttribute("aria-hidden","false");
+    setTimeout(() => qtyInput.focus(), 30);
   }
   function closeQtyModal() {
     qtyEditingId = null;
     if (qtyModal) {
       qtyModal.classList.remove("show");
-      qtyModal.setAttribute("aria-hidden", "true");
+      qtyModal.setAttribute("aria-hidden","true");
     }
   }
 
-  // ---------- events ----------
+  // ---- wire ----
   function wireEvents() {
-    // Search
-    on(searchInput, "input", () => {
-      applyFilter();
-      render();
-    });
+    on(searchInput, "input", () => { applyFilter(); render(); });
 
-    // Clicks in list (event delegation)
     on(container, "click", (ev) => {
       const btn = ev.target.closest("button");
       if (!btn) return;
       const id = btn.getAttribute("data-id");
       if (!id) return;
 
-      if (btn.classList.contains("sv-edit")) {
-        openQtyModal(id);
-        return;
-      }
-      if (btn.classList.contains("sv-approve")) {
-        approve(id, "Approved");
-        return;
-      }
-      if (btn.classList.contains("sv-reject")) {
-        approve(id, "Rejected");
-        return;
-      }
+      if (btn.classList.contains("sv-edit"))   return openQtyModal(id);
+      if (btn.classList.contains("sv-approve")) return approve(id, "Approved");
+      if (btn.classList.contains("sv-reject"))  return approve(id, "Rejected");
     });
 
-    // Modal buttons/inputs
-    qtyModal = $("#svQtyModal");
-    qtyInput = $("#svQtyInput");
-    qtyCloseBtn = $("#svQtyClose");
-    qtyCancelBtn = $("#svQtyCancel");
-    qtySaveBtn = $("#svQtySave");
+    // qty modal buttons (if modal exists)
+    qtyModal     = document.getElementById("svQtyModal");
+    qtyInput     = document.getElementById("svQtyInput");
+    qtySaveBtn   = document.getElementById("svQtySave");
+    qtyCloseBtn  = document.getElementById("svQtyClose");
+    qtyCancelBtn = document.getElementById("svQtyCancel");
 
     on(qtyCloseBtn, "click", closeQtyModal);
-    on(qtyCancelBtn, "click", closeQtyModal);
-    on(qtyModal, "click", (e) => {
-      if (e.target === qtyModal) closeQtyModal(); // backdrop click
-    });
+    on(qtyCancelBtn,"click", closeQtyModal);
+    on(qtyModal, "click", (e) => { if (e.target === qtyModal) closeQtyModal(); });
     on(qtyInput, "keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (qtyEditingId && qtyInput) saveQuantity(qtyEditingId, qtyInput.value);
+        if (qtyEditingId) saveQuantity(qtyEditingId, qtyInput.value);
         closeQtyModal();
       }
     });
@@ -340,21 +309,9 @@
     });
   }
 
-  // ---------- escape util ----------
-  function escapeHTML(s) {
-    return String(s || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  // ---------- init ----------
   document.addEventListener("DOMContentLoaded", async () => {
-    try {
-      if (window.initSidebarToggle) window.initSidebarToggle();
-      if (window.hydrateGreeting) window.hydrateGreeting();
-    } catch {}
+    // mark version in console to confirm file really loaded
+    console.log("[sv-orders] loaded v: group-by-request");
     setActiveTab();
     wireEvents();
     await loadList();
