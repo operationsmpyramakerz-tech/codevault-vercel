@@ -2400,3 +2400,132 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
+/* === S.V Orders: professional one-card-per-order layout === */
+
+/* Cards list */
+#sv-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+/* Main order card */
+.order-card.single {
+  background: #ffffff;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.06);
+  overflow: hidden;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.order-card.single:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.08);
+}
+
+/* Header row (title/meta left, actions right if needed later) */
+.order-card.single .order-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #F3F4F6;
+  background: #FAFAFA;
+}
+
+.order-card.single .head-left {
+  display: grid;
+  gap: 6px;
+}
+
+.order-card.single .order-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #111827;
+}
+
+/* Small meta badges under title (count + date) */
+.order-card.single .meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.order-card.single .meta .badge {
+  background: #F3F4F6;
+  color: #111827;
+  border: 1px solid #E5E7EB;
+  border-radius: 999px;
+  padding: .25rem .6rem;
+  font-weight: 700;
+  font-size: .85rem;
+}
+
+/* Items list inside the card */
+.order-card.single .order-items {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+/* Each product row (mini card) */
+.order-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: .6rem .75rem;
+  background: #fff;
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.06);
+}
+
+/* Left: name + qty line */
+.order-item__left { min-width: 0; }
+.order-item__left .name {
+  font-weight: 700;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+.order-item__left .muted { color: #6B7280; font-size: .9rem; }
+
+/* Right: status + inline buttons (aligned right) */
+.order-item__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Button sizing to keep rows compact */
+.btn-xs { padding: .35rem .55rem; border-radius: 8px; font-size: .82rem; }
+
+/* Status badges (unified) */
+.badge--approved {
+  background-color: #DCFCE7;
+  border: 1px solid #86EFAC;
+  color: #166534;
+}
+.badge--rejected {
+  background-color: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+}
+.badge--notstarted {
+  background-color: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  color: #374151;
+}
+
+/* Hide Assigned/Unassigned badge area on S.V Orders (if present) */
+.order-card.single .order-actions { display: none; }
+
+/* Responsive: stack header on narrow screens */
+@media (max-width: 560px) {
+  .order-card.single .order-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .order-item-card { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .order-item__right { margin-left: 0; }
+}
