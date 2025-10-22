@@ -1,6 +1,9 @@
+
 /* =========================================================================
-   sv-orders.js  —  Controller for "S.V schools orders" (with tabs)
-   Tabs: ?tab=not-started|approved|rejected mapped to Notion "S.V Approval"
+   sv-orders.js — S.V schools orders page
+   - Tabs (?tab=not-started|approved|rejected)
+   - Group cards by Reason (one card per Reason)
+   - Edit quantity / Approve / Reject
    ========================================================================= */
 
 (function () {
@@ -74,18 +77,20 @@
 
   // ---------- tabs visual active state ----------
   function setActiveTab() {
-  const TAB = (new URLSearchParams(location.search).get('tab') || 'not-started').toLowerCase();
-  document.querySelectorAll('#svTabs .tab-portfolio').forEach(a => {
-    const isActive = (a.dataset.tab || '').toLowerCase() === TAB;
-    a.classList.toggle('active', isActive);
-    a.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    try {
-      const u = new URL(a.getAttribute('href'), location.origin);
-      u.searchParams.set('tab', a.dataset.tab || 'not-started');
-      a.setAttribute('href', u.pathname + '?' + u.searchParams.toString());
-    } catch {}
-  });
-}
+    if (!tabsWrap) return;
+    $$("#svTabs .tab-portfolio, #svTabs .tab-chip").forEach((a) => {
+      const tabName = (a.dataset.tab || "").toLowerCase();
+      const isActive = tabName === TAB;
+      a.classList.toggle("active", isActive);
+      a.setAttribute("aria-selected", isActive ? "true" : "false");
+      // keep ?tab stable even if markup was copied without it
+      try {
+        const u = new URL(a.getAttribute("href"), location.origin);
+        u.searchParams.set("tab", a.dataset.tab || "not-started");
+        a.setAttribute("href", u.pathname + "?" + u.searchParams.toString());
+      } catch {}
+    });
+  }
 
   // ---------- fetch & render ----------
   async function loadList() {
@@ -105,7 +110,7 @@
   }
 
   function applyFilter() {
-    const q = (searchInput?.value || "").toLowerCase().trim();
+    const q = (searchInput && searchInput.value || "").toLowerCase().trim();
     if (!q) {
       filtered = allItems.slice();
     } else {
@@ -131,6 +136,72 @@
     return `<span class="pill" title="S.V Approval">Not Started</span>`;
   }
 
+  // ---------- grouping by reason ----------
+  function groupByReason(items) {
+    const groups = new Map();
+    for (const it of items) {
+      const key = (it.reason || "No Reason").trim().toLowerCase();
+      if (!groups.has(key)) groups.set(key, { reason: it.reason || "No Reason", items: [], firstCreated: it.createdTime });
+      const g = groups.get(key);
+      g.items.push(it);
+      try {
+        if (new Date(it.createdTime) < new Date(g.firstCreated)) g.firstCreated = it.createdTime;
+      } catch {}
+    }
+    const arr = Array.from(groups.values());
+    arr.sort((a, b) => new Date(b.firstCreated) - new Date(a.firstCreated));
+    return arr;
+  }
+
+  function renderGroupCard(group) {
+    const count = group.items.length;
+    const chips = `
+      <span class="pill">${count} ${count === 1 ? "Item" : "Items"}</span>
+      <span class="pill">${fmtDate(group.firstCreated)}</span>
+    `;
+
+    const rows = group.items
+      .map((it) => {
+        const qty = N(it.quantity);
+        const approval = it.approval || "";
+        return `
+          <div class="sv-item-row" data-id="${it.id}">
+            <div class="row-left">
+              <div class="name">${escapeHTML(it.productName || "Unnamed product")}</div>
+              <div class="sub muted">Qty: <strong>${qty}</strong></div>
+            </div>
+            <div class="row-right">
+              <div class="approval">${badgeForApproval(approval)}</div>
+              <div class="btn-group">
+                <button class="btn btn-light btn-xs sv-edit" data-id="${it.id}" aria-label="Edit quantity">
+                  <i data-feather="edit-2"></i> Edit
+                </button>
+                <button class="btn btn-success btn-xs sv-approve" data-id="${it.id}">
+                  <i data-feather="check"></i> Approve
+                </button>
+                <button class="btn btn-danger btn-xs sv-reject" data-id="${it.id}">
+                  <i data-feather="x"></i> Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="card sv-group">
+        <div class="group-header">
+          <div class="title">${escapeHTML(group.reason || "No Reason")}</div>
+          <div class="badges">${chips}</div>
+        </div>
+        <div class="group-items">
+          ${rows}
+        </div>
+      </div>
+    `;
+  }
+
   function render() {
     if (!container) return;
 
@@ -152,42 +223,11 @@
       return;
     }
 
-    const cards = filtered.map((it) => {
-      const qty = N(it.quantity);
-      const approval = it.approval || "";
-      return `
-        <div class="card sv-item" data-id="${it.id}">
-          <div class="card-row">
-            <div class="col col-main">
-              <div class="title">${escapeHTML(it.productName || "Unnamed product")}</div>
-              <div class="sub muted">${escapeHTML(it.reason || "No Reason")}</div>
-              <div class="meta muted">Created: ${fmtDate(it.createdTime)}</div>
-            </div>
-            <div class="col col-qty">
-              <div class="label">Quantity</div>
-              <div class="value"><strong>${qty}</strong></div>
-              <button class="btn btn-light btn-xs sv-edit" data-id="${it.id}" aria-label="Edit quantity">
-                <i data-feather="edit-2"></i> Edit
-              </button>
-            </div>
-            <div class="col col-approval">
-              <div class="label">S.V Approval</div>
-              <div class="value">${badgeForApproval(approval)}</div>
-              <div class="btn-group">
-                <button class="btn btn-success btn-xs sv-approve" data-id="${it.id}">
-                  <i data-feather="check"></i> Approve
-                </button>
-                <button class="btn btn-danger btn-xs sv-reject" data-id="${it.id}">
-                  <i data-feather="x"></i> Reject
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    });
+    // --- group items by reason and render one card per reason
+    const groups = groupByReason(filtered);
+    const html = groups.map(renderGroupCard).join("");
 
-    container.innerHTML = cards.join("");
+    container.innerHTML = html;
     if (window.feather) feather.replace();
   }
 
@@ -254,27 +294,26 @@
 
     // Clicks in list (event delegation)
     on(container, "click", (ev) => {
-      const target = ev.target.closest("button");
-      if (!target) return;
-
-      const id = target.getAttribute("data-id");
+      const btn = ev.target.closest("button");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
       if (!id) return;
 
-      if (target.classList.contains("sv-edit")) {
+      if (btn.classList.contains("sv-edit")) {
         openQtyModal(id);
         return;
       }
-      if (target.classList.contains("sv-approve")) {
+      if (btn.classList.contains("sv-approve")) {
         approve(id, "Approved");
         return;
       }
-      if (target.classList.contains("sv-reject")) {
+      if (btn.classList.contains("sv-reject")) {
         approve(id, "Rejected");
         return;
       }
     });
 
-    // Modal buttons
+    // Modal buttons/inputs
     qtyModal = $("#svQtyModal");
     qtyInput = $("#svQtyInput");
     qtyCloseBtn = $("#svQtyClose");
@@ -316,7 +355,6 @@
       if (window.initSidebarToggle) window.initSidebarToggle();
       if (window.hydrateGreeting) window.hydrateGreeting();
     } catch {}
-
     setActiveTab();
     wireEvents();
     await loadList();
