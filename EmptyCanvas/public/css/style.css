@@ -2572,3 +2572,56 @@ main:has(#sv-list) {
     padding-inline: var(--sv-gutter-lg);
   }
 }
+/* === QTY Popover (inline dropdown near Edit button) === */
+.sv-qty-popover {
+  position: absolute;
+  z-index: 3000;
+  width: 220px;
+  background: #ffffff;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.12);
+  padding: 8px 10px 10px;
+}
+.sv-qty-popover__arrow {
+  position: absolute;
+  top: -8px;
+  right: 28px;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-left: 1px solid #E5E7EB;
+  border-top: 1px solid #E5E7EB;
+  transform: rotate(45deg);
+}
+.sv-qty-popover__body { position: relative; }
+.sv-qty-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.sv-qty-input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  outline: none;
+}
+.sv-qty-input:focus {
+  border-color: #A3A3A3;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+.sv-qty-btn {
+  height: 34px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  background: #F9FAFB;
+  cursor: pointer;
+  font-weight: 700;
+}
+.sv-qty-btn:hover { background: #F3F4F6; }
+.sv-qty-actions { display: flex; gap: 8px; justify-content: flex-end; }
