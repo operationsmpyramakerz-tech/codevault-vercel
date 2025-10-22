@@ -2205,3 +2205,50 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 .form-label { font-size: 12px; color:#6b7280; }
 .form-input { display:block; width:100%; border:1px solid #e5e7eb; border-radius: 10px; padding: 10px; }
 .loading-skeleton { opacity: .6; pointer-events: none; }
+/* --- S.V schools orders: Tabs --- */
+#svTabs{
+  display:flex; align-items:center; gap:.5rem;
+  padding:.35rem; border:1px solid #E5E7EB;
+  background:#F8FAFC; border-radius:12px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.02);
+}
+
+#svTabs .tab-chip{
+  --tab-pad-x: 1rem; --tab-pad-y: .55rem;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding: var(--tab-pad-y) var(--tab-pad-x);
+  border-radius:9999px;
+  background:#F3F4F6; color:#374151;
+  border:1px solid #E5E7EB;
+  font-weight:600; font-size:.95rem; line-height:1;
+  text-decoration:none; user-select:none;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease, border-color .15s ease, transform .05s ease;
+}
+#svTabs .tab-chip:hover{ background:#EEF2F7; }
+#svTabs .tab-chip:active{ transform:translateY(1px); }
+
+/* Active state */
+#svTabs .tab-chip.active{
+  background:#fff; color:#1F2937;
+  border-color:#3B82F6;
+  box-shadow:
+    0 1px 2px rgba(16,24,40,.05),
+    0 0 0 4px rgba(59,130,246,.08);
+  position:relative;
+}
+#svTabs .tab-chip.active::after{
+  content:""; position:absolute; left:10%; right:10%; top:-6px; height:3px;
+  border-radius:3px; background:#3B82F6;
+}
+
+/* Focus visibility */
+#svTabs .tab-chip:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(59,130,246,.35);
+}
+
+/* Compact on small screens */
+@media (max-width:640px){
+  #svTabs{ flex-wrap:wrap; gap:.4rem; }
+  #svTabs .tab-chip{ --tab-pad-x:.75rem; --tab-pad-y:.5rem; font-size:.9rem; }
+}

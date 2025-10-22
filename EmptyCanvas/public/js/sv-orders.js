@@ -1,10 +1,14 @@
 /* =========================================================================
-   sv-orders.js  —  Controller for "S.V schools orders"
-   Depends on: /js/common-ui.js  (getJSON, postJSON, toast, etc.)
+   sv-orders.js  —  Controller for "S.V schools orders" (with tabs)
+   Tabs: ?tab=not-started|approved|rejected mapped to Notion "S.V Approval"
    ========================================================================= */
 
 (function () {
   "use strict";
+
+  // --------- read current tab from URL ---------
+  const qs = new URLSearchParams(location.search);
+  const TAB = (qs.get("tab") || "not-started").toLowerCase(); // not-started | approved | rejected
 
   // ---------- small http helpers (fallback to fetch if common-ui not loaded) ----------
   const http = {
@@ -49,6 +53,7 @@
 
   const container = $("#sv-list");
   const searchInput = $("#svSearch");
+  const tabsWrap = $("#svTabs");
 
   // ---------- utils ----------
   const N = (x) => {
@@ -67,12 +72,29 @@
   const toastOK = (msg) => (window.toast ? window.toast.success(msg) : alert(msg));
   const toastERR = (msg) => (window.toast ? window.toast.error(msg) : alert(msg));
 
+  // ---------- tabs visual active state ----------
+  function setActiveTab() {
+  const chips = document.querySelectorAll('#svTabs .tab-chip');
+  chips.forEach(ch => {
+    const isActive = (ch.dataset.tab || '').toLowerCase() === TAB;
+    ch.classList.toggle('active', isActive);
+    ch.setAttribute('aria-selected', isActive ? 'true' : 'false');
+
+    // keep ?tab stable even if markup was copied without it
+    try {
+      const u = new URL(ch.getAttribute('href'), location.origin);
+      u.searchParams.set('tab', ch.dataset.tab || 'not-started');
+      ch.setAttribute('href', u.pathname + '?' + u.searchParams.toString());
+    } catch {}
+  });
+}
+
   // ---------- fetch & render ----------
   async function loadList() {
     loading = true;
     render();
     try {
-      const data = await http.get("/api/sv-orders");
+      const data = await http.get(`/api/sv-orders?tab=${encodeURIComponent(TAB)}`);
       allItems = Array.isArray(data) ? data : [];
       applyFilter();
     } catch (e) {
@@ -108,7 +130,7 @@
       return `<span class="pill pill-success" title="S.V Approval">Approved</span>`;
     if (s === "rejected")
       return `<span class="pill pill-danger" title="S.V Approval">Rejected</span>`;
-    return `<span class="pill" title="S.V Approval">Pending</span>`;
+    return `<span class="pill" title="S.V Approval">Not Started</span>`;
   }
 
   function render() {
@@ -201,7 +223,6 @@
   async function reloadAfterAction() {
     const scrollY = window.scrollY;
     await loadList();
-    // keep the page position; minor nicety
     window.scrollTo(0, scrollY);
   }
 
@@ -294,11 +315,11 @@
   // ---------- init ----------
   document.addEventListener("DOMContentLoaded", async () => {
     try {
-      // common-ui hooks (best-effort)
       if (window.initSidebarToggle) window.initSidebarToggle();
       if (window.hydrateGreeting) window.hydrateGreeting();
     } catch {}
 
+    setActiveTab();
     wireEvents();
     await loadList();
   });

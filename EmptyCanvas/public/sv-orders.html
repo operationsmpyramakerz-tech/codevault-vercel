@@ -120,6 +120,13 @@
         <div class="header-row2">
           <h1 class="page-title">S.V schools orders</h1>
         </div>
+
+        <!-- TABS: Not Started / Approved / Rejected -->
+        <div id="svTabs" class="tabs status-tabs" style="gap:.5rem; display:flex; flex-wrap:wrap; margin:.5rem 0 1rem;">
+          <a class="tab-chip" data-tab="not-started" href="/orders/sv-orders?tab=not-started">Not Started</a>
+          <a class="tab-chip" data-tab="approved"    href="/orders/sv-orders?tab=approved">Approved</a>
+          <a class="tab-chip" data-tab="rejected"    href="/orders/sv-orders?tab=rejected">Rejected</a>
+        </div>
       </header>
 
       <main class="container-full-width">
@@ -149,8 +156,17 @@
   </div>
 
   <script>feather.replace();</script>
+  <script>
+    // Minimal in-page activator so the active tab is highlighted
+    (function(){
+      const tab = (new URLSearchParams(location.search).get('tab') || 'not-started').toLowerCase();
+      document.querySelectorAll('#svTabs a.tab-chip').forEach(a => {
+        a.classList.toggle('active', (a.dataset.tab || '').toLowerCase() === tab);
+      });
+    })();
+  </script>
   <script src="/js/common-ui.js"></script>
-  <!-- New controller -->
+  <!-- Controller -->
   <script src="/js/sv-orders.js"></script>
 </body>
 </html>
