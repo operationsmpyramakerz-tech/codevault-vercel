@@ -20,7 +20,7 @@ const REC_PROP_HARDBIND = "Quantity received by operations";
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "..", "public")
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 
 // --- Health FIRST (before session) so it works even if env is missing ---
