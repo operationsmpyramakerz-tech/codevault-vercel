@@ -20,76 +20,8 @@ const REC_PROP_HARDBIND = "Quantity received by operations";
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "..", "public")));
+app.use(express.static(path.join(__dirname, "..", "public")
 
-// --- S.V orders routes: Notion updates ---
-const { Client } = require('@notionhq/client');
-const notion = new Client({ auth: process.env.Notion_API_Key });
-
-// Property names in Notion (override with env vars if your DB uses different names)
-const SV_APPROVAL_PROP = process.env.SV_APPROVAL_PROP || 'S.V Approval'; // Select
-const SV_QTY_PROP      = process.env.SV_QTY_RECEIVED_PROP || 'Quantity received by operations'; // Number
-
-// Utility: validate decision → force exact Select names in Notion
-function normalizeDecision(x = '') {
-  const s = String(x).trim().toLowerCase();
-  if (s === 'approved') return 'Approved';
-  if (s === 'rejected') return 'Rejected';
-  if (s === 'not started') return 'Not Started';
-  return null;
-}
-
-// Express will match either "/api/sv-orders/..." or "/sv-orders/..."
-const APPROVAL_PATHS = ['/api/sv-orders/:id/approval', '/sv-orders/:id/approval'];
-const QTY_PATHS      = ['/api/sv-orders/:id/quantity', '/sv-orders/:id/quantity'];
-
-// Approve / Reject
-app.post(APPROVAL_PATHS, async (req, res) => {
-  const { id } = req.params;                // Notion page_id for the item row
-  const decision = normalizeDecision(req.body?.decision);
-  if (!id || !decision) {
-    return res.status(400).json({ ok: false, error: 'Invalid id or decision' });
-  }
-  try {
-    const result = await notion.pages.update({
-      page_id: id,
-      properties: {
-        [SV_APPROVAL_PROP]: { select: { name: decision } },
-      },
-    });
-    return res.json({ ok: true, id, decision });
-  } catch (err) {
-    console.error('Notion approval update failed:', err.body || err);
-    return res.status(500).json({
-      ok: false,
-      error: 'Notion update failed',
-      details: err.body || String(err),
-    });
-  }
-});
-
-// Quantity save (from the inline dropdown)
-app.post(QTY_PATHS, async (req, res) => {
-  const { id } = req.params;
-  const qty = Math.max(0, parseInt(req.body?.value, 10) || 0);
-  if (!id) return res.status(400).json({ ok: false, error: 'Missing id' });
-  try {
-    const result = await notion.pages.update({
-      page_id: id,
-      properties: {
-        [SV_QTY_PROP]: { number: qty },
-      },
-    });
-    return res.json({ ok: true, id, qty });
-  } catch (err) {
-    console.error('Notion quantity update failed:', err.body || err);
-    return res.status(500).json({
-      ok: false,
-      error: 'Notion update failed',
-      details: err.body || String(err),
-    });
-  }
-});
 
 // --- Health FIRST (before session) so it works even if env is missing ---
 app.get("/health", (req, res) => {
