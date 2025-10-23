@@ -1,10 +1,10 @@
-/*! sv-orders.js — instant status update (no page reload) + stable qty popover */
+/*! sv-orders.js — per-tab filtering + instant status (no reload) + stable qty popover */
 (() => {
   "use strict";
 
-  // ---- helpers ----
+  // ===== Helpers =====
   const qs = new URLSearchParams(location.search);
-  const TAB = (qs.get("tab") || "not-started").toLowerCase();
+  let TAB = (qs.get("tab") || "not-started").toLowerCase();
 
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
@@ -35,7 +35,15 @@
   const toastOK  = (m) => (window.toast ? window.toast.success(m) : console.log("[OK]", m));
   const toastERR = (m) => (window.toast ? window.toast.error(m)   : console.error("[ERR]", m));
 
-  // ---- state/els ----
+  // Map any raw status to a tab key
+  const statusKey = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "approved") return "approved";
+    if (s === "rejected") return "rejected";
+    return "not-started";
+  };
+
+  // ===== State / Elements =====
   let allItems = [];
   let filtered = [];
   let loading = false;
@@ -44,7 +52,7 @@
   const searchInput = $("#svSearch");
   const tabsWrap    = $("#svTabs");
 
-  // ---- tabs (keep URL in sync) ----
+  // ===== Tabs (client-side switch, preserve URL without reload) =====
   function setActiveTab() {
     if (!tabsWrap) return;
     $$("#svTabs a.tab-portfolio").forEach(a => {
@@ -52,38 +60,55 @@
       const active = tab === TAB;
       a.classList.toggle("active", active);
       a.setAttribute("aria-selected", active ? "true" : "false");
+
+      // keep href tidy
       try {
         const u = new URL(a.getAttribute("href"), location.origin);
         u.searchParams.set("tab", a.dataset.tab || "not-started");
         a.href = u.pathname + "?" + u.searchParams.toString();
       } catch {}
+
+      // prevent full reload — filter in place
+      a.addEventListener("click", (e) => {
+        const targetTab = (a.dataset.tab || "not-started").toLowerCase();
+        if (targetTab && targetTab !== TAB) {
+          e.preventDefault();
+          TAB = targetTab;
+          setActiveTab();
+          applyFilter();
+          render();
+          // update URL without reloading
+          const u = new URL(window.location.href);
+          u.searchParams.set("tab", TAB);
+          history.replaceState({}, "", u.pathname + "?" + u.searchParams.toString());
+        }
+      });
     });
   }
 
-  // ---- fetch list ----
+  // ===== Data fetch =====
   async function loadList() {
     loading = true; render();
     try {
-      const url = `/api/sv-orders?tab=${encodeURIComponent(TAB)}`;
+      const url = `/api/sv-orders?tab=${encodeURIComponent(TAB)}`; // server may filter; we always filter client-side
       const data = await http.get(url);
       allItems = Array.isArray(data) ? data : [];
       applyFilter();
     } catch (e) {
       console.error("loadList()", e);
       toastERR("Failed to load S.V orders.");
-      allItems = [];
-      filtered = [];
+      allItems = []; filtered = [];
     } finally {
-      loading = false;
-      render();
+      loading = false; render();
     }
   }
 
-  // ---- search ----
+  // ===== Filter (tab + search) =====
   function applyFilter() {
     const q = (searchInput?.value || "").trim().toLowerCase();
-    if (!q) { filtered = allItems.slice(); return; }
     filtered = allItems.filter(it => {
+      if (statusKey(it.approval) !== TAB) return false; // per-tab
+      if (!q) return true;
       const hay = [
         it.reason || it.requestReason || "",
         it.productName || it.item || "",
@@ -93,7 +118,7 @@
     });
   }
 
-  // ---- grouping: one order per card (group by request/reason) ----
+  // ===== Grouping (one request per card) =====
   function groupByOrder(items) {
     function groupKey(it) {
       const id =
@@ -113,19 +138,12 @@
         items: [],
         firstCreated: it.createdTime || it.created_at || it.createdAt || ""
       });
-      const g = groups.get(key);
-      g.items.push(it);
-      try {
-        const d = new Date(it.createdTime || it.created_at || it.createdAt || 0);
-        const g0 = new Date(g.firstCreated || 0);
-        if (g0 > d) g.firstCreated = d.toISOString();
-      } catch {}
+      groups.get(key).items.push(it);
     }
-    return Array.from(groups.values())
-      .sort((a,b) => new Date(b.firstCreated) - new Date(a.firstCreated));
+    return Array.from(groups.values()).sort((a,b) => new Date(b.firstCreated) - new Date(a.firstCreated));
   }
 
-  // ---- badges (unified) ----
+  // ===== UI bits =====
   function badgeForApproval(status) {
     const s = String(status || "").toLowerCase();
     if (s === "approved") return `<span class="badge badge--approved">Approved</span>`;
@@ -133,7 +151,6 @@
     return `<span class="badge badge--notstarted">Not Started</span>`;
   }
 
-  // ---- UI templates ----
   function renderItemRow(it) {
     const qty = Math.max(0, N(it.quantity));
     return `
@@ -177,6 +194,7 @@
 
   function render() {
     if (!container) return;
+
     if (loading) {
       container.innerHTML = `<p class="muted"><i data-feather="loader" class="loading-icon"></i> Loading…</p>`;
       window.feather && feather.replace();
@@ -191,13 +209,15 @@
       window.feather && feather.replace();
       return;
     }
+
     const groups = groupByOrder(filtered);
     container.innerHTML = groups.map(renderOrderCard).join("");
     window.feather && feather.replace();
   }
 
-  // ---- qty popover (stable) ----
+  // ===== Quantity popover (stable) =====
   let popEl = null, popForId = null, popAnchor = null;
+
   function destroyPopover() {
     if (popEl?.parentNode) popEl.parentNode.removeChild(popEl);
     popEl = null; popForId = null; popAnchor = null;
@@ -222,6 +242,7 @@
     if (popEl && popForId === id) { destroyPopover(); return; }
     destroyPopover();
     popForId = id; popAnchor = btn;
+
     const row = btn.closest(".order-item-card");
     const currentQtyNode = row?.querySelector('[data-role="qty-val"]');
     const currentVal = currentQtyNode ? N(currentQtyNode.textContent) : 0;
@@ -233,7 +254,7 @@
       <div class="sv-qty-popover__body">
         <div class="sv-qty-row">
           <button class="sv-qty-btn sv-qty-dec" type="button" aria-label="Decrease">−</button>
-          <input class="sv-qty-input" type="number" min="0" step="1" value="${currentVal}" />
+          <input class="sv-qty-input" type="number" min="0" step="1" value="\${currentVal}" />
           <button class="sv-qty-btn sv-qty-inc" type="button" aria-label="Increase">+</button>
         </div>
         <div class="sv-qty-actions">
@@ -265,51 +286,38 @@
       } catch (e) { toastERR("Failed to update quantity."); }
     });
     on(cancel, "click", destroyPopover);
-    setTimeout(() => { document.addEventListener("pointerdown", onDocPointerDown, true);
-                       document.addEventListener("keydown", onEsc, true); }, 0);
+
+    // attach outside-click after a tick to avoid instant close
+    setTimeout(() => {
+      document.addEventListener("pointerdown", onDocPointerDown, true);
+      document.addEventListener("keydown", onEsc, true);
+    }, 0);
   }
 
-  // ---- instant Approve/Reject (no reload) ----
-  const tabKeyFor = (decision) => {
-    const d = String(decision||"").toLowerCase();
-    if (d === "approved") return "approved";
-    if (d === "rejected") return "rejected";
-    return "not-started";
-  };
-
+  // ===== Instant Approve/Reject (no reload) =====
   function setBadge(el, decision) {
     if (!el) return;
     el.innerHTML = badgeForApproval(decision);
   }
 
-  function removeRowIfDoesNotBelong(row, decision) {
-    const newTab = tabKeyFor(decision);
-    if (newTab === TAB) return; // keep it
-    if (!row) return;
-    // fade out then remove
-    row.style.transition = "opacity .18s ease, height .18s ease, margin .18s ease";
-    row.style.opacity = "0";
-    row.style.margin = "0";
-    row.style.height = "0";
-    setTimeout(() => {
-      const card = row.closest(".order-card.single");
-      row.remove();
-      // if card empty, remove card
-      if (card && !card.querySelector(".order-item-card")) {
-        card.style.transition = "opacity .18s ease, height .18s ease, margin .18s ease";
-        card.style.opacity = "0"; card.style.margin = "0"; card.style.height = "0";
-        setTimeout(() => card.remove(), 200);
-      }
-    }, 190);
-  }
-
   async function setApproval(id, decision) {
     try {
       await http.post(`/api/sv-orders/${encodeURIComponent(id)}/approval`, { decision });
+
+      // sync in-memory state
+      const idx = allItems.findIndex(x => String(x.id) === String(id));
+      if (idx >= 0) allItems[idx].approval = decision;
+
+      // update badge immediately
       const row = container.querySelector(`.order-item-card[data-id="${CSS.escape(id)}"]`);
-      const badgeWrap = row?.querySelector(".approval");
-      setBadge(badgeWrap, decision);
-      removeRowIfDoesNotBelong(row, decision);
+      setBadge(row?.querySelector(".approval"), decision);
+
+      // re-filter and re-render for this tab
+      const y = window.scrollY;
+      applyFilter();
+      render();
+      window.scrollTo(0, y);
+
       toastOK(`Marked as ${decision}.`);
     } catch (e) {
       console.error(e);
@@ -317,7 +325,7 @@
     }
   }
 
-  // ---- wire ----
+  // ===== Wire =====
   function wireEvents() {
     on(searchInput, "input", () => { applyFilter(); render(); });
     on(container, "click", (ev) => {
@@ -331,10 +339,11 @@
     });
   }
 
+  // ===== Boot =====
   document.addEventListener("DOMContentLoaded", async () => {
     setActiveTab();
     wireEvents();
     await loadList();
-    console.log("%cSV-ORDERS UI → instant status update", "color:#16A34A;font-weight:700;");
+    console.log("%cSV-ORDERS UI → per-tab filtering + instant status + qty popover", "color:#16A34A;font-weight:700;");
   });
 })();
