@@ -2432,5 +2432,95 @@ app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async 
     return res.status(500).json({ error: "Failed to load S.V orders" });
   }
 });
+/**
+ * sv-approval-routes.js
+ * Drop‑in routes to update the "S.V Approval" column in Notion from the S.V schools orders page.
+ * Usage in app.js (near the bottom, before `module.exports = app;`):
+ *     require("./sv-approval-routes")(app, notion);
+ */
+module.exports = function attachSvApprovalRoutes(app, notion) {
+  const ordersDatabaseId = process.env.Products_list;
+  if (!ordersDatabaseId) {
+    console.warn("[sv-approval-routes] Missing env.Products_list (Orders DB id). Route will 500.");
+  }
+
+  function requireAuthLocal(req, res, next) {
+    if (req.session && req.session.authenticated) return next();
+    return res.status(401).json({ error: "Unauthenticated" });
+  }
+  function requirePageLocal(name) {
+    return (req, res, next) => {
+      const allowed = req.session?.allowedPages || [];
+      if (allowed.includes(name)) return next();
+      return res.status(403).json({ error: "Forbidden" });
+    };
+  }
+
+  const normKey = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  function pickPropName(propsObj, aliases = []) {
+    const keys = Object.keys(propsObj || {});
+    for (const k of keys) {
+      if (aliases.some((a) => normKey(a) === normKey(k))) return k;
+    }
+    return null;
+  }
+
+  async function getOrdersDBProps() {
+    const db = await notion.databases.retrieve({ database_id: ordersDatabaseId });
+    return db.properties || {};
+  }
+
+  async function detectSVApprovalProp() {
+    const props = await getOrdersDBProps();
+    const name =
+      pickPropName(props, ["S.V Approval", "SV Approval", "S V Approval"]) ||
+      "S.V Approval";
+    const type = props[name]?.type || "select"; // "select" or "status"
+    return { name, type };
+  }
+
+  function normalizeDecision(x = "") {
+    const s = String(x).trim().toLowerCase();
+    if (s === "approved" || s === "approve") return "Approved";
+    if (s === "rejected" || s === "reject") return "Rejected";
+    if (s === "not started" || s === "notstarted" || s === "pending") return "Not Started";
+    return null;
+  }
+
+  // ===== Route: Approve/Reject for S.V schools orders =====
+  app.post(
+    ["/api/sv-orders/:id/approval", "/sv-orders/:id/approval"],
+    requireAuthLocal,
+    requirePageLocal("S.V schools orders"),
+    async (req, res) => {
+      try {
+        const pageId = req.params.id;
+        const decision = normalizeDecision(req.body?.decision);
+        if (!pageId || !decision) {
+          return res.status(400).json({ ok: false, error: "Invalid id or decision" });
+        }
+
+        const { name: approvalProp, type } = await detectSVApprovalProp();
+
+        const properties =
+          type === "status"
+            ? { [approvalProp]: { status: { name: decision } } }
+            : { [approvalProp]: { select: { name: decision } } };
+
+        await notion.pages.update({ page_id: pageId, properties });
+
+        return res.json({ ok: true, id: pageId, decision });
+      } catch (err) {
+        console.error("sv-approval-routes error:", err?.body || err);
+        return res.status(500).json({
+          ok: false,
+          error: "Failed to update S.V Approval",
+          details: err?.body || String(err),
+        });
+      }
+    },
+  );
+};
+
 
 module.exports = app;
