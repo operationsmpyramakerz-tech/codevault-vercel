@@ -1,4 +1,4 @@
-/*! sv-orders.js : S.V schools orders — qty popover (stable) */
+/*! sv-orders.js — instant status update (no page reload) + stable qty popover */
 (() => {
   "use strict";
 
@@ -28,20 +28,9 @@
     },
   };
 
-  const N = (x) => {
-    const n = Number(x);
-    return Number.isFinite(n) ? n : 0;
-  };
-  const fmtDate = (d) => {
-    try { 
-      const dt = new Date(d);
-      if (!isNaN(+dt)) return dt.toLocaleString();
-      return d || "";
-    } catch { return d || ""; }
-  };
-  const escapeHTML = (s) =>
-    String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;")
-                   .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const N = (x) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
+  const fmtDate = (d) => { try { const dt = new Date(d); return !isNaN(+dt) ? dt.toLocaleString() : (d || ""); } catch { return d || ""; } };
+  const escapeHTML = (s) => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
   const toastOK  = (m) => (window.toast ? window.toast.success(m) : console.log("[OK]", m));
   const toastERR = (m) => (window.toast ? window.toast.error(m)   : console.error("[ERR]", m));
@@ -55,6 +44,7 @@
   const searchInput = $("#svSearch");
   const tabsWrap    = $("#svTabs");
 
+  // ---- tabs (keep URL in sync) ----
   function setActiveTab() {
     if (!tabsWrap) return;
     $$("#svTabs a.tab-portfolio").forEach(a => {
@@ -70,6 +60,7 @@
     });
   }
 
+  // ---- fetch list ----
   async function loadList() {
     loading = true; render();
     try {
@@ -88,6 +79,7 @@
     }
   }
 
+  // ---- search ----
   function applyFilter() {
     const q = (searchInput?.value || "").trim().toLowerCase();
     if (!q) { filtered = allItems.slice(); return; }
@@ -101,6 +93,7 @@
     });
   }
 
+  // ---- grouping: one order per card (group by request/reason) ----
   function groupByOrder(items) {
     function groupKey(it) {
       const id =
@@ -132,6 +125,7 @@
       .sort((a,b) => new Date(b.firstCreated) - new Date(a.firstCreated));
   }
 
+  // ---- badges (unified) ----
   function badgeForApproval(status) {
     const s = String(status || "").toLowerCase();
     if (s === "approved") return `<span class="badge badge--approved">Approved</span>`;
@@ -139,6 +133,7 @@
     return `<span class="badge badge--notstarted">Not Started</span>`;
   }
 
+  // ---- UI templates ----
   function renderItemRow(it) {
     const qty = Math.max(0, N(it.quantity));
     return `
@@ -202,26 +197,20 @@
   }
 
   // ---- qty popover (stable) ----
-  let popEl = null;
-  let popForId = null;
-  let popAnchor = null;
-
+  let popEl = null, popForId = null, popAnchor = null;
   function destroyPopover() {
     if (popEl?.parentNode) popEl.parentNode.removeChild(popEl);
-    popEl = null;
-    popForId = null;
-    popAnchor = null;
+    popEl = null; popForId = null; popAnchor = null;
     document.removeEventListener("pointerdown", onDocPointerDown, true);
     document.removeEventListener("keydown", onEsc, true);
   }
   function onDocPointerDown(e) {
     if (!popEl) return;
-    if (popEl.contains(e.target)) return;        // inside popover
-    if (popAnchor && popAnchor.contains(e.target)) return; // on the anchor button
+    if (popEl.contains(e.target)) return;
+    if (popAnchor && popAnchor.contains(e.target)) return;
     destroyPopover();
   }
   function onEsc(e) { if (e.key === "Escape") destroyPopover(); }
-
   function placePopoverNear(btn) {
     const r = btn.getBoundingClientRect();
     const x = Math.min(window.innerWidth - 260, Math.max(8, r.right - 220));
@@ -229,15 +218,10 @@
     popEl.style.left = `${x + window.scrollX}px`;
     popEl.style.top  = `${y + window.scrollY}px`;
   }
-
   async function openQtyPopover(btn, id) {
-    // toggle if same id
     if (popEl && popForId === id) { destroyPopover(); return; }
     destroyPopover();
-    popForId = id;
-    popAnchor = btn;
-
-    // current quantity
+    popForId = id; popAnchor = btn;
     const row = btn.closest(".order-item-card");
     const currentQtyNode = row?.querySelector('[data-role="qty-val"]');
     const currentVal = currentQtyNode ? N(currentQtyNode.textContent) : 0;
@@ -267,9 +251,7 @@
     const saveBtn= popEl.querySelector(".sv-qty-save");
     const cancel = popEl.querySelector(".sv-qty-cancel");
 
-    input.focus();
-    input.select();
-
+    input.focus(); input.select();
     on(decBtn, "click", () => { input.value = Math.max(0, N(input.value) - 1); input.dispatchEvent(new Event("input")); });
     on(incBtn, "click", () => { input.value = Math.max(0, N(input.value) + 1); input.dispatchEvent(new Event("input")); });
     on(input, "keydown", (e) => { if (e.key === "Enter") saveBtn.click(); });
@@ -277,34 +259,65 @@
       const v = Math.max(0, Math.floor(N(input.value)));
       try {
         await http.post(`/api/sv-orders/${encodeURIComponent(id)}/quantity`, { value: v });
-        // immediate UI feedback
         if (currentQtyNode) currentQtyNode.textContent = String(v);
         toastOK("Quantity updated.");
         destroyPopover();
       } catch (e) { toastERR("Failed to update quantity."); }
     });
     on(cancel, "click", destroyPopover);
-
-    // Attach outside-click after the current event loop so the opening click doesn't immediately close it
-    setTimeout(() => {
-      document.addEventListener("pointerdown", onDocPointerDown, true);
-      document.addEventListener("keydown", onEsc, true);
-    }, 0);
+    setTimeout(() => { document.addEventListener("pointerdown", onDocPointerDown, true);
+                       document.addEventListener("keydown", onEsc, true); }, 0);
   }
 
-  async function approve(id, decision) {
+  // ---- instant Approve/Reject (no reload) ----
+  const tabKeyFor = (decision) => {
+    const d = String(decision||"").toLowerCase();
+    if (d === "approved") return "approved";
+    if (d === "rejected") return "rejected";
+    return "not-started";
+  };
+
+  function setBadge(el, decision) {
+    if (!el) return;
+    el.innerHTML = badgeForApproval(decision);
+  }
+
+  function removeRowIfDoesNotBelong(row, decision) {
+    const newTab = tabKeyFor(decision);
+    if (newTab === TAB) return; // keep it
+    if (!row) return;
+    // fade out then remove
+    row.style.transition = "opacity .18s ease, height .18s ease, margin .18s ease";
+    row.style.opacity = "0";
+    row.style.margin = "0";
+    row.style.height = "0";
+    setTimeout(() => {
+      const card = row.closest(".order-card.single");
+      row.remove();
+      // if card empty, remove card
+      if (card && !card.querySelector(".order-item-card")) {
+        card.style.transition = "opacity .18s ease, height .18s ease, margin .18s ease";
+        card.style.opacity = "0"; card.style.margin = "0"; card.style.height = "0";
+        setTimeout(() => card.remove(), 200);
+      }
+    }, 190);
+  }
+
+  async function setApproval(id, decision) {
     try {
       await http.post(`/api/sv-orders/${encodeURIComponent(id)}/approval`, { decision });
+      const row = container.querySelector(`.order-item-card[data-id="${CSS.escape(id)}"]`);
+      const badgeWrap = row?.querySelector(".approval");
+      setBadge(badgeWrap, decision);
+      removeRowIfDoesNotBelong(row, decision);
       toastOK(`Marked as ${decision}.`);
-      const y = window.scrollY;
-      await loadList();
-      window.scrollTo(0, y);
     } catch (e) {
       console.error(e);
       toastERR(`Failed to set ${decision}.`);
     }
   }
 
+  // ---- wire ----
   function wireEvents() {
     on(searchInput, "input", () => { applyFilter(); render(); });
     on(container, "click", (ev) => {
@@ -312,10 +325,9 @@
       if (!btn) return;
       const id = btn.getAttribute("data-id");
       if (!id) return;
-
       if (btn.classList.contains("sv-edit"))    { ev.preventDefault(); ev.stopPropagation(); openQtyPopover(btn, id); }
-      else if (btn.classList.contains("sv-approve")) approve(id, "Approved");
-      else if (btn.classList.contains("sv-reject"))  approve(id, "Rejected");
+      else if (btn.classList.contains("sv-approve")) setApproval(id, "Approved");
+      else if (btn.classList.contains("sv-reject"))  setApproval(id, "Rejected");
     });
   }
 
@@ -323,6 +335,6 @@
     setActiveTab();
     wireEvents();
     await loadList();
-    console.log("%cSV-ORDERS UI → qty popover (stable)", "color:#16A34A;font-weight:700;");
+    console.log("%cSV-ORDERS UI → instant status update", "color:#16A34A;font-weight:700;");
   });
 })();
