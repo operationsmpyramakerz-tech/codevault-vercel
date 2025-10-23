@@ -2434,4 +2434,41 @@ app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async 
 });
 
 
+// --- S.V schools orders: Approve/Reject (updates Notion "S.V Approval") ---
+app.post(
+  ["/api/sv-orders/:id/approval", "/sv-orders/:id/approval"],
+  requireAuth,
+  requirePage("S.V schools orders"),
+  async (req, res) => {
+    try {
+      const pageId = req.params.id;
+      const raw = String(req.body?.decision || "").toLowerCase();
+      const decision =
+        raw === "approved" ? "Approved" :
+        raw === "rejected" ? "Rejected" :
+        raw === "not started" ? "Not Started" : null;
+
+      if (!pageId || !decision) {
+        return res.status(400).json({ ok:false, error: "Invalid id or decision" });
+      }
+
+      const approvalProp = await detectSVApprovalPropName();
+      const ordersProps  = await getOrdersDBProps();
+      const type         = ordersProps[approvalProp]?.type || "select";
+
+      const properties = type === "status"
+        ? { [approvalProp]: { status: { name: decision } } }
+        : { [approvalProp]: { select: { name: decision } } };
+
+      await notion.pages.update({ page_id: pageId, properties });
+
+      return res.json({ ok:true, id: pageId, decision });
+    } catch (e) {
+      console.error("POST /api/sv-orders/:id/approval error:", e?.body || e);
+      return res.status(500).json({ ok:false, error: "Failed to update S.V Approval", details: e?.body || String(e) });
+    }
+  }
+);
+
+
 module.exports = app;
