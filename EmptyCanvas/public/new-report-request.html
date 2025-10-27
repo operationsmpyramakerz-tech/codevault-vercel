@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>New Report / Request</title>
   <link rel="stylesheet" href="/css/style.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
   <script src="https://unpkg.com/feather-icons"></script>
 
   <!-- Page-scoped styles (non-invasive) -->
@@ -39,31 +38,6 @@
     }
     .nrr-panel[hidden]{ display:none !important; }
     .nrr-center{ display:flex; justify-content:center; }
-
-    /* Wizard layout */
-    .rac-nav{ display:flex; justify-content:space-between; gap:10px; margin-top:16px; }
-    .rac-steps{ display:flex; flex-direction:column; gap:16px; width:100%; }
-    .rac-row-headers{ display:grid; grid-template-columns: 1fr 120px 60px; font-weight:700; gap:10px; padding:6px 6px; }
-    .product-row{ display:grid; grid-template-columns: 1fr 120px 60px; gap:10px; align-items:center; padding:6px; }
-    .product-row .field select, .product-row .field input{ width:100%; }
-    .actions-cell{ display:flex; align-items:center; gap:6px; justify-content:flex-end; }
-    .icon-btn{ border:1px solid #E5E7EB; background:#fff; border-radius:8px; padding:0 .4rem; height:32px; min-width:32px; cursor:pointer; }
-    .icon-btn--danger{ border-color:#FCA5A5; color:#B91C1C; }
-    .icon-btn--x{ font-size:20px; line-height:1; }
-    .submit-btn[aria-busy="true"]{ opacity:.7; pointer-events:none; }
-    .badge{ display:inline-block; padding:.35rem .55rem; border-radius:999px; background:#F3F4F6; font-size:.9rem; }
-    .product-card{ display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid #E5E7EB; border-radius:12px; margin-bottom:8px; }
-    .loading-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px; }
-    .spinner{ width:28px; height:28px; border-radius:50%; border:3px solid #E5E7EB; border-top-color:#111827; animation:spin 1s linear infinite; }
-    @keyframes spin{to{transform:rotate(360deg);}}
-    .toast-stack{ position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:1000; }
-    .toast{ display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:12px; border:1px solid #E5E7EB; background:#fff; box-shadow:0 10px 30px rgba(17,24,39,.08); opacity:0; transform:translateY(6px); transition:all .18s ease; }
-    .toast.is-in{ opacity:1; transform:translateY(0); }
-    .toast--success{ border-color:#A7F3D0; background:#ECFDF5; }
-    .toast--error{ border-color:#FCA5A5; background:#FEF2F2; }
-    .toast__icon{ margin-top:2px; }
-    .toast__title{ font-weight:700; }
-    .toast__close{ background:transparent; border:0; cursor:pointer; font-size:16px; margin-left:4px; }
   </style>
 </head>
 <body>
@@ -73,7 +47,7 @@
 </script>
 
 <div class="app-container">
-  <!-- ======= SIDEBAR ======= -->
+  <!-- ======= SIDEBAR (copied layout, with active link) ======= -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
@@ -144,88 +118,16 @@
 
         <!-- Content card -->
         <section id="nrrCard" class="nrr-card nrr-center" role="tabpanel" tabindex="0" aria-live="polite">
-          <!-- ===== Request Additional Components (Wizard) ===== -->
+          <!-- Request Additional Components (default) -->
           <div id="panel-request" class="nrr-panel" data-panel="request">
-            <!-- Loading -->
-            <div id="rac-loading" class="loading-panel" style="display:none;">
-              <div class="spinner"></div>
-              <p>Loading...</p>
-            </div>
-
-            <!-- Content -->
-            <div id="rac-content" class="rac-steps">
-              <!-- Step 1: Details -->
-              <section id="rac-step-details" class="card form-card">
-                <h3>Order Details</h3>
-                <form id="rac-details-form" autocomplete="off">
-                  <div class="form-group">
-                    <label for="orderReason">Order Reason</label>
-                    <input type="text" id="orderReason" name="orderReason"
-                      placeholder="e.g., Additional parts for lab session" required/>
-                  </div>
-                  <div class="form-actions rac-nav">
-                    <span></span>
-                    <button id="rac-nextBtn" type="button" class="submit-btn elevated">Next: Products</button>
-                  </div>
-                  <div class="tip-callout" role="note">
-                    <i data-feather="info"></i><span><strong>Tip:</strong> Keep it concise and clear.</span>
-                  </div>
-                </form>
-              </section>
-
-              <!-- Step 2: Products -->
-              <section id="rac-step-products" class="card form-card" style="display:none;">
-                <h3>Products</h3>
-                <div class="rac-row-headers">
-                  <span>Product</span><span>Quantity</span><span></span>
-                </div>
-                <div id="rac-products-container"></div>
-                <div class="form-actions rac-nav">
-                  <button id="rac-prevBtn" type="button" class="btn-outline-pill">Back</button>
-                  <div style="display:flex; gap:10px;">
-                    <button id="rac-addProductBtn" type="button" class="btn-outline-pill">
-                      <i data-feather="plus"></i><span>Add Another Product</span>
-                    </button>
-                    <button id="rac-nextBtn-products" type="button" class="submit-btn elevated">Next: Review</button>
-                  </div>
-                </div>
-                <div class="tip-callout" role="note">
-                  <i data-feather="info"></i><span><strong>Tip:</strong> Use search to filter products quickly.</span>
-                </div>
-              </section>
-
-              <!-- Step 3: Review -->
-              <section id="rac-step-review" class="card form-card" style="display:none;">
-                <h3>Review &amp; Submit</h3>
-                <section class="card card--elevated review-summary-card" style="margin:0 0 12px 0;">
-                  <div class="summary-grid">
-                    <div class="summary-item">
-                      <span class="summary-label">Reason</span>
-                      <span class="summary-value" id="rac-review-reason">-</span>
-                    </div>
-                    <div class="summary-item">
-                      <span class="summary-label">Total Items</span>
-                      <span class="summary-value" id="rac-review-total">0</span>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="card card--elevated products-card" style="margin:0;">
-                  <h3 class="products-list-title" style="margin-top:0;">Products to be Ordered</h3>
-                  <div id="rac-review-list" class="product-cards-grid"></div>
-                  <div class="form-actions rac-nav">
-                    <button id="rac-prevBtn-review" type="button" class="btn-outline-pill">Back</button>
-                    <button id="rac-submitBtn" type="button" class="submit-btn elevated">Submit Order</button>
-                  </div>
-                </section>
-              </section>
-            </div>
+            <h3>Request Additional Components</h3>
+            <p class="nrr-muted">This is a placeholder. Send me the content and I’ll wire it in.</p>
           </div>
 
-          <!-- ===== Report Damage Components (placeholder) ===== -->
+          <!-- Report Damage Components -->
           <div id="panel-report" class="nrr-panel" data-panel="report" hidden>
             <h3>Report Damage Components</h3>
-            <p class="nrr-muted">This section will be set up next.</p>
+            <p class="nrr-muted">This is a placeholder. Send me the content and I’ll wire it in.</p>
           </div>
         </section>
       </div>
@@ -235,7 +137,13 @@
 
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script src="/js/new-report-request.js" defer></script>
+<script>
+  // Ensure the sidebar link shows active when navigating via history API
+  document.addEventListener('DOMContentLoaded', function () {
+    var link = document.querySelector('.sidebar a[href="/new-report-request.html"]');
+    if (link) { link.classList.add('active'); link.setAttribute('aria-current','page'); }
+  });
+</script>
 </body>
 </html>
