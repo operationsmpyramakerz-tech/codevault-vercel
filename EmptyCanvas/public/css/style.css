@@ -2690,3 +2690,55 @@ body:not(.sidebar-mini) .container-full-width { padding-left: 16px !important; }
 
 body.sidebar-mini .main-header,
 body.sidebar-mini .container-full-width { padding-left: 24px !important; }
+/* ===== New Report / Request: Local sidebar layout ===== */
+.nrr-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+/* Local (page) sidebar */
+.subsidebar {
+  position: sticky;
+  top: calc(var(--header-total-height, 88px) + 12px);
+  align-self: start;
+  background: var(--sidebar-bg, #0f172a);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.16);
+}
+
+.subnav { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.subnav-link {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(255,255,255,.85);
+  font-weight: 600;
+  cursor: pointer;
+}
+.subnav-link:hover { background: rgba(255,255,255,.06); }
+.subnav-link.is-active {
+  background: rgba(249, 115, 22, .15);          /* soft orange to match app accent */
+  border-color: rgba(249, 115, 22, .45);
+  color: #fff;
+}
+
+/* Content column */
+.subcontent { min-width: 0; }  /* allow inner grids to shrink properly */
+
+/* Mobile behavior: hide local sidebar, keep your original horizontal tabs */
+@media (max-width: 1024px) {
+  .nrr-layout { grid-template-columns: 1fr; }
+  .subsidebar { display: none; }
+  .nrr-tabs { display: flex; } /* you already have this from before */
+}
+
+/* Desktop behavior: hide horizontal tabs (we use the local sidebar) */
+@media (min-width: 1025px) {
+  .nrr-tabs { display: none; }
+}
