@@ -2742,3 +2742,36 @@ body.sidebar-mini .container-full-width { padding-left: 24px !important; }
 @media (min-width: 1025px) {
   .nrr-tabs { display: none; }
 }
+/* ===== Sidebar nested group (mini dashboard) ===== */
+.nav-group { margin-top: 6px; }
+.nav-group-toggle {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  background: transparent; border: 0; padding: 10px 12px;
+  border-radius: 12px; cursor: pointer;
+  color: rgba(255,255,255,.85);
+}
+.nav-group-toggle:hover { background: rgba(255,255,255,.06); }
+.nav-group-toggle .left { display: inline-flex; align-items: center; gap: 10px; }
+.nav-group .chev { transition: transform .18s ease; opacity: .9; }
+
+/* collapsed by default */
+.nav-sub {
+  margin: 6px 0 0 8px; padding-left: 12px;
+  border-left: 1px solid rgba(255,255,255,.08);
+  display: grid; gap: 6px;
+  max-height: 0; overflow: hidden; transition: max-height .22s ease;
+}
+.nav-group.is-open .nav-sub { max-height: 400px; } /* enough for two items */
+.nav-group.is-open .chev { transform: rotate(90deg); }
+
+.nav-sublink {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 10px;
+  color: rgba(255,255,255,.8); text-decoration: none;
+}
+.nav-sublink:hover { background: rgba(255,255,255,.06); color: #fff; }
+.nav-sublink.active { background: rgba(255,255,255,.12); color: #fff; }
+
+/* Works with your existing scrollable .sidebar-nav */
