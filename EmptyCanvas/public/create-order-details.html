@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Create Order — Details / Damage (Products First, Fixed)</title>
+  <title>Create Order — Details / Damage (Products First)</title>
   <link rel="stylesheet" href="/css/style.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
   <script src="https://unpkg.com/feather-icons"></script>
@@ -80,7 +80,7 @@
           </ol>
         </section>
 
-        <!-- REQUEST: original details form (unchanged) -->
+        <!-- REQUEST: original details form -->
         <section class="card form-card" id="panel-request" hidden>
           <form id="detailsForm" autocomplete="off">
             <div class="form-group">
@@ -95,7 +95,7 @@
           </form>
         </section>
 
-        <!-- DAMAGE: Products UI is step 1 -->
+        <!-- DAMAGE: show Products UI on step 1 -->
         <section class="card form-card" id="panel-damage" hidden>
           <h2 class="section-title" style="margin-top:0">Products</h2>
           <div class="form-row-headers">
@@ -117,20 +117,26 @@
 
   <script>feather.replace();</script>
   <script src="/js/common-ui.js"></script>
-  <!-- IMPORTANT: include main products logic so fields render -->
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-  <script src="/js/order-products.step.js"></script>
-  <!-- Tiny shim to keep ?mode=damage on Next: Review -->
+  <!-- Damage uses a tiny JS variant so the 'Next' goes to review with ?mode=damage -->
   <script src="/js/order-products.step.damage.js"></script>
 
   <script>
   (function(){
     const mode = (new URLSearchParams(location.search).get('mode')||'request').toLowerCase();
     const isDamage = mode==='damage';
-    document.getElementById('tab-request').classList.toggle('active', !isDamage);
-    document.getElementById('tab-damage').classList.toggle('active',  isDamage);
-    document.getElementById('panel-request').hidden = isDamage;
-    document.getElementById('panel-damage').hidden  = !isDamage;
+    const reqTab = document.getElementById('tab-request');
+    const dmgTab = document.getElementById('tab-damage');
+    const reqPanel = document.getElementById('panel-request');
+    const dmgPanel = document.getElementById('panel-damage');
+
+    if(reqTab && dmgTab && reqPanel && dmgPanel){
+      reqTab.classList.toggle('active', !isDamage);
+      dmgTab.classList.toggle('active',  isDamage);
+      reqPanel.hidden = isDamage;
+      dmgPanel.hidden  = !isDamage;
+    }
+    // When in damage mode: rename the stepper labels so Step 1 is "Products"
     if(isDamage){
       const s1 = document.getElementById('step1label');
       const s2 = document.getElementById('step2label');
