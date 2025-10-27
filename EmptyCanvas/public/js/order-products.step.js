@@ -220,7 +220,7 @@
       alert(data?.error || 'Failed to save products.');
       return;
     }
-    window.location.href = '/orders/new/review';
+    window.location.href = '/orders/new/review?mode=request';
   }
 
   async function init() {
