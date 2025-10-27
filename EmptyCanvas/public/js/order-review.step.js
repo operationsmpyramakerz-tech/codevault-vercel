@@ -1,3 +1,5 @@
+function getDraftType(d){ try{ return (d && (d.type || (d.properties && d.properties.Type && d.properties.Type.select && d.properties.Type.select.name)))) || localStorage.getItem('draft.type') || ''; }catch(e){ return localStorage.getItem('draft.type') || ''; }
+
 document.addEventListener('DOMContentLoaded', async () => {
   // ========= Toast: تصميم احترافي بظل =========
   const toast = ((doc) => {
