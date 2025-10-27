@@ -7,11 +7,6 @@
 <title>Create Order — Review</title>
 <link href="/css/style.css" rel="stylesheet"/>
 <script src="https://unpkg.com/feather-icons"></script>
-  <style>
-    .tabs-bar{display:flex;gap:10px;margin:8px 0 0}
-    .tab-btn{display:inline-flex;align-items:center;gap:8px;padding:.6rem 1rem;border-radius:999px;border:1px solid #E5E7EB;background:#F3F4F6;color:#374151;text-decoration:none;font-weight:700}
-    .tab-btn.active{background:#111827;color:#fff;border-color:#111827;box-shadow:0 8px 16px rgba(0,0,0,.18)}
-  </style>
 </head>
 <body>
 <script>
@@ -109,10 +104,6 @@
 </div>
 <div class="header-row2">
 <h1 class="page-title">Create New Order</h1>
-          <div class="tabs-bar">
-            <a class="tab-btn" id="tab-request" href="/orders/new/review?mode=request">Request Additional Components</a>
-            <a class="tab-btn" id="tab-damage"  href="/orders/new/review?mode=damage">Report Damage Components</a>
-          </div>
 </div>
 </header>
 <main class="container create-order-layout">
@@ -123,7 +114,6 @@
 <li class="step active" data-step="3"><span class="circle">3</span><span class="label">Review</span></li>
 </ol>
 </section>
-<div id="panel-request" hidden>
 <!-- Loading -->
 <div class="loading-panel" id="loading-indicator" style="display:none;">
 <div class="spinner"></div>
@@ -150,41 +140,16 @@
 <h3 class="products-list-title">Products to be Ordered</h3>
 <div class="product-cards-grid" id="summary-products-list"></div>
 <div class="form-actions">
-<a class="nav-link" href="/orders/new/products?mode=request" style="padding:.75rem 1rem; border:1px solid #D1D5DB; border-radius:8px; text-decoration:none; color:#374151; background:#fff;">Back</a>
+<a class="nav-link" href="/orders/new/products" style="padding:.75rem 1rem; border:1px solid #D1D5DB; border-radius:8px; text-decoration:none; color:#374151; background:#fff;">Back</a>
 <button class="submit-btn elevated" id="submitOrderBtn">Submit Order</button>
 </div>
 </section>
-</div> <!-- /#order-details -->
-</div> <!-- /#panel-request -->
-
-<section class="card form-card" id="panel-damage" hidden>
-  <h2>Report Damage Components</h2>
-  <p class="muted">Later we’ll add a separate review for damage reports.</p>
-  <div style="margin-top:.75rem;">
-    <a class="btn-3d btn-3d-blue" href="/orders/new/products?mode=damage">Back to Products</a>
-  </div>
-</section>
+</div>
 </main>
 </div>
 </div>
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/order-review.step.js"></script>
-<script>
-(function(){
-  const mode = (new URLSearchParams(location.search).get('mode')||'request').toLowerCase();
-  const isDamage = mode==='damage';
-  const reqTab = document.getElementById('tab-request');
-  const dmgTab = document.getElementById('tab-damage');
-  const reqPanel = document.getElementById('panel-request');
-  const dmgPanel = document.getElementById('panel-damage');
-  if(reqTab && dmgTab && reqPanel && dmgPanel){
-    reqTab.classList.toggle('active', !isDamage);
-    dmgTab.classList.toggle('active',  isDamage);
-    reqPanel.hidden = isDamage;
-    dmgPanel.hidden = !isDamage;
-  }
-})();
-</script>
 </body>
 </html>
