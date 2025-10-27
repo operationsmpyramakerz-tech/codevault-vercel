@@ -514,9 +514,32 @@
           showStep(2);
         }
       });
-      nextBtn?.addEventListener('click', async () => {
-        if (currentStep === 1) {
-          if (await saveDetails()) showStep(2);
+      
+nextBtn?.addEventListener('click', async () => {
+  if (!nextBtn) return;
+  const origText = nextBtn.textContent;
+  try {
+    nextBtn.disabled = true;
+    nextBtn.setAttribute('aria-busy', 'true');
+    if (currentStep === 1) {
+      if (await saveDetails()) {
+        showStep(2);
+      }
+    } else if (currentStep === 2) {
+      if (await saveProducts()) {
+        await renderReview();
+        showStep(3);
+      }
+    }
+  } catch (err) {
+    toast({ type: 'error', title: 'Action failed', message: err?.message || 'Please try again.' });
+  } finally {
+    nextBtn.disabled = false;
+    nextBtn.removeAttribute('aria-busy');
+    nextBtn.textContent = origText;
+  }
+});
+
         } else if (currentStep === 2) {
           if (await saveProducts()) {
             await renderReview();
