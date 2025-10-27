@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>New Report / Request</title>
+
+  <!-- Your global styles (already in your app) -->
+  <link rel="stylesheet" href="/style.css">
+
+  <!-- Page-scoped styles (kept minimal; won’t clash with existing CSS) -->
+  <style>
+    :root{
+      --pill-bg:#f6f7fb; --pill-text:#1f2937; --pill-active:#111827; --pill-active-text:#fff;
+      --card-bg:#fff; --card-border:#eef1f6; --shadow:0 10px 30px rgba(17,24,39,.08);
+      --muted:#6b7280;
+    }
+    .nrr-wrap{ max-width: 1040px; margin: 28px auto 64px; padding: 0 20px; }
+    .nrr-header{ margin: 6px 0 18px; }
+    .nrr-title{ font-size: 24px; font-weight: 800; color:#0f172a; margin:0; }
+
+    .nrr-tabs{ display:flex; justify-content:center; gap:14px; margin: 18px auto 20px; flex-wrap:wrap; }
+    .nrr-tab{
+      display:inline-flex; align-items:center; justify-content:center; text-decoration:none;
+      min-width: 280px; padding:14px 22px; border-radius: 999px;
+      background: var(--pill-bg); color: var(--pill-text); font-weight:700;
+      box-shadow: 0 6px 18px rgba(17,24,39,.06);
+      border: 1px solid var(--card-border);
+      transition: transform .08s ease, box-shadow .12s ease, background .12s ease;
+    }
+    .nrr-tab:hover{ transform: translateY(-1px); box-shadow: 0 10px 26px rgba(17,24,39,.08); }
+    .nrr-tab.active{ background: var(--pill-active); color: var(--pill-active-text); }
+
+    .nrr-card{
+      background: var(--card-bg); border:1px solid var(--card-border);
+      border-radius: 18px; box-shadow: var(--shadow);
+      padding: 20px; max-width: 900px; margin: 10px auto;
+    }
+    .nrr-muted{ color: var(--muted); }
+
+    /* Panels */
+    .nrr-panel[hidden]{ display:none !important; }
+
+    /* Keep the content centered even on wide layouts */
+    .nrr-center{ display:flex; justify-content:center; }
+  </style>
+</head>
+<body>
+
+  <main class="nrr-wrap">
+    <header class="nrr-header">
+      <h1 class="nrr-title">New Report / Request</h1>
+      <p class="nrr-muted">Choose what you want to do below.</p>
+    </header>
+
+    <!-- Tabs -->
+    <nav id="nrrTabs" class="nrr-tabs" role="tablist" aria-label="Report or Request">
+      <a href="?tab=request" class="nrr-tab" role="tab" data-tab="request" aria-selected="true">
+        Request Additional Components
+      </a>
+      <a href="?tab=report" class="nrr-tab" role="tab" data-tab="report" aria-selected="false">
+        Report Damage Components
+      </a>
+    </nav>
+
+    <!-- Content card -->
+    <section id="nrrCard" class="nrr-card nrr-center" role="tabpanel" tabindex="0" aria-live="polite">
+      <!-- Request Additional Components (default) -->
+      <div id="panel-request" class="nrr-panel" data-panel="request">
+        <!-- ↓ You’ll place your real “Request Additional Components” content here -->
+        <h3>Request Additional Components</h3>
+        <p class="nrr-muted">This is a placeholder. Send me the content and I’ll wire it in.</p>
+      </div>
+
+      <!-- Report Damage Components -->
+      <div id="panel-report" class="nrr-panel" data-panel="report" hidden>
+        <!-- ↓ You’ll place your real “Report Damage Components” content here -->
+        <h3>Report Damage Components</h3>
+        <p class="nrr-muted">This is a placeholder. Send me the content and I’ll wire it in.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/new-report-request.js" defer></script>
+</body>
+</html>
