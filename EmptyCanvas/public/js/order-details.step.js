@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         body: JSON.stringify({ reason })
       });
       if (!res.ok) throw new Error('Failed to save details.');
-      window.location.href = '/orders/new/products';
+      window.location.href = '/orders/new/products?mode=request';
     } catch (err) {
       alert(err.message);
     }
