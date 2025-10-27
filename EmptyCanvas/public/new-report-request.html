@@ -82,5 +82,21 @@
   </main>
 
   <script src="/js/new-report-request.js" defer></script>
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // normalize path (strip trailing slash)
+    var path = location.pathname.replace(/\/+$/,'') || '/';
+    // try exact match first
+    var link = document.querySelector('.sidebar a[href="' + path + '"]');
+    // fallback to the known href
+    if (!link) link = document.querySelector('.sidebar a[href="/new-report-request.html"]');
+    if (link) {
+      link.classList.add('active');
+      link.setAttribute('aria-current', 'page');
+    }
+    // render feather icons if present
+    if (window.feather && typeof feather.replace === 'function') feather.replace();
+  });
+</script>
 </body>
 </html>
