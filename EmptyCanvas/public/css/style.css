@@ -2662,3 +2662,61 @@ main:has(#sv-list) {
   border-radius: 8px;
 }
 .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+
+/* ==== Sidebar/content spacing control ==== */
+:root{
+  /* match your real widths (these are close to your UI) */
+  --sidebar-w: 264px;       /* expanded width */
+  --sidebar-mini-w: 72px;   /* collapsed width */
+
+  /* the visual gap between sidebar edge and content */
+  --gap-open: 16px;         /* when sidebar expanded */
+  --gap-mini: 24px;         /* when sidebar collapsed (needs a bit more) */
+}
+
+/* Layout: sidebar + main (you already have this; the key is padding-left below) */
+.app-container{
+  display: flex;
+  min-height: 100dvh;
+}
+
+.sidebar{
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+}
+
+body.sidebar-mini .sidebar{
+  width: var(--sidebar-mini-w);
+  flex-basis: var(--sidebar-mini-w);
+}
+
+/* Make only the nav area scroll (you added this earlier) */
+.sidebar-nav{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The **only** place we control the space between sidebar and content */
+.main-content{
+  flex: 1 1 auto;
+  /* keep your existing top/right/bottom paddings — adjust if you need */
+  padding: 24px 24px 32px;
+  padding-left: var(--gap-open);   /* gap when sidebar is open */
+}
+
+/* When the sidebar is collapsed, increase the gap slightly */
+body.sidebar-mini .main-content{
+  padding-left: var(--gap-mini);
+}
+
+/* Make inner sections (like headers/containers) follow the same left gap */
+.main-header,
+.container-full-width{
+  padding-left: inherit;    /* matches .main-content padding-left */
+}
+
+/* Responsive: on small screens the sidebar typically overlays; just use a small gap */
+@media (max-width: 1024px){
+  .main-content{ padding-left: 16px; }
+}
