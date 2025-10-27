@@ -99,53 +99,39 @@
         <h1 class="page-title">New Report / Request</h1>
       </div>
     </header>
-   <main class="nrr-layout container-full-width nrr-wrap">
-  <!-- Local (page) sidebar -->
-  <aside class="subsidebar" role="navigation" aria-label="New Report / Request sections">
-    <ul class="subnav">
-      <li>
-        <button class="subnav-link is-active" data-tab="request">
-          <i data-feather="plus-circle" aria-hidden="true"></i>
-          <span>Request Additional Components</span>
-        </button>
-      </li>
-      <li>
-        <button class="subnav-link" data-tab="report">
-          <i data-feather="tool" aria-hidden="true"></i>
-          <span>Report Damage Components</span>
-        </button>
-      </li>
-    </ul>
-  </aside>
 
-  <!-- Page content area -->
-  <section class="subcontent">
-    <!-- Keep the top horizontal tabs for mobile only -->
-    <div class="nrr-tabs" role="tablist" aria-label="New Report / Request (mobile)">
-      <button id="tab-request" class="nrr-tab is-active" role="tab"
-              aria-selected="true" aria-controls="panel-request"
-              data-tab="request">Request Additional Components</button>
-      <button id="tab-report" class="nrr-tab" role="tab"
-              aria-selected="false" aria-controls="panel-report"
-              data-tab="report">Report Damage Components</button>
-    </div>
+    <main class="container-full-width">
+      <div class="nrr-wrap">
+        <header class="nrr-header">
+          <p class="nrr-muted">Choose what you want to do below.</p>
+        </header>
 
-    <!-- Panel: Request (your 3-step merged flow lives here) -->
-    <section id="panel-request" class="nrr-panel is-active" role="tabpanel" aria-labelledby="tab-request">
-      <!-- keep your existing stepper + steps here exactly as you have them -->
-      <!-- request-stepper, #nrr-step1 / #nrr-step2 / #nrr-step3 … -->
-    </section>
+        <!-- Tabs -->
+        <nav id="nrrTabs" class="nrr-tabs" role="tablist" aria-label="Report or Request">
+          <a href="?tab=request" class="nrr-tab" role="tab" data-tab="request" aria-selected="true">
+            Request Additional Components
+          </a>
+          <a href="?tab=report" class="nrr-tab" role="tab" data-tab="report" aria-selected="false">
+            Report Damage Components
+          </a>
+        </nav>
 
-    <!-- Panel: Report -->
-    <section id="panel-report" class="nrr-panel" role="tabpanel" aria-labelledby="tab-report">
-      <!-- your “Report Damage Components” content / placeholder -->
-      <div class="card" style="padding:16px; border-radius:12px;">
-        <h3>Report Damage Components</h3>
-        <p>This is a placeholder. Send me the content and I’ll wire it in.</p>
+        <!-- Content card -->
+        <section id="nrrCard" class="nrr-card nrr-center" role="tabpanel" tabindex="0" aria-live="polite">
+          <!-- Request Additional Components (default) -->
+          <div id="panel-request" class="nrr-panel" data-panel="request">
+            <h3>Request Additional Components</h3>
+            <p class="nrr-muted">This is a placeholder. Send me the content and I’ll wire it in.</p>
+          </div>
+
+          <!-- Report Damage Components -->
+          <div id="panel-report" class="nrr-panel" data-panel="report" hidden>
+            <h3>Report Damage Components</h3>
+            <p class="nrr-muted">This is a placeholder. Send me the content and I’ll wire it in.</p>
+          </div>
+        </section>
       </div>
-    </section>
-  </section>
-</main>
+    </main>
   </div>
 </div>
 
