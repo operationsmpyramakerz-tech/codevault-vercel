@@ -139,5 +139,33 @@
     }
   })();
   </script>
+  <script>
+document.addEventListener('DOMContentLoaded', function(){
+  const form = document.getElementById('detailsForm');
+  const reasonInput = document.getElementById('orderReason');
+  if(!form || !reasonInput) return; // IDs must match your markup
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault(); e.stopPropagation();
+    const reason = (reasonInput.value || '').trim();
+    if(!reason){ alert('Please enter the order reason.'); return; }
+
+    try{
+      const res = await fetch('/api/order-draft/details', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({ reason })
+      });
+      if(!res.ok) throw new Error('Failed to save details.');
+      const url = new URL('/orders/new/products', location.origin);
+      url.searchParams.set('mode','request');
+      location.href = url.toString();
+    }catch(err){
+      alert(err.message || 'Failed to save details.');
+    }
+  });
+});
+</script>
 </body>
 </html>
