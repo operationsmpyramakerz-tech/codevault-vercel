@@ -2625,3 +2625,40 @@ main:has(#sv-list) {
 }
 .sv-qty-btn:hover { background: #F3F4F6; }
 .sv-qty-actions { display: flex; gap: 8px; justify-content: flex-end; }
+/* ==== Sidebar: keep header/footer fixed, make links scroll ==== */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;                 /* full viewport height (mobile-safe) */
+  position: sticky;
+  top: 0;
+  overflow: hidden;                /* the nav will scroll inside */
+}
+
+/* The area that contains the menu links */
+.sidebar-nav {
+  flex: 1 1 auto;                  /* take remaining space */
+  min-height: 0;                   /* CRITICAL for flex + overflow to work */
+  overflow-y: auto;                /* scroll only the links area */
+  overscroll-behavior: contain;    /* nicer scroll behavior */
+  padding-right: 4px;              /* room for scrollbar */
+}
+
+/* Keep the logout area anchored at the bottom and always visible */
+.sidebar-footer {
+  flex: 0 0 auto;
+  margin-top: auto;                /* pins it to the bottom of the flex column */
+  background: var(--sidebar-bg, #0f172a);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  /* optional "sticky within the sidebar" look */
+  position: sticky;
+  bottom: 0;
+}
+
+/* Optional: subtle scrollbar styling (WebKit/Blink) */
+.sidebar-nav::-webkit-scrollbar { width: 8px; }
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.18);
+  border-radius: 8px;
+}
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
