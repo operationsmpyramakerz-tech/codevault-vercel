@@ -70,12 +70,32 @@
     <i data-feather="award"></i>
     <span class="nav-label">S.V schools orders</span>
   </a>
-</li>
+<!-- New Report / Request group -->
+<li class="nav-group" data-group="nrr">
+  <button class="nav-link nav-group-toggle" type="button" aria-expanded="false">
+    <span class="left">
+      <i data-feather="folder-plus" aria-hidden="true"></i>
+      <span class="nav-label">New Report / Request</span>
+    </span>
+    <i data-feather="chevron-right" class="chev" aria-hidden="true"></i>
+  </button>
+
+  <ul class="nav-sub">
     <li>
-  <a class="nav-link" href="/new-report-request.html">
-    <i data-feather="folder-plus"></i>
-    <span class="nav-label">New Report / Request</span>
-  </a>
+      <a class="nav-sublink"
+         href="/new-report-request.html?view=request">
+        <i data-feather="plus-circle" aria-hidden="true"></i>
+        <span>Request Additional Components</span>
+      </a>
+    </li>
+    <li>
+      <a class="nav-sublink"
+         href="/new-report-request.html?view=report">
+        <i data-feather="tool" aria-hidden="true"></i>
+        <span>Report Damage Components</span>
+      </a>
+    </li>
+  </ul>
 </li>
 </ul>
 </nav>
