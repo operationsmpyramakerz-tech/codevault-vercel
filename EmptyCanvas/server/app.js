@@ -194,6 +194,21 @@ async function detectAvailableQtyPropName() {
 }
 
 // خاصية Status (select) — لاستخدام زر Mark prepared
+
+// "Type" (Select) detector on Orders DB
+async function detectTypePropName() {
+  const props = await getOrdersDBProps();
+  return (
+    pickPropName(props, [
+      "Type",
+      "Request Type",
+      "Order Type",
+      "نوع الطلب",
+      "type"
+    ]) || "Type"
+  );
+}
+
 async function detectStatusPropName() {
   const props = await getOrdersDBProps();
   return (
@@ -490,6 +505,22 @@ app.delete(
   },
 );
 
+
+// Save draft TYPE (Step 1)
+app.post(
+  "/api/order-draft/type",
+  requireAuth,
+  requirePage("Create New Order"),
+  (req, res) => {
+    const { type } = req.body || {};
+    if (!type || !String(type).trim()) {
+      return res.status(400).json({ error: "Type is required." });
+    }
+    req.session.orderDraft = req.session.orderDraft || {};
+    req.session.orderDraft.type = String(type).trim();
+    return res.json({ ok: true });
+  },
+);
 // Orders listing (Current Orders)
 app.get(
   "/api/orders",
@@ -1462,13 +1493,20 @@ app.post(
         .json({ success: false, message: "Database IDs are not configured." });
     }
 
-    let { reason, products } = req.body || {};
+    let { reason, products, type } = req.body || {};
+
     if (!reason || !Array.isArray(products) || products.length === 0) {
       const d = req.session.orderDraft;
       if (d && d.reason && Array.isArray(d.products) && d.products.length > 0) {
         reason = d.reason;
         products = d.products;
       }
+
+    // Get type from draft if not in body
+    if (!type && req.session.orderDraft && req.session.orderDraft.type) {
+      type = req.session.orderDraft.type;
+    }
+
     }
 
     if (!reason || !Array.isArray(products) || products.length === 0) {
@@ -1488,6 +1526,11 @@ app.post(
       }
       const userId = userQuery.results[0].id;
 
+      
+      // Resolve "Type" property name if exists
+      let typeProp = null;
+      try { typeProp = await detectTypePropName(); } catch {}
+
       const creations = await Promise.all(
         products.map(async (product) => {
           const created = await notion.pages.create({
@@ -1498,6 +1541,7 @@ app.post(
               Product: { relation: [{ id: product.id }] },
               "Status": { select: { name: "Pending" } },
               "Teams Members": { relation: [{ id: userId }] },
+              ...(type && typeProp ? { [typeProp]: { select: { name: String(type) } } } : {}),
             },
           });
 
