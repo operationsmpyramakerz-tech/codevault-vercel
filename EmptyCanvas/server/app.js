@@ -1,10 +1,4 @@
 const express = require("express");
-// --- Type label mapping for Notion Select ---
-const TYPE_NAME_MAP = {
-  request: "Request Additional Components",
-  damage:  "Report Damage Components",
-};
-
 const path = require("path");
 const { Client } = require("@notionhq/client");
 const PDFDocument = require("pdfkit"); // PDF
@@ -512,22 +506,19 @@ app.delete(
 );
 
 
-// Save draft TYPE (Step 1) — stores both code and label
+// Save draft TYPE (Step 1)
 app.post(
   "/api/order-draft/type",
   requireAuth,
   requirePage("Create New Order"),
   (req, res) => {
-    const { type, label } = req.body || {};
-    if (!type) return res.status(400).json({ error: "Type is required." });
-    const code = String(type).trim();
-    const lbl  = (label && String(label).trim()) || TYPE_NAME_MAP[code] || code;
-
+    const { type } = req.body || {};
+    if (!type || !String(type).trim()) {
+      return res.status(400).json({ error: "Type is required." });
+    }
     req.session.orderDraft = req.session.orderDraft || {};
-    req.session.orderDraft.typeCode = code; // code (request|damage)
-    req.session.orderDraft.type     = lbl;  // human label (matches Notion option)
-
-    return res.json({ ok: true, type: lbl });
+    req.session.orderDraft.type = String(type).trim();
+    return res.json({ ok: true });
   },
 );
 // Orders listing (Current Orders)
@@ -1502,13 +1493,20 @@ app.post(
         .json({ success: false, message: "Database IDs are not configured." });
     }
 
-    let { reason, products, type, label } = req.body || {};
+    let { reason, products, type } = req.body || {};
+
     if (!reason || !Array.isArray(products) || products.length === 0) {
       const d = req.session.orderDraft;
       if (d && d.reason && Array.isArray(d.products) && d.products.length > 0) {
         reason = d.reason;
         products = d.products;
       }
+
+    // Get type from draft if not in body
+    if (!type && req.session.orderDraft && req.session.orderDraft.type) {
+      type = req.session.orderDraft.type;
+    }
+
     }
 
     if (!reason || !Array.isArray(products) || products.length === 0) {
@@ -1529,11 +1527,11 @@ app.post(
       const userId = userQuery.results[0].id;
 
       
-  // Resolve Notion 'Type' property name
-  let typeProp = null;
-  try { typeProp = await detectTypePropName(); } catch {}
-  
-const creations = await Promise.all(
+      // Resolve "Type" property name if exists
+      let typeProp = null;
+      try { typeProp = await detectTypePropName(); } catch {}
+
+      const creations = await Promise.all(
         products.map(async (product) => {
           const created = await notion.pages.create({
             parent: { database_id: ordersDatabaseId },
@@ -1542,9 +1540,8 @@ const creations = await Promise.all(
               "Quantity Requested": { number: Number(product.quantity) },
               Product: { relation: [{ id: product.id }] },
               "Status": { select: { name: "Pending" } },
-              "Teams Members": { relation: [{ id: userId }] }
-              ...(typeProp && typeLabel ? { [typeProp]: { select: { name: String(typeLabel) } } } : {}),
-            },
+              "Teams Members": { relation: [{ id: userId }] },
+              ...(type && typeProp ? { [typeProp]: { select: { name: String(type) } } } : {}),
             },
           });
 
@@ -1599,13 +1596,7 @@ const creations = await Promise.all(
         .status(500)
         .json({ success: false, message: "Failed to save order to Notion." });
     }
-  }
-  // Normalize Type: prefer explicit label, then session, then mapped code
-  if (!type && req.session.orderDraft && req.session.orderDraft.type) {
-    type = req.session.orderDraft.type; // already a label from Step 1
-  }
-  const typeLabel = (label && String(label).trim()) || (TYPE_NAME_MAP[type] || type || "");
-,
+  },
 );
 
 // Update Status — requires Current Orders
