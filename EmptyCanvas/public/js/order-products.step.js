@@ -3,6 +3,7 @@
   let components = [];
   let isComponentsLoaded = false;
   const toHydrate = []; // { inst, container, defaultId }
+  let isDamageFlow = false;
   let urlById = new Map(); // id -> URL from Products_Database
 
   const rowsContainer = document.getElementById('products-container');
@@ -11,7 +12,7 @@
 
   async function loadComponents() {
     try {
-      const res = await fetch('/api/components');
+      const res = await fetch('/api/components', { credentials: 'same-origin' });
       if (!res.ok) throw new Error(await res.text());
       const list = await res.json();
       if (!Array.isArray(list)) throw new Error('Bad response format');
@@ -96,7 +97,7 @@
     });
   }
 
-  function addRow(defaultId = '', defaultQty = 1) {
+  function addRow(defaultId = '', defaultQty = 1, defaultDamage = '') {
     const row = document.createElement('div');
     row.className = 'product-row';
 
@@ -125,6 +126,20 @@
     qtyInput.value = String(defaultQty || 1);
     qtyInput.className = 'qty-input';
     qtyCell.appendChild(qtyInput);
+
+    // Damage Description (only in damage flow)
+    let dmgCell = null; let dmgInput = null;
+    if (isDamageFlow) {
+      dmgCell = document.createElement('div');
+      dmgCell.className = 'field';
+      dmgInput = document.createElement('input');
+      dmgInput.type = 'text';
+      dmgInput.className = 'damage-input';
+      dmgInput.placeholder = 'Damage description (optional)';
+      dmgInput.value = String(defaultDamage || '');
+      dmgCell.appendChild(dmgInput);
+    }
+
 
     // Actions cell (icon link + remove)
     const actionsCell = document.createElement('div');
@@ -170,6 +185,7 @@
 
     row.appendChild(productCell);
     row.appendChild(qtyCell);
+    if (isDamageFlow && dmgCell) row.appendChild(dmgCell);
     row.appendChild(actionsCell);
     rowsContainer.appendChild(row);
 
@@ -201,7 +217,9 @@
       const id = selectEl?.value;
       const qty = Number(r.querySelector('input[type="number"]')?.value);
       if (id && Number.isFinite(qty) && qty > 0) {
-        payload.push({ id, quantity: qty });
+        const item = { id, quantity: qty };
+        if (isDamageFlow) { const dmg = (r.querySelector('input.damage-input')?.value || '').trim(); item.damageDescription = dmg; }
+        payload.push(item);
       }
     }
 
@@ -210,7 +228,7 @@
       return;
     }
 
-    const res = await fetch('/api/order-draft/products', {
+    const res = await fetch('/api/order-draft/products', { credentials: 'same-origin',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ products: payload })
@@ -254,7 +272,7 @@
         if (Array.isArray(draft.products) && draft.products.length) {
           rowsContainer.innerHTML = '';
           for (const p of draft.products) {
-            addRow(String(p.id), Number(p.quantity) || 1);
+            addRow(String(p.id), Number(p.quantity) || 1, String(p.damageDescription || ''));
           }
           updateAllLinks();
         }
