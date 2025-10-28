@@ -518,10 +518,12 @@ app.post(
     }
     req.session.orderDraft = req.session.orderDraft || {};
     const __code = String(type).trim();
-    const __label = (req.body && req.body.label && String(req.body.label).trim()) || '';
+    const __labelMap = { request: 'Request Additional Components', damage: 'Report Damage Components' };
+    const __label = (req.body && req.body.label && String(req.body.label).trim())
+      || __labelMap[__code.toLowerCase()] || __code;
     req.session.orderDraft.type = __code;
-    if (__label) req.session.orderDraft.typeLabel = __label;
-    return res.json({ ok: true, type: __code, label: __label || undefined });
+    req.session.orderDraft.typeLabel = __label;
+    return res.json({ ok: true, type: __code, label: __label });
   },
 );
 // Orders listing (Current Orders)
@@ -1509,10 +1511,14 @@ app.post(
     if (!type && req.session.orderDraft && req.session.orderDraft.type) {
       type = req.session.orderDraft.type;
     }
-    // Use the human-readable label for Notion Select; if none, skip Type
-    var __labelFromSession = (req.session.orderDraft && req.session.orderDraft.typeLabel) || '';
-    var __finalLabel = (label && String(label).trim()) || (__labelFromSession && String(__labelFromSession).trim()) || '';
-    if (__finalLabel) { type = __finalLabel; } else { type = ''; }
+    // Normalize 'type' to the dropdown label selected in Step 1
+    const __map = { request: 'Request Additional Components', damage: 'Report Damage Components' };
+    const __labelFromSession = (req.session.orderDraft && req.session.orderDraft.typeLabel) || '';
+    const __fromCode = __map[String(type||'').toLowerCase()] || String(type||'');
+    const __finalLabel = (label && String(label).trim()) || (__labelFromSession && String(__labelFromSession).trim()) || __fromCode;
+    type = __finalLabel || '';
+    // Set Type property name explicitly (Notion column labeled 'Type')
+    const typeProp = 'Type';
 
 
     }
