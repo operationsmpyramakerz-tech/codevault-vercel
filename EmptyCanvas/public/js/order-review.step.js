@@ -1,200 +1,135 @@
-function getDraftType(d){ try{ return (d && (d.type || (d.properties && d.properties.Type && d.properties.Type.select && d.properties.Type.select.name)))) || localStorage.getItem('draft.type') || ''; }catch(e){ return localStorage.getItem('draft.type') || ''; }
 
+// public/js/order-review.step.js  — FIXED (4-steps + renders content)
 document.addEventListener('DOMContentLoaded', async () => {
-  // ========= Toast: تصميم احترافي بظل =========
+  // --- tiny toast utility (no deps) ---
   const toast = ((doc) => {
-    const icons = {
-      success:
-        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
-      error:
-        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-      info:
-        '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
-    };
-
-    const ensureStack = () => {
-      let stack = doc.getElementById('toast-stack');
-      if (!stack) {
-        stack = doc.createElement('div');
-        stack.id = 'toast-stack';
-        stack.className = 'toast-stack';
-        doc.body.appendChild(stack);
+    const ensure = () => {
+      let el = doc.getElementById('toast-stack');
+      if (!el) {
+        el = doc.createElement('div');
+        el.id = 'toast-stack';
+        el.style.position = 'fixed';
+        el.style.right = '16px';
+        el.style.top = '16px';
+        el.style.display = 'grid';
+        el.style.gap = '10px';
+        el.style.zIndex = '9999';
+        doc.body.appendChild(el);
       }
-      return stack;
-    };
-
-    return ({ type = 'info', title = '', message = '', duration = 3500 } = {}) => {
-      const stack = ensureStack();
-      const el = doc.createElement('div');
-      el.className = `toast toast--${type}`;
-      el.setAttribute('role', 'status');
-      el.setAttribute('aria-live', 'polite');
-
-      el.innerHTML = `
-        <div class="toast__icon">${icons[type] || icons.info}</div>
-        <div class="toast__content">
-          <div class="toast__title">${title ? String(title) : ''}</div>
-          ${message ? `<div class="toast__msg">${String(message)}</div>` : ''}
-        </div>
-        <button class="toast__close" aria-label="Close notification">✕</button>
-      `;
-
-      const remove = () => {
-        if (!el.isConnected) return;
-        el.classList.remove('is-in');
-        // wait transition then remove
-        setTimeout(() => el.remove(), 180);
-      };
-
-      el.querySelector('.toast__close').addEventListener('click', remove);
-
-      // Pause auto-hide on hover
-      let timer = null;
-      const startTimer = () => {
-        if (duration > 0) timer = setTimeout(remove, duration);
-      };
-      const stopTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
-      el.addEventListener('mouseenter', stopTimer);
-      el.addEventListener('mouseleave', startTimer);
-
-      stack.appendChild(el);
-      // animate in
-      requestAnimationFrame(() => el.classList.add('is-in'));
-      startTimer();
-
       return el;
     };
+    return ({ type='info', message='', duration=2500 }={}) => {
+      const stack = ensure();
+      const n = doc.createElement('div');
+      n.textContent = String(message || '');
+      n.style.font = '14px/1.4 system-ui, sans-serif';
+      n.style.padding = '10px 12px';
+      n.style.borderRadius = '8px';
+      n.style.color = (type === 'error') ? '#7f1d1d' : '#065f46';
+      n.style.background = (type === 'error') ? '#fee2e2' : '#d1fae5';
+      n.style.border = '1px solid ' + (type === 'error' ? '#fecaca' : '#a7f3d0');
+      stack.appendChild(n);
+      setTimeout(() => n.remove(), duration);
+    };
   })(document);
-  // ========= نهاية Toast =========
 
-  // عناصر الـ UI
-  const reasonEl =
-    document.getElementById('summary-reason-value') ||
-    document.querySelector('[data-review-reason]');
-  const totalEl =
-    document.getElementById('summary-total-value') ||
-    document.querySelector('[data-review-total-items]');
-  const listEl =
-    document.getElementById('summary-products-list') ||
-    document.querySelector('[data-review-products-list]');
+  // --- DOM ---
+  const loadingEl = document.getElementById('loading-indicator');
+  const contentEl = document.getElementById('order-details');
+  const reasonEl = document.getElementById('summary-reason-value') || document.querySelector('[data-review-reason]');
+  const totalEl  = document.getElementById('summary-total-value') || document.querySelector('[data-review-total-items]');
+  const listEl   = document.getElementById('summary-products-list') || document.querySelector('[data-review-products-list]');
   const submitBtn = document.getElementById('submitOrderBtn');
 
-  // Loading/content containers
-  const loadingIndicator = document.getElementById('loading-indicator');
-  const orderDetailsContainer = document.getElementById('order-details');
-
   const showLoading = () => {
-    if (loadingIndicator) loadingIndicator.style.display = 'flex';
-    if (orderDetailsContainer) orderDetailsContainer.style.display = 'none';
+    if (loadingEl) loadingEl.style.display = 'flex';
+    if (contentEl) contentEl.style.display = 'none';
   };
   const showContent = () => {
-    if (loadingIndicator) loadingIndicator.style.display = 'none';
-    if (orderDetailsContainer) orderDetailsContainer.style.display = 'block';
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.style.display = 'block';
   };
 
-  const escapeHTML = (s) =>
-    String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[c]));
-
-  showLoading();
+  const esc = (s) => String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   try {
-    // تحميل الدِرافْت + قائمة المنتجات
-    const [draftRes, compRes] = await Promise.all([
+    showLoading();
+
+    const [draftRes, compsRes] = await Promise.all([
       fetch('/api/order-draft', { credentials: 'same-origin' }),
       fetch('/api/components', { credentials: 'same-origin' })
     ]);
 
     const draft = await draftRes.json().catch(() => ({}));
-    const components = await compRes.json().catch(() => []);
+    const comps = await compsRes.json().catch(() => []);
 
-    if (!draft?.reason) {
-      location.replace('/orders/new');
+    // Guard flow
+    if (!draft || !draft.reason) {
+      window.location.replace('/orders/new');
       return;
     }
     if (!Array.isArray(draft.products) || draft.products.length === 0) {
-      location.replace('/orders/new/products');
+      window.location.replace('/orders/new/products');
       return;
     }
 
+    // Fill summary
     if (reasonEl) reasonEl.textContent = draft.reason || '-';
-    if (totalEl) totalEl.textContent = String(draft.products.length);
+    if (totalEl) totalEl.textContent  = String(draft.products.length);
 
-    const byId = new Map(
-      Array.isArray(components) ? components.map(c => [String(c.id), c]) : []
-    );
+    // Index components by id for names
+    const byId = new Map(Array.isArray(comps) ? comps.map(c => [String(c.id), c]) : []);
 
     if (listEl) {
       listEl.innerHTML = '';
-      draft.products.forEach(p => {
+      for (const p of draft.products) {
         const comp = byId.get(String(p.id));
         const name = comp?.name || 'Unknown product';
-
         const card = document.createElement('div');
         card.className = 'product-card';
         card.innerHTML = `
-          <span class="badge badge--name" title="${escapeHTML(name)}">${escapeHTML(name)}</span>
-          <span class="badge badge--qty">Qty: ${Number(p.quantity) || 0}</span>
+          <span class="badge badge--name" title="${esc(name)}">${esc(name)}</span>
+          <span class="badge badge--qty">Qty: ${Number(p.quantity)||0}</span>
         `;
         listEl.appendChild(card);
+      }
+    }
+
+    showContent();
+
+    // Submit
+    if (submitBtn) {
+      submitBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (submitBtn.disabled) return;
+        const prev = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        submitBtn.setAttribute('aria-busy', 'true');
+        try {
+          const res = await fetch('/api/submit-order', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify({})
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) throw new Error(data?.message || 'Failed to submit');
+          toast({ type:'success', message:'Order created successfully.' });
+          setTimeout(() => window.location.replace('/orders'), 1000);
+        } catch (err) {
+          toast({ type:'error', message: err?.message || 'Submit failed' });
+          submitBtn.disabled = false;
+          submitBtn.textContent = prev;
+          submitBtn.removeAttribute('aria-busy');
+        }
       });
     }
-
-    showContent();
-  } catch (error) {
-    console.error('Failed to load order review:', error);
-    showContent();
-    if (listEl) {
-      listEl.innerHTML = `
-        <div class="card" style="border:1px solid #FCA5A5; background:#FEE2E2; color:#B91C1C; padding:1rem; border-radius:8px;">
-          Error loading order details. Please go back and try again.
-        </div>
-      `;
-    }
-    if (submitBtn) submitBtn.parentElement.style.display = 'none';
+  } catch (err) {
+    console.error('Review init failed:', err);
+    if (contentEl) contentEl.style.display = 'block';
+    if (listEl) listEl.innerHTML = '<div class="card" style="border:1px solid #fecaca;background:#fee2e2;color:#7f1d1d;padding:1rem;border-radius:8px;">Error loading order details.</div>';
   }
 
-  // إرسال الطلب — نفس المنطق لكن باستخدام التوست الجديد
-  if (submitBtn) {
-    submitBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      if (submitBtn.disabled) return;
-      const origText = submitBtn.textContent;
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
-      submitBtn.setAttribute('aria-busy', 'true');
-
-      try {
-        const res = await fetch('/api/submit-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({})
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.success) throw new Error(data?.message || 'Failed to submit');
-
-        toast({
-          type: 'success',
-          title: 'Order Submitted!',
-          message: 'Your order has been created successfully.',
-          duration: 3500
-        });
-
-        setTimeout(() => location.replace('/orders'), 1200);
-      } catch (err) {
-        toast({
-          type: 'error',
-          title: 'Submission Failed',
-          message: err?.message || 'Something went wrong. Please try again.',
-          duration: 5000
-        });
-        submitBtn.disabled = false;
-        submitBtn.textContent = origText;
-        submitBtn.removeAttribute('aria-busy');
-      }
-    });
-  }
-
-  if (window.feather) feather.replace();
+  if (window.feather) try { feather.replace(); } catch {}
 });
