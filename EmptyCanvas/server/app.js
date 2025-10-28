@@ -16,7 +16,7 @@ const fundsDatabaseId = process.env.Funds;
 // ----- Hardbind: Received Quantity property name (Number) -----
 const REC_PROP_HARDBIND = "Quantity received by operations";
 
-// Map internal type codes to Notion Select labels
+// Map internal codes to Notion Select labels for "Type"
 const TYPE_NAME_MAP = {
   request: "Request Additional Components",
   damage:  "Report Damage Components",
@@ -526,8 +526,7 @@ app.post(
     req.session.orderDraft = req.session.orderDraft || {};
     const __code = String(type).trim();
     const __label = (req.body && req.body.label && String(req.body.label).trim())
-      || (typeof TYPE_NAME_MAP !== 'undefined' && TYPE_NAME_MAP[__code.toLowerCase()])
-      || __code;
+      || TYPE_NAME_MAP[__code.toLowerCase()] || __code;
     req.session.orderDraft.type = __code;
     req.session.orderDraft.typeLabel = __label;
     return res.json({ ok: true, type: __code, label: __label });
@@ -1495,28 +1494,20 @@ app.get(
 
 // Submit Order — requires Create New Order
 
-// Ensure the Type label exists in Notion options; otherwise return null
-async function resolveTypeLabelForNotion(label) {
+// Ensure the provided label exists as a Select option in the Orders DB "Type" property
+async function ensureTypeOption(label) {
   try {
-    const typeProp = await detectTypePropName();
+    const propName = await detectTypePropName();
     const props = await getOrdersDBProps();
-    const opts = (props?.[typeProp]?.select?.options) || [];
+    const opts = (props?.[propName]?.select?.options) || [];
     const norm = (s) => String(s||"").trim().toLowerCase();
     const target = norm(label);
-    if (!target) return { typeProp, label: null };
-    let hit = opts.find(o => norm(o.name) === target);
-    if (hit) return { typeProp, label: hit.name };
-    const mapped = TYPE_NAME_MAP[target] || label;
-    hit = opts.find(o => norm(o.name) === norm(mapped));
-    if (hit) return { typeProp, label: hit.name };
-    hit = opts.find(o => norm(o.name).includes(target) || target.includes(norm(o.name)));
-    if (hit) return { typeProp, label: hit.name };
-    return { typeProp, label: null };
+    const hit = opts.find(o => norm(o.name) === target);
+    return { propName, exists: Boolean(hit), label: hit ? hit.name : label };
   } catch (e) {
-    return { typeProp: null, label: null };
+    return { propName: null, exists: false, label };
   }
 }
-
 app.post(
   "/api/submit-order",
   requireAuth,
@@ -1541,13 +1532,14 @@ app.post(
     if (!type && req.session.orderDraft && req.session.orderDraft.type) {
       type = req.session.orderDraft.type;
     }
-    // Compute a safe label that exists in Notion options
-    let rawTypeLabel = (label && String(label).trim())
+    // Normalize to dropdown label
+    let typeLabel = (label && String(label).trim())
       || (req.session.orderDraft && req.session.orderDraft.typeLabel)
-      || (TYPE_NAME_MAP[String(type||"").toLowerCase()] || String(type||""));
-    const __typeResolved = await resolveTypeLabelForNotion(rawTypeLabel);
-    const typeProp = __typeResolved.typeProp; // may be null if not found
-    const typeLabel = __typeResolved.label;   // null if not matched
+      || (TYPE_NAME_MAP[String(type||'').toLowerCase()] || String(type||''));
+    // Confirm the label exists in Notion options; if not, we will skip this property
+    const typeCheck = await ensureTypeOption(typeLabel);
+    const typeProp = typeCheck.propName;
+    const typeLabelSafe = typeCheck.exists ? typeCheck.label : null;
 
 
     }
@@ -1576,17 +1568,30 @@ app.post(
 
       const creations = await Promise.all(
         products.map(async (product) => {
-          const created = await notion.pages.create({
-            parent: { database_id: ordersDatabaseId },
-            properties: {
+          const baseProps = {
               Reason: { title: [{ text: { content: reason || "" } }] },
               "Quantity Requested": { number: Number(product.quantity) },
               Product: { relation: [{ id: product.id }] },
               "Status": { select: { name: "Pending" } },
               "Teams Members": { relation: [{ id: userId }] },
-              ...(typeLabel && typeProp ? { [typeProp]: { select: { name: String(typeLabel) } } } : {}),
-            },
-          });
+            };
+            const withTypeProps = (typeLabelSafe && typeProp)
+              ? { ...baseProps, [typeProp]: { select: { name: String(typeLabelSafe) } } }
+              : baseProps;
+
+            let created;
+            try {
+              created = await notion.pages.create({
+                parent: { database_id: ordersDatabaseId },
+                properties: withTypeProps,
+              });
+            } catch (e) {
+              console.warn("Create with Type failed; retrying without Type", e?.body || e);
+              created = await notion.pages.create({
+                parent: { database_id: ordersDatabaseId },
+                properties: baseProps,
+              });
+            }
 
           let productName = "Unknown Product";
           try {
