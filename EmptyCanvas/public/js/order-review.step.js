@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const reasonEl = document.getElementById('summary-reason-value') || document.querySelector('[data-review-reason]');
   const totalEl  = document.getElementById('summary-total-value') || document.querySelector('[data-review-total-items]');
   const listEl   = document.getElementById('summary-products-list') || document.querySelector('[data-review-products-list]');
+  const summaryGrid = document.querySelector('.summary-grid');
   const submitBtn = document.getElementById('submitOrderBtn');
 
   const showLoading = () => {
@@ -64,7 +65,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const comps = await compsRes.json().catch(() => []);
 
     // Guard flow
-    if (!draft || !draft.reason) {
+    const __t = String(draft?.type || '').toLowerCase();
+    const __isDamage = (__t==='damage' || __t.includes('report damage'));
+    if (!__isDamage && (!draft || !draft.reason)) {
       window.location.replace('/orders/new');
       return;
     }
@@ -74,7 +77,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Fill summary
-    if (reasonEl) reasonEl.textContent = draft.reason || '-';
+    if (reasonEl) reasonEl.textContent = draft.reason || (__isDamage ? '(Damage flow — no reason required)' : '-');
+    if (summaryGrid) { const typeRow=document.createElement('div'); typeRow.className='summary-item'; typeRow.innerHTML='<span class="summary-label">Type</span><span class="summary-value">'+(draft.type||'-')+'</span>'; summaryGrid.insertBefore(typeRow, summaryGrid.firstChild); }
     if (totalEl) totalEl.textContent  = String(draft.products.length);
 
     // Index components by id for names
@@ -90,6 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         card.innerHTML = `
           <span class="badge badge--name" title="${esc(name)}">${esc(name)}</span>
           <span class="badge badge--qty">Qty: ${Number(p.quantity)||0}</span>
+          ${ (p.damageDescription && String(p.damageDescription).trim()) ? `<span class="badge badge--note" title="${esc(p.damageDescription)}">Damage: ${esc(p.damageDescription)}</span>` : "" }
         `;
         listEl.appendChild(card);
       }
