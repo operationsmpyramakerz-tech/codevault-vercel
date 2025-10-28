@@ -482,6 +482,7 @@ app.post(
       .map((p) => ({
         id: String(p.id),
         quantity: Number(p.quantity) || 0,
+        damageDescription: typeof p.damageDescription === 'string' ? p.damageDescription.trim() : ''
       }))
       .filter((p) => p.id && p.quantity > 0);
 
@@ -1550,6 +1551,10 @@ app.post(
           const created = await notion.pages.create({
             parent: { database_id: ordersDatabaseId },
             properties: {
+...(String(product.damageDescription || '').trim()
+    ? { ["Damage Description"]: { rich_text: [{ text: { content: String(product.damageDescription).trim() } }] } }
+    : {}),
+
               Reason: { title: [{ text: { content: reason || "" } }] },
               "Quantity Requested": { number: Number(product.quantity) },
               Product: { relation: [{ id: product.id }] },
