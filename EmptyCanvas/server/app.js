@@ -222,6 +222,21 @@ async function detectStatusPropName() {
   );
 }
 
+// Detect "Damage Description" text property on Orders DB
+async function detectDamageDescPropName() {
+  const props = await getOrdersDBProps();
+  const name =
+    pickPropName(props, [
+      "Damage Description",
+      "Damage",
+      "Damage Notes",
+      "Issue Description",
+      "Notes"
+    ]) || null;
+  return name; // may be null if column not present
+}
+
+
 // Authentication middleware
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
@@ -286,31 +301,37 @@ app.get(
     res.sendFile(path.join(__dirname, "..", "public", "create-order-details.html"));
   },
 );
+
 app.get(
   "/orders/new/products",
   requireAuth,
   requirePage("Create New Order"),
   (req, res) => {
-    if (!req.session.orderDraft || !req.session.orderDraft.reason) {
+    const d = req.session.orderDraft || {};
+    const t = String(d.type || d.typeLabel || "").toLowerCase();
+    const isDamage = t === "damage" || t.includes("report damage");
+    if (!isDamage && !d.reason) {
       return res.redirect("/orders/new");
     }
     res.sendFile(path.join(__dirname, "..", "public", "create-order-products.html"));
   },
 );
+
 app.get(
   "/orders/new/review",
   requireAuth,
   requirePage("Create New Order"),
   (req, res) => {
     const d = req.session.orderDraft || {};
-    if (!d.reason) return res.redirect("/orders/new");
+    const t = String(d.type || d.typeLabel || "").toLowerCase();
+    const isDamage = t === "damage" || t.includes("report damage");
+    if (!isDamage && !d.reason) return res.redirect("/orders/new");
     if (!Array.isArray(d.products) || d.products.length === 0) {
       return res.redirect("/orders/new/products");
     }
     res.sendFile(path.join(__dirname, "..", "public", "create-order-review.html"));
   },
 );
-
 app.get("/stocktaking", requireAuth, requirePage("Stocktaking"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "stocktaking.html"));
 });
@@ -469,6 +490,7 @@ app.post(
     return res.json({ ok: true });
   },
 );
+
 app.post(
   "/api/order-draft/products",
   requireAuth,
@@ -482,6 +504,8 @@ app.post(
       .map((p) => ({
         id: String(p.id),
         quantity: Number(p.quantity) || 0,
+        damageDescription:
+          typeof p.damageDescription === "string" ? p.damageDescription.trim() : ""
       }))
       .filter((p) => p.id && p.quantity > 0);
 
@@ -1146,9 +1170,7 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     return res.json({ ok: true, updated: results });
   } catch (e) {
     console.error('logistics/mark-received error:', e?.body || e);
-    return res.status(500).json({ ok: false, error: 'Failed to mark received' });
-  }
-});
+    return res.status(500).json({ ok: false, error: 'Failed to mark received' });, ...(damageProp && String(product.damageDescription || "").trim() ? { [damageProp]: { rich_text: [{ text: { content: String(product.damageDescription).trim() } }] } } : {}) } }) ;
 app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
