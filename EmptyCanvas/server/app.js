@@ -16,6 +16,12 @@ const fundsDatabaseId = process.env.Funds;
 // ----- Hardbind: Received Quantity property name (Number) -----
 const REC_PROP_HARDBIND = "Quantity received by operations";
 
+// Map internal codes to Notion Select labels for the Type field
+const TYPE_NAME_MAP = {
+  request: "Request Additional Components",
+  damage:  "Report Damage Components",
+};
+
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -512,292 +518,20 @@ app.post(
   requireAuth,
   requirePage("Create New Order"),
   (req, res) => {
-    const { type } = req.body || {};
+    const { type, label } = req.body || {};
     if (!type || !String(type).trim()) {
       return res.status(400).json({ error: "Type is required." });
     }
+    const code = String(type).trim();
+    const lbl  = (label && String(label).trim()) || TYPE_NAME_MAP[code.toLowerCase()] || code;
+
     req.session.orderDraft = req.session.orderDraft || {};
-    req.session.orderDraft.type = String(type).trim();
-    return res.json({ ok: true });
+    req.session.orderDraft.type = code;          // keep code for compatibility
+    req.session.orderDraft.typeLabel = lbl;      // store the human label for Notion/Review
+
+    return res.json({ ok: true, type: code, label: lbl });
   },
-);
-// Orders listing (Current Orders)
-app.get(
-  "/api/orders",
-  requireAuth,
-  requirePage("Current Orders"),
-  async (req, res) => {
-    if (!ordersDatabaseId || !teamMembersDatabaseId) {
-      return res
-        .status(500)
-        .json({ error: "Database IDs are not configured." });
-    }
-
-    res.set("Cache-Control", "no-store");
-
-    try {
-      const userQuery = await notion.databases.query({
-        database_id: teamMembersDatabaseId,
-        filter: { property: "Name", title: { equals: req.session.username } },
-      });
-      if (userQuery.results.length === 0) {
-        return res.status(404).json({ error: "User not found." });
-      }
-      const userId = userQuery.results[0].id;
-
-      const allOrders = [];
-      let hasMore = true;
-      let startCursor = undefined;
-
-      while (hasMore) {
-        const response = await notion.databases.query({
-          database_id: ordersDatabaseId,
-          start_cursor: startCursor,
-          filter: { property: "Teams Members", relation: { contains: userId } },
-          sorts: [{ timestamp: "created_time", direction: "descending" }],
-        });
-
-        for (const page of response.results) {
-          const productRelation = page.properties.Product?.relation;
-          let productName = "Unknown Product";
-          if (productRelation && productRelation.length > 0) {
-            try {
-              const productPage = await notion.pages.retrieve({
-                page_id: productRelation[0].id,
-              });
-              productName =
-                productPage.properties?.Name?.title?.[0]?.plain_text ||
-                "Unknown Product";
-            } catch (e) {
-              console.error(
-                "Could not retrieve related product page:",
-                e.body || e.message,
-              );
-            }
-          }
-
-          allOrders.push({
-            id: page.id,
-            reason:
-              page.properties?.Reason?.title?.[0]?.plain_text || "No Reason",
-            productName,
-            quantity: page.properties?.["Quantity Requested"]?.number || 0,
-            status:
-              page.properties?.["Status"]?.select?.name || "Pending",
-            createdTime: page.created_time,
-          });
-        }
-
-        hasMore = response.has_more;
-        startCursor = response.next_cursor;
-      }
-
-      const TTL_MS = 10 * 60 * 1000;
-      let recent = Array.isArray(req.session.recentOrders)
-        ? req.session.recentOrders
-        : [];
-      recent = recent.filter(
-        (r) => Date.now() - new Date(r.createdTime).getTime() < TTL_MS,
-      );
-
-      const ids = new Set(allOrders.map((o) => o.id));
-      const extras = recent.filter((r) => !ids.has(r.id));
-      const merged = allOrders
-        .concat(extras)
-        .sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
-
-      req.session.recentOrders = recent;
-
-      res.json(merged);
-    } catch (error) {
-      console.error("Error fetching orders from Notion:", error.body || error);
-      res.status(500).json({ error: "Failed to fetch orders from Notion." });
-    }
-  },
-);
-
-// Team members (for assignment) — requires Requested Orders
-app.get(
-  "/api/team-members",
-  requireAuth,
-  requirePage("Requested Orders"),
-  async (req, res) => {
-    try {
-      const result = await notion.databases.query({
-        database_id: teamMembersDatabaseId,
-        sorts: [{ property: "Name", direction: "ascending" }],
-      });
-      const items = result.results.map((p) => ({
-        id: p.id,
-        name: p.properties?.Name?.title?.[0]?.plain_text || "Unnamed",
-      }));
-      res.json(items);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to load team members" });
-    }
-  },
-);
-
-// Requested orders for all users — requires Requested Orders
-app.get(
-  "/api/orders/requested",
-  requireAuth,
-  requirePage("Requested Orders"),
-  async (req, res) => {
-    if (!ordersDatabaseId)
-      return res.status(500).json({ error: "Orders DB not configured" });
-    try {
-      const all = [];
-      let hasMore = true,
-        startCursor;
-
-      const nameCache = new Map();
-      async function memberName(id) {
-        if (!id) return "";
-        if (nameCache.has(id)) return nameCache.get(id);
-        try {
-          const page = await notion.pages.retrieve({ page_id: id });
-          const nm = page.properties?.Name?.title?.[0]?.plain_text || "";
-          nameCache.set(id, nm);
-          return nm;
-        } catch {
-          return "";
-        }
-      }
-
-      const findAssignedProp = (props) => {
-        const cand = [
-          "Assigned To",
-          "assigned to",
-          "ِAssigned To",
-          "Assigned_to",
-          "AssignedTo",
-        ];
-        const keys = Object.keys(props || {});
-        for (const k of keys) {
-          if (cand.some((c) => normKey(c) === normKey(k))) return k;
-        }
-        return "Assigned To";
-      };
-
-      while (hasMore) {
-        const resp = await notion.databases.query({
-          database_id: ordersDatabaseId,
-          start_cursor: startCursor,
-          sorts: [{ timestamp: "created_time", direction: "descending" }],
-        });
-
-        for (const page of resp.results) {
-          const props = page.properties || {};
-
-          // Product name
-          let productName = "Unknown Product";
-          const productRel = props.Product?.relation;
-          if (Array.isArray(productRel) && productRel.length) {
-            try {
-              const productPage = await notion.pages.retrieve({
-                page_id: productRel[0].id,
-              });
-              productName =
-                productPage.properties?.Name?.title?.[0]?.plain_text ||
-                productName;
-            } catch {}
-          }
-
-          const reason = props.Reason?.title?.[0]?.plain_text || "No Reason";
-          const qty = props["Quantity Requested"]?.number || 0;
-          const status = props["Status"]?.select?.name || "Pending";
-          const createdTime = page.created_time;
-
-          // Created by (Teams Members relation)
-          let createdById = "";
-          let createdByName = "";
-          const teamRel = props["Teams Members"]?.relation;
-          if (Array.isArray(teamRel) && teamRel.length) {
-            createdById = teamRel[0].id;
-            createdByName = await memberName(createdById);
-          }
-
-          // Assigned To
-          const assignedKey = findAssignedProp(props);
-          let assignedToId = "";
-          let assignedToName = "";
-          const assignedRel = props[assignedKey]?.relation;
-          if (Array.isArray(assignedRel) && assignedRel.length) {
-            assignedToId = assignedRel[0].id;
-            assignedToName = await memberName(assignedToId);
-          }
-
-          all.push({
-            id: page.id,
-            reason,
-            productName,
-            quantity: qty,
-            status,
-            createdTime,
-            createdById,
-            createdByName,
-            assignedToId,
-            assignedToName,
-          });
-        }
-
-        hasMore = resp.has_more;
-        startCursor = resp.next_cursor;
-      }
-
-      res.json(all);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to fetch requested orders" });
-    }
-  },
-);
-
-// Assign member to multiple order items — requires Requested Orders
-app.post(
-  "/api/orders/assign",
-  requireAuth,
-  requirePage("Requested Orders"),
-  async (req, res) => {
-    try {
-      let { orderIds, memberIds, memberId } = req.body || {};
-      if (!Array.isArray(orderIds) || orderIds.length === 0) {
-        return res.status(400).json({ error: "orderIds required" });
-      }
-      if ((!Array.isArray(memberIds) || memberIds.length === 0) && !memberId)
-        return res.status(400).json({ error: "memberIds or memberId required" });
-      if (!Array.isArray(memberIds) || memberIds.length === 0) memberIds = memberId ? [memberId] : [];
-
-      // Detect property name "Assigned To"
-      const sample = await notion.pages.retrieve({ page_id: orderIds[0] });
-      const props = sample.properties || {};
-      const candidates = [
-        "Assigned To",
-        "assigned to",
-        "ِAssigned To",
-        "Assigned_to",
-        "AssignedTo",
-      ];
-      let assignedProp = "Assigned To";
-      for (const k of Object.keys(props)) {
-        if (candidates.some((c) => normKey(c) === normKey(k))) {
-          assignedProp = k;
-          break;
-        }
-      }
-
-      await Promise.all(
-        orderIds.map((id) =>
-          notion.pages.update({
-            page_id: id,
-            properties: { [assignedProp]: { relation: (memberIds || []).map(id => ({ id })) } },
-          }),
-        ),
-      );
-
-      res.json({ success: true });
+);res.json({ success: true });
     } catch (e) {
       console.error("Assign error:", e.body || e);
       res.status(500).json({ error: "Failed to assign member" });
@@ -1493,7 +1227,7 @@ app.post(
         .json({ success: false, message: "Database IDs are not configured." });
     }
 
-    let { reason, products, type } = req.body || {};
+    let { reason, products, type, label } = req.body || {};
 
     if (!reason || !Array.isArray(products) || products.length === 0) {
       const d = req.session.orderDraft;
@@ -1506,6 +1240,16 @@ app.post(
     if (!type && req.session.orderDraft && req.session.orderDraft.type) {
       type = req.session.orderDraft.type;
     }
+    // Resolve human-readable Type label to match Notion Select value
+    let typeLabel = '';
+    if (label && String(label).trim()) {
+      typeLabel = String(label).trim();
+    } else if (req.session.orderDraft && req.session.orderDraft.typeLabel) {
+      typeLabel = String(req.session.orderDraft.typeLabel);
+    } else if (type) {
+      typeLabel = TYPE_NAME_MAP[String(type).toLowerCase()] || String(type);
+    }
+
 
     }
 
@@ -1541,7 +1285,7 @@ app.post(
               Product: { relation: [{ id: product.id }] },
               "Status": { select: { name: "Pending" } },
               "Teams Members": { relation: [{ id: userId }] },
-              ...(type && typeProp ? { [typeProp]: { select: { name: String(type) } } } : {}),
+              ...(typeLabel && typeProp ? { [typeProp]: { select: { name: String(typeLabel) } } } : {}),
             },
           });
 
