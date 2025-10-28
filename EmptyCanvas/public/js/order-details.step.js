@@ -3,6 +3,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('detailsForm');
 
   // Prefill
+// Auto-skip details when type = damage
+try {
+  const __dd = await fetch('/api/order-draft', { credentials: 'same-origin' }).then(r=>r.json());
+  const __t = String(__dd?.type || '').toLowerCase();
+  if (__t === 'damage' || __t.includes('report damage')) { window.location.replace('/orders/new/products'); return; }
+} catch {}
+
   try {
     const d = await fetch('/api/order-draft', { credentials: 'same-origin' }).then(r => r.json());
     if (d.reason) orderReason.value = d.reason;
