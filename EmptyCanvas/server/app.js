@@ -1494,6 +1494,29 @@ app.get(
 );
 
 // Submit Order — requires Create New Order
+
+// Ensure the Type label exists in Notion options; otherwise return null
+async function resolveTypeLabelForNotion(label) {
+  try {
+    const typeProp = await detectTypePropName();
+    const props = await getOrdersDBProps();
+    const opts = (props?.[typeProp]?.select?.options) || [];
+    const norm = (s) => String(s||"").trim().toLowerCase();
+    const target = norm(label);
+    if (!target) return { typeProp, label: null };
+    let hit = opts.find(o => norm(o.name) === target);
+    if (hit) return { typeProp, label: hit.name };
+    const mapped = TYPE_NAME_MAP[target] || label;
+    hit = opts.find(o => norm(o.name) === norm(mapped));
+    if (hit) return { typeProp, label: hit.name };
+    hit = opts.find(o => norm(o.name).includes(target) || target.includes(norm(o.name)));
+    if (hit) return { typeProp, label: hit.name };
+    return { typeProp, label: null };
+  } catch (e) {
+    return { typeProp: null, label: null };
+  }
+}
+
 app.post(
   "/api/submit-order",
   requireAuth,
@@ -1518,15 +1541,13 @@ app.post(
     if (!type && req.session.orderDraft && req.session.orderDraft.type) {
       type = req.session.orderDraft.type;
     }
-    // Normalize 'type' to the human label for Notion
-    let typeLabel = '';
-    if (label && String(label).trim()) {
-      typeLabel = String(label).trim();
-    } else if (req.session.orderDraft && req.session.orderDraft.typeLabel) {
-      typeLabel = String(req.session.orderDraft.typeLabel);
-    } else if (type) {
-      typeLabel = (typeof TYPE_NAME_MAP !== 'undefined' && TYPE_NAME_MAP[String(type).toLowerCase()]) || String(type);
-    }
+    // Compute a safe label that exists in Notion options
+    let rawTypeLabel = (label && String(label).trim())
+      || (req.session.orderDraft && req.session.orderDraft.typeLabel)
+      || (TYPE_NAME_MAP[String(type||"").toLowerCase()] || String(type||""));
+    const __typeResolved = await resolveTypeLabelForNotion(rawTypeLabel);
+    const typeProp = __typeResolved.typeProp; // may be null if not found
+    const typeLabel = __typeResolved.label;   // null if not matched
 
 
     }
