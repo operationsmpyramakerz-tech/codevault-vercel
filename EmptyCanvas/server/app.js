@@ -526,7 +526,7 @@ app.post(
     req.session.orderDraft = req.session.orderDraft || {};
     const __code = String(type).trim();
     const __label = (req.body && req.body.label && String(req.body.label).trim())
-      || (typeof TYPE_NAME_MAP !== "undefined" && TYPE_NAME_MAP[__code.toLowerCase()])
+      || (typeof TYPE_NAME_MAP !== 'undefined' && TYPE_NAME_MAP[__code.toLowerCase()])
       || __code;
     req.session.orderDraft.type = __code;
     req.session.orderDraft.typeLabel = __label;
@@ -1518,13 +1518,14 @@ app.post(
     if (!type && req.session.orderDraft && req.session.orderDraft.type) {
       type = req.session.orderDraft.type;
     }
-    // Normalize 'type' to be the dropdown LABEL for Notion
+    // Normalize 'type' to the human label for Notion
+    let typeLabel = '';
     if (label && String(label).trim()) {
-      type = String(label).trim();
+      typeLabel = String(label).trim();
     } else if (req.session.orderDraft && req.session.orderDraft.typeLabel) {
-      type = String(req.session.orderDraft.typeLabel);
+      typeLabel = String(req.session.orderDraft.typeLabel);
     } else if (type) {
-      type = (typeof TYPE_NAME_MAP !== 'undefined' && TYPE_NAME_MAP[String(type).toLowerCase()]) || String(type);
+      typeLabel = (typeof TYPE_NAME_MAP !== 'undefined' && TYPE_NAME_MAP[String(type).toLowerCase()]) || String(type);
     }
 
 
@@ -1562,7 +1563,7 @@ app.post(
               Product: { relation: [{ id: product.id }] },
               "Status": { select: { name: "Pending" } },
               "Teams Members": { relation: [{ id: userId }] },
-              ...(type && typeProp ? { [typeProp]: { select: { name: String(type) } } } : {}),
+              ...(typeLabel && typeProp ? { [typeProp]: { select: { name: String(typeLabel) } } } : {}),
             },
           });
 
