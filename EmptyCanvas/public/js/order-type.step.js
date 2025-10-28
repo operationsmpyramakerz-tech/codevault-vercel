@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!res.ok) throw new Error('Failed to save request type.');
 
       // Go to Step 2: Order Details
-      window.location.href = '/orders/new/details';
+      const __t = String(typeVal).toLowerCase(); window.location.href = (__t==='damage'||__t.includes('report damage'))?'/orders/new/products':'/orders/new/details';
     } catch (err) {
       alert(err.message || 'Failed to save.');
     }
