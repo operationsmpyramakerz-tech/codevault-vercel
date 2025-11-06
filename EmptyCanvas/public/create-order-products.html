@@ -8,11 +8,6 @@
 <link href="/css/style.css" rel="stylesheet"/>
 <link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet"/>
 <script src="https://unpkg.com/feather-icons"></script>
-  <style>
-    .tabs-bar{display:flex;gap:10px;margin:8px 0 0}
-    .tab-btn{display:inline-flex;align-items:center;gap:8px;padding:.6rem 1rem;border-radius:999px;border:1px solid #E5E7EB;background:#F3F4F6;color:#374151;text-decoration:none;font-weight:700}
-    .tab-btn.active{background:#111827;color:#fff;border-color:#111827;box-shadow:0 8px 16px rgba(0,0,0,.18)}
-  </style>
 </head>
 <body>
 <script>
@@ -112,10 +107,6 @@
 </div>
 <div class="header-row2">
 <h1 class="page-title">Create New Order</h1>
-          <div class="tabs-bar">
-            <a class="tab-btn" id="tab-request" href="/orders/new/products?mode=request">Request Additional Components</a>
-            <a class="tab-btn" id="tab-damage"  href="/orders/new/products?mode=damage">Report Damage Components</a>
-          </div>
 </div>
 </header>
 <main class="container create-order-layout">
@@ -130,7 +121,7 @@
 <li class="step" data-step="3"><span class="circle">3</span><span class="label">Review</span></li>
 </ol>
 </section>
-<section class="card form-card" id="panel-request" hidden>
+<section class="card form-card">
 <div class="form-row-headers">
 <span>Product</span>
 <span>Quantity</span>
@@ -153,13 +144,6 @@
 <strong>Tip:</strong>: Use search to filter products quickly.</span>
 </div>
 </section>
-        <section class="card form-card" id="panel-damage" hidden>
-          <h2>Report Damage Components</h2>
-          <p class="muted">Coming soon: damaged component form & uploads.</p>
-          <div style="margin-top:.75rem;">
-            <a class="btn-3d btn-3d-blue" href="/orders/new?mode=damage">Back to Details</a>
-          </div>
-        </section>
 </main>
 </div>
 </div>
@@ -167,32 +151,5 @@
 <script src="/js/common-ui.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script src="/js/order-products.step.js"></script>
-<script>
-(function(){
-  const mode = (new URLSearchParams(location.search).get('mode')||'request').toLowerCase();
-  const isDamage = mode==='damage';
-  const reqTab = document.getElementById('tab-request');
-  const dmgTab = document.getElementById('tab-damage');
-  const reqPanel = document.getElementById('panel-request');
-  const dmgPanel = document.getElementById('panel-damage');
-  if(reqTab && dmgTab && reqPanel && dmgPanel){
-    reqTab.classList.toggle('active', !isDamage);
-    dmgTab.classList.toggle('active',  isDamage);
-    reqPanel.hidden = isDamage;
-    dmgPanel.hidden = !isDamage;
-  }
-  if(!isDamage){
-    const next = document.getElementById('nextReviewBtn');
-    next && next.addEventListener('click', function(){
-      const url = new URL('/orders/new/review', location.origin);
-      url.searchParams.set('mode','request');
-      location.href = url.toString();
-    });
-    // back link: force mode=request
-    const back = document.querySelector('a.nav-link[href="/orders/new"]');
-    if(back){ back.href = '/orders/new?mode=request'; }
-  }
-})();
-</script>
 </body>
 </html>
