@@ -1,97 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Create Order — Details</title>
-<link rel="stylesheet" href="/css/style.css"/>
-<script src="https://unpkg.com/feather-icons"></script>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Create Order — Details / Damage (Products First, Fixed)</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+  <script src="https://unpkg.com/feather-icons"></script>
+  <style>
+    .tabs-bar{display:flex;gap:10px;margin:8px 0 0}
+    .tab-btn{display:inline-flex;align-items:center;gap:8px;padding:.6rem 1rem;border-radius:999px;border:1px solid #E5E7EB;background:#F3F4F6;color:#374151;text-decoration:none;font-weight:700}
+    .tab-btn.active{background:#111827;color:#fff;border-color:#111827;box-shadow:0 8px 16px rgba(0,0,0,.18)}
+    .form-row-headers{display:grid;grid-template-columns:1fr 120px 60px;gap:10px;margin:.25rem 0 .5rem;color:#6B7280;font-weight:700}
+    .product-row{display:grid;grid-template-columns:1fr 120px 60px;gap:10px;align-items:center}
+    .product-url-link{display:none;align-items:center;justify-content:center;border:1px solid #E5E7EB;border-radius:8px;height:36px;width:36px}
+    .product-url-link i{pointer-events:none}
+  </style>
 </head>
 <body>
-<script>
-  (function() {
-    try {
-      if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
-        document.body.classList.add('sidebar-mini');
-      }
-    } catch(e) {}
-  })();
-</script>
-<div class="app-container">
-<aside class="sidebar">
-  <div class="sidebar-header">
-    <h2>Dashboard</h2>
-    <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true"><i data-feather="chevrons-left"></i></button>
-  </div>
-  <nav class="sidebar-nav">
-    <ul class="nav-list">
-      <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
-      <li><a class="nav-link" href="/orders/requested"><i data-feather="users"></i><span class="nav-label">Schools Requested Orders</span></a></li>
-      <li><a class="nav-link" href="/orders/assigned"><i data-feather="user-check"></i><span class="nav-label">Storage</span></a></li>
-      <li><a class="nav-link active" href="/orders/new"><i data-feather="plus-circle"></i><span class="nav-label">Create New Order</span></a></li>
-      <li><a class="nav-link" href="/stocktaking"><i data-feather="archive"></i><span class="nav-label">Stocktaking</span></a></li>
-      <li><a class="nav-link" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
-      <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
-      <li><a class="nav-link" href="/orders/sv-orders"><i data-feather="award"></i><span class="nav-label">S.V schools orders</span></a></li>
-      <li><a class="nav-link" href="/new-report-request.html"><i data-feather="folder-plus"></i><span class="nav-label">New Report / Request</span></a></li>
-    </ul>
-  </nav>
-  <div class="sidebar-footer">
-    <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
-  </div>
-</aside>
+  <script>(function(){try{if(window.innerWidth>768&&localStorage.getItem('ui.sidebarMini')==='1'){document.body.classList.add('sidebar-mini')}}catch(e){}})();</script>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Dashboard</h2>
+        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true"><i data-feather="chevrons-left"></i></button>
+      </div>
+      <nav class="sidebar-nav">
+        <ul class="nav-list">
+          <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
+          <li><a class="nav-link" href="/orders/requested"><i data-feather="users"></i><span class="nav-label">Schools Requested Orders</span></a></li>
+          <li><a class="nav-link" href="/orders/assigned"><i data-feather="user-check"></i><span class="nav-label">Storage</span></a></li>
+          <li><a class="nav-link active" href="/orders/new"><i data-feather="plus-circle"></i><span class="nav-label">Create New Order</span></a></li>
+          <li><a class="nav-link" href="/stocktaking"><i data-feather="archive"></i><span class="nav-label">Stocktaking</span></a></li>
+          <li><a class="nav-link" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
+          <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
+          <li><a class="nav-link" href="/orders/sv-orders"><i data-feather="award"></i><span class="nav-label">S.V schools orders</span></a></li>
+          <li><a class="nav-link" href="/new-report-request.html"><i data-feather="folder-plus"></i><span class="nav-label">New Report / Request</span></a></li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" id="logoutBtn"><i data-feather="log-out"></i> Logout</button>
+      </div>
+    </aside>
 
-<div class="main-content">
-<header class="main-header">
-  <div class="header-row1">
-    <div class="left">
-      <div class="greeting-pill" aria-live="polite">
-        <span class="greeting-avatar"><img src="/images/greeting-icon.png" alt="Hi icon"/></span>
-        <div class="greet-text">
-          <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
-          <div class="greet-sub">Start your day with operations</div>
+    <div class="main-content">
+      <header class="main-header">
+        <div class="header-row1">
+          <div class="left">
+            <div class="greeting-pill" aria-live="polite">
+              <span class="greeting-avatar"><img src="/images/greeting-icon.png" alt="Hi icon"/></span>
+              <div class="greet-text">
+                <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
+                <div class="greet-sub">Start your day with operations</div>
+              </div>
+            </div>
+          </div>
+          <div class="right topbar-right">
+            <a class="account-mini" href="/account" aria-label="My account" title="My account">
+              <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
+              <span class="label">My account</span>
+            </a>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="right topbar-right">
-      <a class="account-mini" href="/account" title="My account" aria-label="My account">
-        <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
-        <span class="label">My account</span>
-      </a>
+        <div class="header-row2">
+          <h1 class="page-title">Create New Order</h1>
+          <div class="tabs-bar">
+            <a class="tab-btn" id="tab-request" href="/orders/new?mode=request">Request Additional Components</a>
+            <a class="tab-btn" id="tab-damage"  href="/orders/new?mode=damage">Report Damage Components</a>
+          </div>
+        </div>
+      </header>
+
+      <main class="container create-order-layout">
+        <section class="page-stepper">
+          <ol class="stepper" id="order-stepper" aria-label="Order steps">
+            <li class="step active" data-step="1"><span class="circle">1</span><span class="label" id="step1label">Order Details</span><span class="bar"></span></li>
+            <li class="step" data-step="2"><span class="circle">2</span><span class="label" id="step2label">Products</span><span class="bar"></span></li>
+            <li class="step" data-step="3"><span class="circle">3</span><span class="label" id="step3label">Review</span></li>
+          </ol>
+        </section>
+
+        <!-- REQUEST: original details form (unchanged) -->
+        <section class="card form-card" id="panel-request" hidden>
+          <form id="detailsForm" autocomplete="off">
+            <div class="form-group">
+              <label for="orderReason">Order Reason</label>
+              <input type="text" id="orderReason" name="orderReason" placeholder="e.g., Materials for steam fair" required/>
+            </div>
+            <div class="form-actions">
+              <span></span>
+              <button id="nextStepBtn" type="submit" class="submit-btn elevated">Next: Products</button>
+            </div>
+            <div class="tip-callout" role="note"><i data-feather="info"></i><span><strong>Tip:</strong> Keep it concise and clear.</span></div>
+          </form>
+        </section>
+
+        <!-- DAMAGE: Products UI is step 1 -->
+        <section class="card form-card" id="panel-damage" hidden>
+          <h2 class="section-title" style="margin-top:0">Products</h2>
+          <div class="form-row-headers">
+            <span>Product</span><span>Quantity</span><span></span>
+          </div>
+          <div id="products-container"></div>
+          <div class="form-actions">
+            <button id="addProductBtn" type="button" class="btn-outline-pill"><i data-feather="plus"></i><span>Add Another Product</span></button>
+            <div style="display:flex; gap:10px;">
+              <a class="nav-link" href="/orders/new?mode=damage" style="padding:.75rem 1rem; border:1px solid #D1D5DB; border-radius:12px; text-decoration:none; color:#374151; background:#fff;">Back</a>
+              <button id="nextReviewBtn" type="button" class="submit-btn elevated">Next: Review</button>
+            </div>
+          </div>
+          <div class="tip-callout" role="note"><i data-feather="info"></i><span><strong>Tip:</strong> Use search to filter products quickly.</span></div>
+        </section>
+      </main>
     </div>
   </div>
-  <div class="header-row2"><h1 class="page-title">Create New Order</h1></div>
-</header>
 
-<main class="container create-order-layout">
-  <section class="page-stepper">
-    <ol id="order-stepper" class="stepper" aria-label="Order steps">
-      <li class="step completed" data-step="1"><span class="circle">1</span><span class="label">Type of Request</span><span class="bar"></span></li>
-      <li class="step active" data-step="2"><span class="circle">2</span><span class="label">Order Details</span><span class="bar"></span></li>
-      <li class="step" data-step="3"><span class="circle">3</span><span class="label">Products</span><span class="bar"></span></li>
-      <li class="step" data-step="4"><span class="circle">4</span><span class="label">Review</span></li>
-    </ol>
-  </section>
+  <script>feather.replace();</script>
+  <script src="/js/common-ui.js"></script>
+  <!-- IMPORTANT: include main products logic so fields render -->
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <script src="/js/order-products.step.js"></script>
+  <!-- Tiny shim to keep ?mode=damage on Next: Review -->
+  <script src="/js/order-products.step.damage.js"></script>
 
-  <section class="card form-card">
-    <form id="detailsForm" autocomplete="off">
-      <div class="form-group">
-        <label for="orderReason">Order Reason</label>
-        <input type="text" id="orderReason" name="orderReason" placeholder="e.g., Materials for steam fair" required/>
-      </div>
-      <div class="form-actions">
-        <a class="nav-link" href="/orders/new/type" style="padding:.75rem 1rem; border:1px solid #D1D5DB; border-radius:12px; text-decoration:none; color:#374151; background:#fff;">Back</a>
-        <button type="submit" id="nextStepBtn" class="submit-btn elevated">Next: Products</button>
-      </div>
-      <div class="tip-callout" role="note"><i data-feather="info"></i><span><strong>Tip:</strong> Keep it concise and clear.</span></div>
-    </form>
-  </section>
-</main>
-</div>
-</div>
+  <script>
+  (function(){
+    const mode = (new URLSearchParams(location.search).get('mode')||'request').toLowerCase();
+    const isDamage = mode==='damage';
+    document.getElementById('tab-request').classList.toggle('active', !isDamage);
+    document.getElementById('tab-damage').classList.toggle('active',  isDamage);
+    document.getElementById('panel-request').hidden = isDamage;
+    document.getElementById('panel-damage').hidden  = !isDamage;
+    if(isDamage){
+      const s1 = document.getElementById('step1label');
+      const s2 = document.getElementById('step2label');
+      if(s1) s1.textContent = 'Products';
+      if(s2) s2.textContent = 'Review';
+    }
+  })();
+  </script>
+  <script>
+document.addEventListener('DOMContentLoaded', function(){
+  const form = document.getElementById('detailsForm');
+  const reasonInput = document.getElementById('orderReason');
+  if(!form || !reasonInput) return; // IDs must match your markup
 
-<script>feather.replace();</script>
-<script src="/js/common-ui.js"></script>
-<script src="/js/order-details.step.js"></script>
+  form.addEventListener('submit', async function(e){
+    e.preventDefault(); e.stopPropagation();
+    const reason = (reasonInput.value || '').trim();
+    if(!reason){ alert('Please enter the order reason.'); return; }
+
+    try{
+      const res = await fetch('/api/order-draft/details', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({ reason })
+      });
+      if(!res.ok) throw new Error('Failed to save details.');
+      const url = new URL('/orders/new/products', location.origin);
+      url.searchParams.set('mode','request');
+      location.href = url.toString();
+    }catch(err){
+      alert(err.message || 'Failed to save details.');
+    }
+  });
+});
+</script>
 </body>
 </html>
