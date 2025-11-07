@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Damaged Assets</title>
   <link rel="stylesheet" href="/style.css"/>
+
   <style>
+    /* تنسيقات خفيفة للكانتينر الداخلي للفورم */
     .container{max-width:900px;margin:24px auto;padding:16px}
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px}
     .row{display:flex;gap:12px;flex-wrap:wrap}
@@ -19,49 +21,101 @@
     .note{color:#6b7280;font-size:12px;margin-top:6px}
     .ok{color:#065f46}
     .err{color:#991b1b}
+
+    /* هيكل تخطيط بسيط للداشبورد لو الصفحة دي كانت مستقلة */
+    .layout{display:flex;min-height:100dvh;background:#f7f7f8}
+    .sidebar{width:260px;background:#0c1222;color:#fff;display:flex;flex-direction:column}
+    .sidebar__header{padding:18px 20px;font-weight:700}
+    .nav-list{list-style:none;margin:0;padding:6px 8px 18px 8px}
+    .nav-link{display:flex;gap:10px;align-items:center;color:#cfd8e3;text-decoration:none;
+              padding:10px 12px;border-radius:10px}
+    .nav-link:hover{background:#131a2c;color:#fff}
+    .nav-link.active{background:#ffefe9;color:#8b2a00}
+    .nav-label{line-height:1}
+    .content{flex:1;padding:24px}
+    @media (max-width: 1024px) { .sidebar{display:none} .content{padding:16px} }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Damaged Assets</h1>
-    <div class="card">
-      <form id="damageForm">
-        <div class="row">
-          <div class="field">
-            <label for="assetName">Asset Name *</label>
-            <input id="assetName" name="assetName" type="text" placeholder="e.g., 3D Printer, Laptop #A-12" required/>
-          </div>
-          <div class="field">
-            <label for="location">Location</label>
-            <input id="location" name="location" type="text" placeholder="e.g., Lab A, Storage Room" />
-          </div>
-          <div class="field">
-            <label for="severity">Severity</label>
-            <select id="severity" name="severity">
-              <option value="">-- optional --</option>
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-              <option>Critical</option>
-            </select>
-          </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar__header">Dashboard</div>
+      <ul class="nav-list">
+        <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/requested"><i data-feather="inbox"></i><span class="nav-label">Requested Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/assigned"><i data-feather="users"></i><span class="nav-label">Assigned Schools Requested Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/new"><i data-feather="plus-square"></i><span class="nav-label">Create New Order</span></a></li>
+        <li><a class="nav-link" href="/stocktaking"><i data-feather="package"></i><span class="nav-label">Stocktaking</span></a></li>
+        <li><a class="nav-link" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
+        <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
+        <li><a class="nav-link" href="/sv-schools-orders"><i data-feather="check-circle"></i><span class="nav-label">S.V schools orders</span></a></li>
+        <li><a class="nav-link" href="/new-report-request"><i data-feather="file-plus"></i><span class="nav-label">New Report / Request</span></a></li>
+
+        <!-- الرابط المهم: Damaged Assets (أيقونة تحذير) -->
+        <li><a class="nav-link active" href="/damaged-assets">
+          <i data-feather="alert-octagon"></i><span class="nav-label">Damaged Assets</span>
+        </a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+      <div class="container">
+        <h1>Damaged Assets</h1>
+        <div class="card">
+          <form id="damageForm">
+            <div class="row">
+              <div class="field">
+                <label for="assetName">Asset Name *</label>
+                <input id="assetName" name="assetName" type="text" placeholder="e.g., 3D Printer, Laptop #A-12" required/>
+              </div>
+              <div class="field">
+                <label for="location">Location</label>
+                <input id="location" name="location" type="text" placeholder="e.g., Lab A, Storage Room" />
+              </div>
+              <div class="field">
+                <label for="severity">Severity</label>
+                <select id="severity" name="severity">
+                  <option value="">-- optional --</option>
+                  <option>Low</option>
+                  <option>Medium</option>
+                  <option>High</option>
+                  <option>Critical</option>
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="field" style="flex:1 1 100%">
+                <label for="damageDescription">Damage Description *</label>
+                <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage, when it happened, and any context..." required></textarea>
+                <div class="note">This will be saved to the Notion column named <b>Damage Description</b> (or the first rich text column if that one does not exist).</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" type="submit">Submit Report</button>
+            </div>
+            <div id="msg" class="note" aria-live="polite"></div>
+          </form>
         </div>
-        <div class="row">
-          <div class="field" style="flex:1 1 100%">
-            <label for="damageDescription">Damage Description *</label>
-            <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage, when it happened, and any context..." required></textarea>
-            <div class="note">This will be saved to the Notion column named <b>Damage Description</b> (or the first rich text column if that one does not exist).</div>
-          </div>
-        </div>
-        <div class="actions">
-          <button class="btn btn-primary" type="submit">Submit Report</button>
-        </div>
-        <div id="msg" class="note" aria-live="polite"></div>
-      </form>
-    </div>
+      </div>
+    </main>
   </div>
 
+  <!-- Feather icons -->
+  <script src="https://unpkg.com/feather-icons"></script>
+
   <script>
+    // فعّل الأيقونات
+    feather.replace();
+
+    // فعّل الهايلايت تلقائيًا حسب المسار (لو عايز تسيبه بدل class="active" manual)
+    document.querySelectorAll('.nav-link').forEach(a => {
+      if (a.getAttribute('href') === location.pathname) a.classList.add('active');
+    });
+
+    // نفس سكريبت الإرسال اللي عندك
     const el = (id) => document.getElementById(id);
     const msg = el('msg');
     document.getElementById('damageForm').addEventListener('submit', async (e) => {
