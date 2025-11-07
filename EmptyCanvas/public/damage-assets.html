@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Damaged Assets</title>
+  <link rel="stylesheet" href="/style.css"/>
+  <style>
+    .container{max-width:900px;margin:24px auto;padding:16px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .field{flex:1 1 280px;display:flex;flex-direction:column;gap:6px}
+    label{font-weight:600;color:#111827}
+    input[type="text"], textarea, select{border:1px solid #d1d5db;border-radius:8px;padding:10px}
+    textarea{min-height:120px}
+    .actions{margin-top:16px;display:flex;gap:12px}
+    .btn{border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .btn-primary{background:#111827;color:#fff}
+    .note{color:#6b7280;font-size:12px;margin-top:6px}
+    .ok{color:#065f46}
+    .err{color:#991b1b}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Damaged Assets</h1>
+    <div class="card">
+      <form id="damageForm">
+        <div class="row">
+          <div class="field">
+            <label for="assetName">Asset Name *</label>
+            <input id="assetName" name="assetName" type="text" placeholder="e.g., 3D Printer, Laptop #A-12" required/>
+          </div>
+          <div class="field">
+            <label for="location">Location</label>
+            <input id="location" name="location" type="text" placeholder="e.g., Lab A, Storage Room" />
+          </div>
+          <div class="field">
+            <label for="severity">Severity</label>
+            <select id="severity" name="severity">
+              <option value="">-- optional --</option>
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+              <option>Critical</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1 1 100%">
+            <label for="damageDescription">Damage Description *</label>
+            <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage, when it happened, and any context..." required></textarea>
+            <div class="note">This will be saved to the Notion column named <b>Damage Description</b> (or the first rich text column if that one does not exist).</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Submit Report</button>
+        </div>
+        <div id="msg" class="note" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const msg = el('msg');
+    document.getElementById('damageForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = 'Submitting...';
+      msg.className = 'note';
+
+      const payload = {
+        assetName: el('assetName').value.trim(),
+        damageDescription: el('damageDescription').value.trim(),
+        location: el('location').value.trim(),
+        severity: el('severity').value,
+      };
+
+      if (!payload.assetName || !payload.damageDescription) {
+        msg.textContent = 'Please fill the required fields.';
+        msg.className = 'note err';
+        return;
+      }
+
+      try {
+        const r = await fetch('/api/damaged-assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Failed');
+        msg.textContent = 'Saved! Notion page created.';
+        msg.className = 'note ok';
+        e.target.reset();
+      } catch (err) {
+        msg.textContent = 'Error: ' + (err.message || 'Failed to save.');
+        msg.className = 'note err';
+      }
+    });
+  </script>
+</body>
+</html>
