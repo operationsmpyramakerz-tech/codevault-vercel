@@ -13,6 +13,7 @@ const ordersDatabaseId = process.env.Products_list;
 const teamMembersDatabaseId = process.env.Team_Members;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
+const damagedAssetsDatabaseId = process.env.Damaged_Assets;
 // ----- Hardbind: Received Quantity property name (Number) -----
 const REC_PROP_HARDBIND = "Quantity received by operations";
 
@@ -54,7 +55,8 @@ const ALL_PAGES = [
   "Stocktaking",
   "Funds",
   "Logistics",
-  "S.V schools orders",
+  "S.V schools orders"
+  "Damaged Assets",
 ];
 
 const norm = (s) => String(s || "").trim().toLowerCase();
@@ -81,6 +83,7 @@ function normalizePages(names = []) {
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
   if (set.has("logistics")) out.push("Logistics");  if (set.has("s.v schools orders") || set.has("sv schools orders")) out.push("S.V schools orders");
+  if (set.has("damaged assets")) out.push("Damaged Assets");
 
   return out;
 }
@@ -102,6 +105,7 @@ function expandAllowedForUI(list = []) {
   if (set.has("Logistics")) {
     set.add("Logistics");
   }
+  if (set.has("Damaged Assets")) { set.add("Damaged Assets"); }
   return Array.from(set);
 }
 
@@ -312,6 +316,10 @@ app.get("/funds", requireAuth, requirePage("Funds"), (req, res) => {
 // Logistics page
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "logistics.html"));
+});
+// Damaged Assets page
+app.get("/damaged-assets", requireAuth, requirePage("Damaged Assets"), (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "damaged-assets.html"));
 });
 
 // --- API Routes ---
@@ -2469,4 +2477,113 @@ app.post(
     }
   }
 );
+
+// === Damaged Assets: submit report ===
+app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), async (req, res) => {
+  try {
+    if (!damagedAssetsDatabaseId) {
+      return res.status(500).json({ ok: false, error: "Damaged_Assets database ID is not configured." });
+    }
+    const { assetName, damageDescription, location, severity, photos = [] } = req.body || {};
+
+    // المستخدم الحالي (لو عندك relation على Team Members)
+    const userQuery = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: req.session.username } },
+    });
+    const currentUserId = userQuery.results?.[0]?.id || null;
+
+    // قراءة خصائص قاعدة Damaged_Assets لمواءمة الأعمدة آمنًا
+    const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
+    const props = db.properties || {};
+
+    const titleKey = Object.keys(props).find(k => props[k]?.type === "title") || "Name";
+    const findProp = (wantedType, candidates = [], regexHint = null) => {
+      // جرّب المرشحين بالأسماء أولًا
+      for (const c of candidates) {
+        const p = props[c];
+        if (p && p.type === wantedType) return c;
+      }
+      // جرّب الـ regex على أسماء الأعمدة
+      if (regexHint) {
+        const rx = new RegExp(regexHint, "i");
+        for (const k of Object.keys(props)) {
+          if (props[k]?.type === wantedType && rx.test(k)) return k;
+        }
+      }
+      // أول عمود من النوع المطلوب كحل أخير
+      for (const k of Object.keys(props)) {
+        if (props[k]?.type === wantedType) return k;
+      }
+      return null;
+    };
+
+    const descKey  = findProp("rich_text", ["Damage Description", "Description", "Details", "Notes"], "(damage|desc|note|detail)");
+    const placeKey = findProp("rich_text", ["Location", "Place", "Area", "Site"], "(locat|place|site|area)");
+    const dateKey  = findProp("date",      ["Date", "Reported On", "Report Date"], "(date|report)");
+
+    // relation على Team Members لو موجود
+    let reporterKey = null;
+    for (const [k, v] of Object.entries(props)) {
+      if (v?.type === "relation" && v?.relation?.database_id === teamMembersDatabaseId) {
+        reporterKey = k;
+        break;
+      }
+    }
+
+    const severityKey = findProp("select", ["Severity", "Level", "Priority"], "(severity|level|priority)");
+
+    const properties = {};
+    // العنوان (Title)
+    properties[titleKey] = { title: [{ text: { content: (assetName || "Damaged asset").toString() } }] };
+
+    // Damage Description — المطلوبة منك صراحةً
+    if (descKey) {
+      properties[descKey] = { rich_text: [{ text: { content: (damageDescription || "").toString() } }] };
+    }
+
+    // Location
+    if (placeKey && location) {
+      properties[placeKey] = { rich_text: [{ text: { content: location.toString() } }] };
+    }
+
+    // التاريخ اليوم
+    if (dateKey) {
+      const today = new Date().toISOString().slice(0,10);
+      properties[dateKey] = { date: { start: today } };
+    }
+
+    // المبلّغ (لو فيه relation مناسب)
+    if (reporterKey && currentUserId) {
+      properties[reporterKey] = { relation: [{ id: currentUserId }] };
+    }
+
+    // مستوى الشدة (لو فيه عمود Select مناسب)
+    if (severityKey && severity) {
+      properties[severityKey] = { select: { name: severity.toString() } };
+    }
+
+    const created = await notion.pages.create({
+      parent: { database_id: damagedAssetsDatabaseId },
+      properties
+    });
+
+    // لو فيه عمود Files واتبعت صور (روابط خارجية)
+    const filesKey = Object.keys(props).find(k => props[k]?.type === "files");
+    if (filesKey && Array.isArray(photos) && photos.length) {
+      const files = photos.slice(0, 10).map((u, i) => ({ type: "external", name: "photo-" + (i+1), external: { url: u }}));
+      try {
+        await notion.pages.update({
+          page_id: created.id,
+          properties: { [filesKey]: { files } }
+        });
+      } catch {}
+    }
+
+    res.json({ ok: true, id: created.id });
+  } catch (e) {
+    console.error("Damaged Assets submit error:", e?.body || e);
+    res.status(500).json({ ok: false, error: "Failed to save damaged asset report" });
+  }
+});
 module.exports = app;
