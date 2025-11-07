@@ -55,7 +55,7 @@ const ALL_PAGES = [
   "Stocktaking",
   "Funds",
   "Logistics",
-  "S.V schools orders"
+  "S.V schools orders",
   "Damaged Assets",
 ];
 
