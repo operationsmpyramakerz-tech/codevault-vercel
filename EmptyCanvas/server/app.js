@@ -2440,8 +2440,6 @@ app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async 
     return res.status(500).json({ error: "Failed to load S.V orders" });
   }
 });
-
-
 // --- S.V schools orders: Approve/Reject (updates Notion "S.V Approval") ---
 app.post(
   ["/api/sv-orders/:id/approval", "/sv-orders/:id/approval"],
@@ -2477,7 +2475,6 @@ app.post(
     }
   }
 );
-
 // === Damaged Assets: submit report ===
 app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), async (req, res) => {
   try {
