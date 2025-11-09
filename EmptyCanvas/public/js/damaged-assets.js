@@ -7,36 +7,29 @@ let PRODUCT_OPTIONS = []; // [{id, name}]
 
 // ---------------------- Options loader (Notion) ----------------------
 async function loadProductOptions() {
-  // نجرب أكثر من endpoint مستخدم في المشروع (زي صفحة Create Order)
-  const candidates = [
-    '/api/options/products',
-    '/api/products/options',
-    '/api/order-products/options',
-    '/api/orders/products/options',
-    '/api/damaged-assets/options' // لو كنت عامل واحد خاص بالصفحة
-  ];
-
-  for (const url of candidates) {
-    try {
-      const r = await fetch(url, { credentials: 'same-origin' });
-      if (!r.ok) continue;
-      const j = await r.json();
-      const list = Array.isArray(j) ? j : (Array.isArray(j.options) ? j.options : []);
-      if (list.length) {
-        // نوحّد الشكل إلى {id, name}
-        PRODUCT_OPTIONS = list.map(o => ({
-          id: String(o.id ?? o.pageId ?? o.value ?? o.slug ?? ''),
-          name: String(o.name ?? o.title ?? o.label ?? o.text ?? '').trim() || String(o.id ?? '')
-        })).filter(x => x.id);
-        console.debug('[DamagedAssets] loaded products from', url, PRODUCT_OPTIONS.length);
-        return;
-      }
-    } catch (e) {
-      // نكمل نجرب الباقيين
-    }
-  }
-  console.warn('[DamagedAssets] no products options found from any endpoint');
   PRODUCT_OPTIONS = [];
+  try {
+    const r = await fetch('/api/damaged-assets/products', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const list = Array.isArray(j.options) ? j.options : [];
+    PRODUCT_OPTIONS = list.map(o => ({
+      id: String(o.id || ''),
+      name: String(o.name || '').trim() || String(o.id || '')
+    })).filter(x => x.id);
+    // أعِد تعبئة أي select كانت مضافة قبل وصول الداتا
+    document.querySelectorAll('select[id^="product"]').forEach(sel => {
+      // لو فضيّة أو معلّم عليها populate متأخر
+      if (!sel.options.length || sel.dataset.needsPopulate === '1') {
+        sel.dataset.needsPopulate = '';
+        // دالة populateSelect موجودة بالفعل في ملفك
+        populateSelect(sel);
+      }
+    });
+  } catch (e) {
+    console.error('options error:', e);
+    PRODUCT_OPTIONS = [];
+  }
 }
 
 // ---------------------- Basic UI helpers ----------------------
