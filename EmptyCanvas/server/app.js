@@ -2571,17 +2571,17 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
       process.env.PRODUCTS_DATABASE_ID ||
       null;
 
-    // لو عندك relation لـ Team Members هنجيب صفحة المستخدم الحالي
-    let currentUserId = null;
-    try {
-      if (teamMembersDatabaseId) {
-        const userQuery = await notion.databases.query({
-          database_id: teamMembersDatabaseId,
-          filter: { property: "Name", title: { equals: req.session.username } },
-        });
-        currentUserId = userQuery.results?.[0]?.id || null;
-      }
-    } catch {}
+    // Resolve current user (Team Members) once and reuse
+let reporterId = null;
+try {
+  if (teamMembersDatabaseId) {
+    const userQuery = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: req.session.username } },
+    });
+    reporterId = userQuery.results?.[0]?.id || null;
+  }
+} catch {}
 
     // نقرأ خصائص قاعدة Damaged_Assets مرة واحدة
     const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
@@ -2639,14 +2639,15 @@ for (const [k, v] of Object.entries(props)) {
     
 
     // ====== فرع الـ V2: items[] ======
-    const items = Array.isArray(req.body?.items) ? req.body.items : null;
-    if (items && items.length) {
-      const created = [];
-      // Resolve current user's Team Member page (by email then name)
-let currentUserId =
-  req.session?.notionMemberPageId ||
-  req.user?.notionMemberPageId ||
-  null;
+const items = Array.isArray(req.body?.items) ? req.body.items : null;
+if (items && items.length) {
+  const created = [];
+
+  // استخدم الـ ID اللي جبناه فوق، ولو مش موجود جرّب نجيبه بالاسم مرّة أخرى
+  let tmId = reporterId;
+  if (!tmId && teamMembersDatabaseId) {
+    try { tmId = await getCurrentUserPageId(req.session.username); } catch {}
+  }
 
 if (!currentUserId && teamMembersDatabaseId) {
   try {
@@ -2706,9 +2707,9 @@ if (!currentUserId && teamMembersDatabaseId) {
         }
 
         // Team Member (المبلّغ)
-        if (reporterKey && currentUserId) {
-          properties[reporterKey] = { relation: [{ id: currentUserId }] };
-        }
+if (reporterKey && tmId) {
+  properties[reporterKey] = { relation: [{ id: tmId }] };
+}
 
         // Date = اليوم
         if (dateKey) {
@@ -2759,9 +2760,9 @@ if (!currentUserId && teamMembersDatabaseId) {
       properties[dateKey] = { date: { start: today } };
     }
 
-    if (reporterKey && currentUserId) {
-      properties[reporterKey] = { relation: [{ id: currentUserId }] };
-    }
+    if (reporterKey && reporterId) {
+  properties[reporterKey] = { relation: [{ id: reporterId }] };
+}
 
     // Severity (select/status) لو موجود
     const severityKey = findProp("select", ["Severity", "Level", "Priority"], "(severity|level|priority)");
