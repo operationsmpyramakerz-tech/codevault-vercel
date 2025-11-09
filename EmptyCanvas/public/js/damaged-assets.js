@@ -1,16 +1,18 @@
-// damaged-assets.js — نفس أسلوب funds.js مع تعدد المكوّنات ورفع ملفات
+// damaged-assets.js — Damaged Assets Form Handler (like funds.js pattern)
 
 let itemCounter = 0;
 let PRODUCT_OPTIONS = []; // {id, name}
 
-// نحمل خيارات Products (ريليشن من Notion)
+// Load options for Products (relation)
 async function loadProductOptions() {
   try {
+    // Endpoint مخصص للخيارات (خليه يرجع [{id,name},...])
     const res = await fetch('/api/damaged-assets/options', { credentials: 'same-origin' });
     if (!res.ok) throw new Error('Failed to load options');
     const data = await res.json();
     PRODUCT_OPTIONS = Array.isArray(data.options) ? data.options : [];
   } catch (e) {
+    // Fallback بسيط (هتغيره حسب ما تحب)
     PRODUCT_OPTIONS = [];
   }
 }
@@ -33,33 +35,38 @@ function populateProductSelect(selectEl, selectedId) {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-  await loadProductOptions();
+  await initializePage();
 
-  document.getElementById('addComponentBtn').addEventListener('click', addItemEntry);
-  document.getElementById('damagedFormV2').addEventListener('submit', handleFormSubmit);
+  document.getElementById('addItemBtn').addEventListener('click', addItemEntry);
+  document.getElementById('damagedForm').addEventListener('submit', handleFormSubmit);
 
-  // أول عنصر افتراضي
+  // Entry أولى
   addItemEntry();
 
-  // تحذير مبكر لو الداتابيز غير مهيأة
+  // فحص إعدادات قاعدة البيانات (اختياري لرسائل التنبيه)
   checkDatabaseConfiguration();
 });
 
-// إنشاء مكوّن واحد
+async function initializePage() {
+  await loadProductOptions();
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+}
+
+// Add one component entry
 function addItemEntry() {
   itemCounter++;
 
-  const itemsList = document.getElementById('componentsList');
+  const itemsList = document.getElementById('itemsList');
   const wrap = document.createElement('div');
-  wrap.className = 'component-entry';
+  wrap.className = 'expense-entry';
   wrap.dataset.itemId = itemCounter;
 
   wrap.innerHTML = `
-    <div class="component-head">
-      <h3><i data-feather="package"></i> Component ${itemCounter}</h3>
-      <button type="button" class="btn btn-danger remove-expense" data-item-id="${itemCounter}" title="Delete component">
-        <i data-feather="trash-2"></i> Remove
-      </button>
+    <div class="expense-header">
+      <h4><i data-feather="package"></i> Component ${itemCounter}</h4>
+      <button type="button" class="expense-status remove-expense" data-item-id="${itemCounter}" title="Delete component"></button>
     </div>
 
     <div class="form-row">
@@ -109,33 +116,37 @@ function addItemEntry() {
 
   itemsList.appendChild(wrap);
 
-  // تعبئة قائمة المنتجات
+  // Populate products
   populateProductSelect(document.getElementById(`product${itemCounter}`));
 
-  // حذف المكوّن
+  // Remove handler
   const rm = wrap.querySelector('.remove-expense');
   rm.addEventListener('click', () => removeItemEntry(itemCounter));
 
+  // Feather for injected nodes
   feather.replace();
 
+  // Focus on the product select
   document.getElementById(`product${itemCounter}`).focus();
 }
 
 function removeItemEntry(id) {
   const el = document.querySelector(`[data-item-id="${id}"]`);
   if (!el) return;
-  const total = document.querySelectorAll('.component-entry').length;
+  const total = document.querySelectorAll('.expense-entry').length;
   if (total <= 1) return showToast('At least one component is required', 'error');
   el.remove();
 }
 
 function validateForm() {
-  const nodes = document.querySelectorAll('.component-entry');
+  const nodes = document.querySelectorAll('.expense-entry');
   let ok = false;
   for (const n of nodes) {
     const product = n.querySelector('[name*="[productId]"]');
     const title   = n.querySelector('[name*="[title]"]');
-    if (product?.value && title?.value?.trim()) { ok = true; break; }
+    if (product?.value && title?.value?.trim()) {
+      ok = true; break;
+    }
   }
   if (!ok) showToast('Please add at least one complete component', 'error');
   return ok;
@@ -143,7 +154,7 @@ function validateForm() {
 
 async function handleFormSubmit(e) {
   e.preventDefault();
-  const btn = document.getElementById('submitBtnV2');
+  const btn = document.getElementById('submitBtn');
 
   try {
     btn.disabled = true;
@@ -153,6 +164,7 @@ async function handleFormSubmit(e) {
     if (!validateForm()) return;
 
     const payload = await collectPayload();
+    // أرسل JSON — مثل funds.js (رفع الملفات الحقيقي اختياري لاحقًا)
     const res = await fetch('/api/damaged-assets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -160,6 +172,7 @@ async function handleFormSubmit(e) {
       body: JSON.stringify(payload)
     });
 
+    // تأكد إنه JSON
     const ct = res.headers.get('content-type') || '';
     if (!ct.includes('application/json')) {
       const t = await res.text();
@@ -186,7 +199,7 @@ async function handleFormSubmit(e) {
 
 async function collectPayload() {
   const items = [];
-  const entries = document.querySelectorAll('.component-entry');
+  const entries = document.querySelectorAll('.expense-entry');
   for (const entry of entries) {
     const id    = entry.dataset.itemId;
     const sel   = document.getElementById(`product${id}`);
@@ -200,10 +213,10 @@ async function collectPayload() {
     const productName = sel.options[sel.selectedIndex]?.text || '';
 
     const item = {
-      product: { id: productId, name: productName },
-      title: title.value.trim(),
-      reason: (reason?.value || '').trim(),
-      files: []
+      product: { id: productId, name: productName }, // relation Products
+      title: title.value.trim(),                      // Title (Description of issue)
+      reason: (reason?.value || '').trim(),          // Text (Issue Reason)
+      files: []                                      // Files metadata (optional)
     };
 
     if (files && files.files && files.files.length) {
@@ -219,8 +232,8 @@ async function collectPayload() {
 }
 
 function resetForm() {
-  document.getElementById('damagedFormV2').reset();
-  const list = document.getElementById('componentsList');
+  document.getElementById('damagedForm').reset();
+  const list = document.getElementById('itemsList');
   list.innerHTML = '';
   itemCounter = 0;
   addItemEntry();
@@ -231,7 +244,16 @@ function showToast(message, type='info') {
   else alert(message);
 }
 
-// اختيارية
+async function handleLogout() {
+  try {
+    const r = await fetch('/api/logout', { method:'POST', credentials:'same-origin' });
+    if (r.ok) location.href = '/login';
+  } catch {
+    location.href = '/login';
+  }
+}
+
+// Ping simple check (اختياري لعرض رسائل إعداد القاعدة)
 async function checkDatabaseConfiguration() {
   try {
     const r = await fetch('/api/damaged-assets/check', { credentials:'same-origin' });
