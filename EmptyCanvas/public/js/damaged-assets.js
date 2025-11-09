@@ -1,410 +1,281 @@
-// damaged-assets.js — Damaged Assets (Funds-like) with searchable Products select
+// public/js/damaged-assets.js
+// Damaged Assets page – products dropdown with Choices.js (same UX as order-products.step)
 
-let itemCounter = 0;
-let PRODUCT_OPTIONS = []; // [{id, name}]
+(() => {
+  // -------- State ----------
+  let components = [];             // [{ id, name, url? }]
+  let isComponentsLoaded = false;
+  const toHydrate = [];            // waits for data: { inst, container, defaultId }
+  let urlById = new Map();         // (optional) id -> url
 
-// ---------------------- helpers to normalize server payload ----------------------
-const PRODUCTS_ENDPOINTS = [
-  '/api/damaged-assets/options',
-  '/api/options/products',
-  '/api/products/options',
-  '/api/products/list',
-  '/api/catalog/products',
-];
+  let itemCounter = 0;
 
-function toStr(v) {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (Array.isArray(v)) return v.map(toStr).filter(Boolean).join(' ');
-  if (typeof v === 'object') {
-    // Notion-like rich text/title shapes
-    if (v.plain_text) return String(v.plain_text);
-    if (v.text?.content) return String(v.text.content);
-    if (v.name) return toStr(v.name);
-    if (v.title) return toStr(v.title);
-  }
-  return String(v ?? '');
-}
+  // -------- DOM ----------
+  const listEl   = document.getElementById('itemsList');      // container for components entries
+  const addBtn   = document.getElementById('addItemBtn');     // "Add Component" button
+  const formEl   = document.getElementById('damagedForm');    // main form
+  const logoutBtn= document.getElementById('logoutBtn');      // sidebar logout (if exists)
+  const submitBtn= document.getElementById('submitBtn');      // submit button
 
-function normalizeArray(arr) {
-  const seen = new Set();
-  const out = [];
-  for (const o of arr || []) {
-    const id =
-      o.id ||
-      o.pageId ||
-      o.value ||
-      o.key ||
-      o._id ||
-      o.notionId ||
-      o.page_id ||
-      '';
-    // أفضل اسم ممكن
-    const nameCandidate =
-      o.name ??
-      o.title ??
-      o.label ??
-      o.text ??
-      o.displayName ??
-      o.productName ??
-      (o.properties?.Name?.title) ??
-      (o.properties?.name?.title);
+  // Use the same endpoint used by the products step
+  const COMPONENTS_ENDPOINT = '/api/components';
 
-    const name = toStr(nameCandidate) || toStr(id);
-    const safeId = toStr(id);
-    if (!safeId || !name || seen.has(safeId)) continue;
-    seen.add(safeId);
-    out.push({ id: safeId, name });
-  }
-  return out;
-}
-
-function normalizePayload(data) {
-  if (!data) return [];
-  if (Array.isArray(data)) return normalizeArray(data);
-  if (Array.isArray(data.options)) return normalizeArray(data.options);
-  if (Array.isArray(data.items)) return normalizeArray(data.items);
-  if (Array.isArray(data.data)) return normalizeArray(data.data);
-  if (Array.isArray(data.data?.options)) return normalizeArray(data.data.options);
-  return [];
-}
-
-// ---------------------- Options loader (Notion) ----------------------
-async function loadProductOptions() {
-  // 1) لو فيه preload في window استخدمه
-  if (Array.isArray(window.__PRODUCT_OPTIONS__)) {
-    PRODUCT_OPTIONS = normalizeArray(window.__PRODUCT_OPTIONS__);
-    if (PRODUCT_OPTIONS.length) return;
+  // ---------- Helpers ----------
+  function toast(message, type = 'info') {
+    if (window.UI && typeof UI.toast === 'function') UI.toast({ type, message });
+    else alert(message);
   }
 
-  // 2) جرّب مجموعة endpoints لحد ما تلاقي بيانات
-  for (const url of PRODUCTS_ENDPOINTS) {
+  async function handleLogout() {
     try {
-      const r = await fetch(url, { credentials: 'same-origin' });
-      if (!r.ok) continue;
-      const ct = r.headers.get('content-type') || '';
-      if (!ct.includes('json')) continue;
-      const j = await r.json();
-      const norm = normalizePayload(j);
-      if (norm.length) {
-        PRODUCT_OPTIONS = norm;
-        return;
-      }
+      const r = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+      if (r.ok) location.href = '/login';
+      else location.href = '/login';
+    } catch {
+      location.href = '/login';
+    }
+  }
+
+  // ---------- Data ----------
+  async function loadComponents() {
+    try {
+      const res = await fetch(COMPONENTS_ENDPOINT);
+      if (!res.ok) throw new Error(await res.text());
+      const list = await res.json();
+      if (!Array.isArray(list)) throw new Error('Bad response format');
+      return list;
     } catch (e) {
-      // جرّب اللي بعده
+      console.error('Failed to load components:', e);
+      return [];
     }
   }
 
-  // 3) fallback أخير: فضيّ اللستة
-  PRODUCT_OPTIONS = [];
-  console.error('options error: no product options received from any endpoint');
-}
-
-// ---------------------- Basic UI helpers ----------------------
-function showToast(message, type = 'info') {
-  if (typeof UI !== 'undefined' && UI.toast) UI.toast({ type, message });
-  else alert(message);
-}
-
-async function handleLogout() {
-  try {
-    const r = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
-    if (r.ok) location.href = '/login';
-    else location.href = '/login';
-  } catch {
-    location.href = '/login';
+  function optionsFromComponents() {
+    return components.map(c => ({
+      value: String(c.id),
+      label: c.name || String(c.id),
+      selected: false,
+      disabled: false
+    }));
   }
-}
 
-// ---------------------- Searchable select ----------------------
-// يحوّل <select> عادية إلى كومبوبوكس بمحرّك بحث داخلي (بدون حذف الـ<select> الأصلية)
-function makeSearchableSelect(selectEl, options) {
-  if (!selectEl) return;
-
-  // لو اتعمل قبل كده، متعملوش تاني
-  if (selectEl.__searchableWrapped) return;
-  selectEl.__searchableWrapped = true;
-
-  // لفّ الـ<select> بكونتينر
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'relative';
-  wrapper.className = 'searchable-select';
-  selectEl.parentNode.insertBefore(wrapper, selectEl);
-  wrapper.appendChild(selectEl);
-
-  // أخفي الـ<select> بصريًا (نحتفظ بها للنموذج/الفالديشن)
-  selectEl.style.position = 'absolute';
-  selectEl.style.opacity = '0';
-  selectEl.style.pointerEvents = 'none';
-  selectEl.style.width = '100%';
-  selectEl.style.height = '40px';
-
-  // input يظهر للمستخدم + قائمة منسدلة
-  const input = document.createElement('input');
-  input.type = 'search';
-  input.className = 'form-input';
-  input.placeholder = 'Select product...';
-  input.autocomplete = 'off';
-  input.style.paddingRight = '34px';
-  wrapper.insertBefore(input, selectEl);
-
-  const dropdown = document.createElement('div');
-  dropdown.className = 'dropdown-panel';
-  dropdown.style.position = 'absolute';
-  dropdown.style.left = '0';
-  dropdown.style.right = '0';
-  dropdown.style.top = '100%';
-  dropdown.style.zIndex = '50';
-  dropdown.style.maxHeight = '260px';
-  dropdown.style.overflow = 'auto';
-  dropdown.style.background = '#fff';
-  dropdown.style.border = '1px solid #e5e7eb';
-  dropdown.style.borderRadius = '10px';
-  dropdown.style.boxShadow = '0 8px 20px rgba(0,0,0,.06)';
-  dropdown.style.marginTop = '6px';
-  dropdown.style.display = 'none';
-  wrapper.appendChild(dropdown);
-
-  function render(list, query = '') {
-    dropdown.innerHTML = '';
-    const q = (query || '').trim().toLowerCase();
-    const filtered = !q
-      ? list
-      : list.filter(o => (o.name || '').toLowerCase().includes(q));
-
-    if (!filtered.length) {
-      const empty = document.createElement('div');
-      empty.style.padding = '10px 12px';
-      empty.style.color = '#6b7280';
-      empty.textContent = 'No results';
-      dropdown.appendChild(empty);
-    } else {
-      for (const o of filtered) {
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'dropdown-item';
-        row.style.display = 'block';
-        row.style.width = '100%';
-        row.style.textAlign = 'left';
-        row.style.padding = '10px 12px';
-        row.style.border = '0';
-        row.style.background = 'transparent';
-        row.style.cursor = 'pointer';
-        row.onmouseenter = () => (row.style.background = '#f9fafb');
-        row.onmouseleave = () => (row.style.background = 'transparent');
-        row.textContent = o.name || o.id;
-        row.dataset.value = o.id || o.name || '';
-        row.addEventListener('click', () => commit(o));
-        dropdown.appendChild(row);
+  // ---------- Choices.js (same config as products step) ----------
+  function enhanceWithChoices(select, defaultId = '') {
+    const inst = new Choices(select, {
+      searchEnabled: true,
+      placeholder: true,
+      placeholderValue: isComponentsLoaded ? 'Select a product...' : 'Loading products list...',
+      itemSelectText: '',
+      shouldSort: true,
+      allowHTML: false,
+      position: 'bottom',
+      searchResultLimit: 500,
+      fuseOptions: {
+        keys: ['label'],
+        threshold: 0.3
       }
-    }
-  }
-
-  function commit(opt) {
-    // حدّث الـ<select> الأصلية
-    const v = String(opt.id || opt.name || '');
-    let found = false;
-    for (const op of selectEl.options) {
-      if (op.value === v) {
-        selectEl.value = v;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      const op = document.createElement('option');
-      op.value = v;
-      op.textContent = opt.name || opt.id || 'Unnamed';
-      selectEl.appendChild(op);
-      selectEl.value = v;
-    }
-    input.value = opt.name || opt.id || '';
-    dropdown.style.display = 'none';
-    input.blur();
-  }
-
-  // افتح القائمة وفلتر
-  input.addEventListener('focus', () => {
-    render(PRODUCT_OPTIONS);
-    dropdown.style.display = 'block';
-  });
-  input.addEventListener('input', () => render(PRODUCT_OPTIONS, input.value));
-
-  // إغلاق عند الضغط خارج
-  document.addEventListener('click', (e) => {
-    if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
-  });
-
-  // مزامنة العرض الأولي من select
-  const selected = selectEl.selectedOptions?.[0];
-  if (selected) input.value = selected.textContent || '';
-}
-
-// ---------------------- Entry builder ----------------------
-function buildEntryDom(id) {
-  const wrap = document.createElement('div');
-  wrap.className = 'expense-entry';
-  wrap.dataset.itemId = id;
-
-  wrap.innerHTML = `
-    <div class="expense-header">
-      <h4><i data-feather="package"></i> Component ${id}</h4>
-      <button type="button" class="expense-status remove-expense" title="Delete component" data-item-id="${id}"></button>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" for="product${id}"><i data-feather="box"></i> Products *</label>
-        <select id="product${id}" name="items[${id}][productId]" class="form-input" required>
-          <option value="">Select product...</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" for="title${id}"><i data-feather="type"></i> Description of issue (Title) *</label>
-        <input id="title${id}" name="items[${id}][title]" class="form-input" type="text" placeholder="Short issue summary..." required/>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="reason${id}"><i data-feather="message-square"></i> Issue Reason</label>
-      <textarea id="reason${id}" name="items[${id}][reason]" class="form-input" placeholder="Extra details, when/how it happened, etc."></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="files${id}"><i data-feather="image"></i> Files &amp; media</label>
-      <input id="files${id}" name="items[${id}][files]" class="form-input" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png"/>
-      <small class="form-help">Upload photos/screenshots (optional)</small>
-    </div>
-  `;
-
-  return wrap;
-}
-
-function populateSelect(selectEl) {
-  // املاّ الدروبلست
-  selectEl.innerHTML = '<option value="">Select product...</option>';
-  for (const o of PRODUCT_OPTIONS) {
-    const op = document.createElement('option');
-    op.value = String(o.id || o.name || '');
-    op.textContent = o.name || o.id || 'Unnamed';
-    selectEl.appendChild(op);
-  }
-  // حرّكها إلى كومبوبوكس قابل للبحث
-  makeSearchableSelect(selectEl, PRODUCT_OPTIONS);
-}
-
-function addItemEntry() {
-  itemCounter++;
-  const list = document.getElementById('itemsList');
-  const node = buildEntryDom(itemCounter);
-  list.appendChild(node);
-  feather.replace();
-
-  const sel = document.getElementById(`product${itemCounter}`);
-  populateSelect(sel);
-
-  node.querySelector('.remove-expense').addEventListener('click', () => {
-    const total = document.querySelectorAll('.expense-entry').length;
-    if (total <= 1) return showToast('At least one component is required', 'error');
-    node.remove();
-  });
-
-  sel.focus();
-}
-
-function validateForm() {
-  const entries = document.querySelectorAll('.expense-entry');
-  for (const e of entries) {
-    const p = e.querySelector('[name*="[productId]"]');
-    const t = e.querySelector('[name*="[title]"]');
-    if (p?.value && t?.value?.trim()) return true;
-  }
-  showToast('Please add at least one complete component', 'error');
-  return false;
-}
-
-async function collectPayload() {
-  const items = [];
-  const entries = document.querySelectorAll('.expense-entry');
-  for (const e of entries) {
-    const id = e.dataset.itemId;
-    const sel = document.getElementById(`product${id}`);
-    const title = document.getElementById(`title${id}`);
-    const reason = document.getElementById(`reason${id}`);
-    const files = document.getElementById(`files${id}`);
-
-    if (!(sel?.value && title?.value?.trim())) continue;
-
-    const productId = sel.value;
-    const productName = sel.selectedOptions?.[0]?.text || '';
-
-    const item = {
-      product: { id: productId, name: productName }, // relation Products
-      title: title.value.trim(),                      // Title
-      reason: (reason?.value || '').trim(),          // Text
-      files: []                                      // meta (اختياري)
-    };
-
-    if (files?.files?.length) {
-      for (const f of files.files) item.files.push({ name: f.name, type: f.type, size: f.size });
-    }
-    items.push(item);
-  }
-  return { items };
-}
-
-async function handleFormSubmit(ev) {
-  ev.preventDefault();
-  const btn = document.getElementById('submitBtn');
-
-  try {
-    if (!validateForm()) return;
-
-    btn.disabled = true;
-    btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
-    feather.replace();
-
-    const payload = await collectPayload();
-    const r = await fetch('/api/damaged-assets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify(payload)
     });
 
-    const ct = r.headers.get('content-type') || '';
-    const j = ct.includes('application/json') ? await r.json() : { success: false, error: 'Non-JSON response' };
-    if (!r.ok || !j.success) throw new Error(j.error || 'Failed to submit');
+    const container =
+      inst.containerOuter?.element ||
+      select.closest('.choices') ||
+      select.parentElement.querySelector('.choices');
 
-    showToast(j.message || 'Damage report submitted successfully!', 'success');
-
-    // reset
-    document.getElementById('damagedForm').reset();
-    document.getElementById('itemsList').innerHTML = '';
-    itemCounter = 0;
-    addItemEntry();
-  } catch (e) {
-    console.error(e);
-    showToast(e.message || 'Failed to submit', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i data-feather="save"></i> Submit Report';
-    feather.replace();
+    if (!isComponentsLoaded) {
+      container?.classList.add('is-loading');
+      inst.disable();
+      toHydrate.push({ inst, container, defaultId });
+    } else {
+      inst.clearChoices();
+      inst.setChoices(optionsFromComponents(), 'value', 'label', true);
+      if (defaultId) inst.setChoiceByValue(String(defaultId));
+    }
+    return inst;
   }
-}
 
-// ---------------------- Init ----------------------
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadProductOptions();
+  function hydratePendingChoices() {
+    toHydrate.forEach(({ inst, container, defaultId }) => {
+      try {
+        inst.enable();
+        inst.clearChoices();
+        inst.setChoices(optionsFromComponents(), 'value', 'label', true);
+        if (defaultId) inst.setChoiceByValue(String(defaultId));
+        container?.classList.remove('is-loading');
+      } catch (e) {
+        console.warn('Hydration failed for a select', e);
+      }
+    });
+    toHydrate.length = 0;
+  }
 
-  const addBtn   = document.getElementById('addItemBtn');
-  const form     = document.getElementById('damagedForm');
-  const logoutBtn= document.getElementById('logoutBtn');
+  // ---------- UI: rows ----------
+  function buildEntryDom(id) {
+    const wrap = document.createElement('div');
+    wrap.className = 'expense-entry';
+    wrap.dataset.itemId = String(id);
 
-  addBtn.addEventListener('click', addItemEntry);
-  form.addEventListener('submit', handleFormSubmit);
-  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+    // layout mirrors Funds + Products pages
+    wrap.innerHTML = `
+      <div class="expense-header">
+        <h4><i data-feather="package"></i> Component ${id}</h4>
+        <button type="button" class="expense-status remove-expense" title="Delete component" data-item-id="${id}"></button>
+      </div>
 
-  addItemEntry(); // أول عنصر
-});
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="product${id}"><i data-feather="box"></i> Products *</label>
+          <select id="product${id}" name="items[${id}][productId]" class="product-select" required>
+            <option value="" disabled selected>${isComponentsLoaded ? 'Select a product...' : 'Loading products list...'}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="title${id}"><i data-feather="type"></i> Description of issue (Title) *</label>
+          <input id="title${id}" name="items[${id}][title]" class="form-input" type="text" placeholder="Short issue summary..." required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="reason${id}"><i data-feather="message-square"></i> Issue Reason</label>
+        <textarea id="reason${id}" name="items[${id}][reason]" class="form-input" placeholder="Extra details, when/how it happened, etc."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="files${id}"><i data-feather="image"></i> Files &amp; media</label>
+        <input id="files${id}" name="items[${id}][files]" class="form-input" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png" />
+        <small class="form-help">Upload photos/screenshots (optional)</small>
+      </div>
+    `;
+
+    return wrap;
+  }
+
+  function addItemEntry(defaultProductId = '') {
+    itemCounter++;
+    const node = buildEntryDom(itemCounter);
+    listEl.appendChild(node);
+
+    // feather icons
+    if (window.feather) feather.replace();
+
+    // enhance select
+    const select = node.querySelector('select.product-select');
+    enhanceWithChoices(select, defaultProductId);
+
+    // remove handler
+    node.querySelector('.remove-expense').addEventListener('click', () => {
+      const total = document.querySelectorAll('.expense-entry').length;
+      if (total <= 1) return toast('At least one component is required', 'error');
+      node.remove();
+    });
+
+    // focus user into the newly added select (Choices will focus properly)
+    select.focus();
+  }
+
+  // ---------- Validate + payload ----------
+  function validateForm() {
+    const entries = document.querySelectorAll('.expense-entry');
+    for (const e of entries) {
+      const p = e.querySelector('select.product-select');
+      const t = e.querySelector('input[name*="[title]"]');
+      if (p?.value && t?.value?.trim()) return true;
+    }
+    toast('Please add at least one complete component', 'error');
+    return false;
+  }
+
+  function collectPayload() {
+    const items = [];
+    document.querySelectorAll('.expense-entry').forEach(e => {
+      const id = e.dataset.itemId;
+      const sel = e.querySelector(`#product${id}`);
+      const title = e.querySelector(`#title${id}`);
+      const reason = e.querySelector(`#reason${id}`);
+      const files = e.querySelector(`#files${id}`);
+
+      if (!(sel?.value && title?.value?.trim())) return;
+
+      const productId = String(sel.value);
+      const productName = sel.selectedOptions?.[0]?.text || '';
+
+      const item = {
+        product: { id: productId, name: productName }, // relation Products
+        title: title.value.trim(),                      // Title
+        reason: (reason?.value || '').trim(),          // Text
+        files: []
+      };
+
+      if (files?.files?.length) {
+        for (const f of files.files) item.files.push({ name: f.name, type: f.type, size: f.size });
+      }
+      items.push(item);
+    });
+    return { items };
+  }
+
+  // ---------- Submit ----------
+  async function handleSubmit(ev) {
+    ev.preventDefault();
+    if (!validateForm()) return;
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i data-feather="loader"></i> Submitting...';
+    if (window.feather) feather.replace();
+
+    try {
+      const payload = collectPayload();
+
+      const r = await fetch('/api/damaged-assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      });
+
+      const ct = r.headers.get('content-type') || '';
+      const j = ct.includes('application/json') ? await r.json() : { success: false, error: 'Non-JSON response' };
+      if (!r.ok || !j.success) throw new Error(j.error || 'Failed to submit');
+
+      toast(j.message || 'Damage report submitted successfully!', 'success');
+
+      formEl.reset();
+      listEl.innerHTML = '';
+      itemCounter = 0;
+      addItemEntry();
+    } catch (e) {
+      console.error(e);
+      toast(e.message || 'Failed to submit', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i data-feather="save"></i> Submit Report';
+      if (window.feather) feather.replace();
+    }
+  }
+
+  // ---------- Init ----------
+  async function init() {
+    if (!listEl || !addBtn || !formEl) {
+      console.error('Damaged Assets: missing required DOM nodes');
+      return;
+    }
+
+    // Add first empty row
+    addItemEntry();
+
+    // Load components (same data source as products step)
+    components = await loadComponents();
+    isComponentsLoaded = true;
+    urlById = new Map(components.map(c => [String(c.id), c.url || ""])); // optional
+    hydratePendingChoices();
+
+    // Hook events
+    addBtn.addEventListener('click', () => addItemEntry());
+    formEl.addEventListener('submit', handleSubmit);
+    logoutBtn?.addEventListener('click', handleLogout);
+
+    if (window.feather) feather.replace();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
