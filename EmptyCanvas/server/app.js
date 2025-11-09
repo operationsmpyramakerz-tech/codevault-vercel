@@ -14,6 +14,13 @@ const teamMembersDatabaseId = process.env.Team_Members;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
 const damagedAssetsDatabaseId = process.env.Damaged_Assets;
+// Team Members DB (from ENV)
+const teamMembersDatabaseId =
+  process.env.Team_Members ||
+  process.env.TEAM_MEMBERS ||
+  process.env.TeamMembers ||
+  null;
+
 // ----- Hardbind: Received Quantity property name (Number) -----
 const REC_PROP_HARDBIND = "Quantity received by operations";
 
@@ -2581,6 +2588,26 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     // نقرأ خصائص قاعدة Damaged_Assets مرة واحدة
     const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
     const props = db.properties || {};
+
+  // Detect the relation property that points to Team_Members DB
+let reporterKey = null;
+if (teamMembersDatabaseId) {
+  for (const [k, v] of Object.entries(props)) {
+    if (v?.type === 'relation' && v?.relation?.database_id === teamMembersDatabaseId) {
+      reporterKey = k;
+      break;
+    }
+  }
+}
+// Fallback: اسم العمود يحتوي team/member لو الربط غير مباشر
+if (!reporterKey) {
+  for (const [k, v] of Object.entries(props)) {
+    if (v?.type === 'relation' && /team|member/i.test(k)) {
+      reporterKey = k;
+      break;
+    }
+  }
+}
     const titleKey =
       Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
 
@@ -2632,6 +2659,43 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     const items = Array.isArray(req.body?.items) ? req.body.items : null;
     if (items && items.length) {
       const created = [];
+      // Resolve current user's Team Member page (by email then name)
+let currentUserId =
+  req.session?.notionMemberPageId ||
+  req.user?.notionMemberPageId ||
+  null;
+
+if (!currentUserId && teamMembersDatabaseId) {
+  try {
+    const tmDb = await notion.databases.retrieve({ database_id: teamMembersDatabaseId });
+    const tProps = tmDb.properties || {};
+    const emailProp = Object.keys(tProps).find(k => tProps[k]?.type === 'email') || 'Email';
+    const titleProp = Object.keys(tProps).find(k => tProps[k]?.type === 'title') || 'Name';
+
+    const email = req.user?.email || req.session?.email || null;
+    const name  = req.user?.name  || req.session?.name  || null;
+
+    if (email) {
+      const q1 = await notion.databases.query({
+        database_id: teamMembersDatabaseId,
+        filter: { property: emailProp, email: { equals: String(email).trim() } },
+        page_size: 1
+      });
+      if (q1.results?.[0]?.id) currentUserId = q1.results[0].id;
+    }
+
+    if (!currentUserId && name) {
+      const q2 = await notion.databases.query({
+        database_id: teamMembersDatabaseId,
+        filter: { property: titleProp, title: { contains: String(name).trim() } },
+        page_size: 1
+      });
+      if (q2.results?.[0]?.id) currentUserId = q2.results[0].id;
+    }
+  } catch (e) {
+    console.error('resolve team member failed:', e?.body || e);
+  }
+}
 
       for (const it of items) {
         const productId = it?.product?.id || it?.productId || null;
