@@ -2581,6 +2581,14 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     // نقرأ خصائص قاعدة Damaged_Assets مرة واحدة
     const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
     const props = db.properties || {};
+    // === Detect "Team Members" relation column on Damaged_Assets DB ===
+let reporterKey = null;
+for (const [k, v] of Object.entries(props)) {
+  if (v?.type === "relation" && v?.relation?.database_id === teamMembersDatabaseId) {
+    reporterKey = k;
+    break;
+  }
+}
 
     const titleKey =
       Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
@@ -2669,6 +2677,10 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
           const today = new Date().toISOString().slice(0, 10);
           properties[dateKey] = { date: { start: today } };
         }
+        // Team Member (المبلّغ)
+if (reporterKey && currentUserId) {
+  properties[reporterKey] = { relation: [{ id: currentUserId }] };
+}
 
         const page = await notion.pages.create({
           parent: { database_id: damagedAssetsDatabaseId },
