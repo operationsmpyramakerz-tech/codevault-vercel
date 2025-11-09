@@ -2584,15 +2584,6 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     const titleKey =
       Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
 
-    // === Detect "Team Members" relation column on Damaged_Assets DB ===
-let reporterKey = null;
-for (const [k, v] of Object.entries(props)) {
-  if (v?.type === "relation" && v?.relation?.database_id === teamMembersDatabaseId) {
-    reporterKey = k;
-    break;
-  }
-}
-
     // Helper للعثور على عمود بنوع معيّن
     const findProp = (wantedType, candidates = [], regexHint = null) => {
       for (const c of candidates) {
