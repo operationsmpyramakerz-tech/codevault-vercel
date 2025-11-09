@@ -1,286 +1,354 @@
-// public/js/damaged-assets.js
-// Damaged Assets – products dropdown with the same UX/behavior as the Products step.
-// Robust loader: tries /api/components first, then /api/damaged-assets/options,
-// and normalizes different response shapes.
+/* damaged-assets.js — Damaged Assets (Funds-like) with searchable Products select
+   لا يوجد حذف لأي منطق: نفس IDs ونفس تدفق الإرسال، فقط إصلاح تحميل الخيارات + سيرش داخلي.
+*/
 
-(() => {
-  // ---------- State ----------
-  let items = [];                 // normalized: [{id, name, url?}]
-  let loaded = false;
-  const pendingChoices = [];      // selects that were created before data arrived
-  let itemCounter = 0;
+let itemCounter = 0;
+let PRODUCT_OPTIONS = []; // [{id, name}]
 
-  // ---------- DOM ----------
-  const listEl    = document.getElementById('itemsList');
-  const addBtn    = document.getElementById('addItemBtn');
-  const formEl    = document.getElementById('damagedForm');
-  const submitBtn = document.getElementById('submitBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
+// ---------------------- Options loader (Notion) ----------------------
+async function loadProductOptions() {
+  // نجرب أكثر من endpoint مستخدم في المشروع (زي صفحة Create Order)
+  const candidates = [
+    '/api/options/products',
+    '/api/products/options',
+    '/api/order-products/options',
+    '/api/orders/products/options',
+    '/api/damaged-assets/options' // لو كنت عامل واحد خاص بالصفحة
+  ];
 
-  // ---------- Helpers ----------
-  function toast(message, type = 'info') {
-    if (window.UI && typeof UI.toast === 'function') UI.toast({ type, message });
-    else alert(message);
-  }
-
-  async function handleLogout() {
+  for (const url of candidates) {
     try {
-      const r = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
-      location.href = '/login';
-    } catch {
-      location.href = '/login';
-    }
-  }
-
-  // ---------- Data loading ----------
-  async function fetchJSON(url) {
-    const r = await fetch(url, { credentials: 'same-origin' });
-    if (!r.ok) throw new Error(await r.text());
-    const ct = r.headers.get('content-type') || '';
-    return ct.includes('application/json') ? r.json() : Promise.reject(new Error('Non-JSON response'));
-  }
-
-  function normalizeList(raw) {
-    // Accept:
-    // - array of {id, name}
-    // - array of {value, label}
-    // - {components: [...]}
-    // - {options: [...]}
-    // - raw Notion pages (item.properties.Name.title[0].plain_text)
-    const arr = Array.isArray(raw) ? raw
-              : Array.isArray(raw?.components) ? raw.components
-              : Array.isArray(raw?.options)    ? raw.options
-              : [];
-
-    const out = [];
-    for (const it of arr) {
-      if (it?.id && it?.name) { out.push({ id: String(it.id), name: it.name, url: it.url }); continue; }
-      if (it?.value && it?.label) { out.push({ id: String(it.value), name: it.label }); continue; }
-      if (it?.properties) {
-        const props = it.properties;
-        const nameP = props.Name || props['Product Name'] || props['Component Name'];
-        let txt = '';
-        if (nameP?.title?.length) txt = nameP.title.map(t => t.plain_text).join('').trim();
-        out.push({ id: String(it.id), name: txt || String(it.id), url: it.url });
-      }
-    }
-    return out;
-  }
-
-  async function loadItems() {
-    try {
-      // 1) نفس مصدر صفحة المنتجات
-      let data = await fetchJSON('/api/components');
-      items = normalizeList(data);
-      // 2) fallback لو مفيش بيانات
-      if (!items.length) {
-        data = await fetchJSON('/api/damaged-assets/options');
-        items = normalizeList(data);
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const list = Array.isArray(j) ? j : (Array.isArray(j.options) ? j.options : []);
+      if (list.length) {
+        // نوحّد الشكل إلى {id, name}
+        PRODUCT_OPTIONS = list.map(o => ({
+          id: String(o.id ?? o.pageId ?? o.value ?? o.slug ?? ''),
+          name: String(o.name ?? o.title ?? o.label ?? o.text ?? '').trim() || String(o.id ?? '')
+        })).filter(x => x.id);
+        console.debug('[DamagedAssets] loaded products from', url, PRODUCT_OPTIONS.length);
+        return;
       }
     } catch (e) {
-      console.warn('Products load failed (primary):', e);
-      try {
-        const data = await fetchJSON('/api/damaged-assets/options');
-        items = normalizeList(data);
-      } catch (err) {
-        console.error('Products load failed (fallback):', err);
-        items = [];
-      }
-    } finally {
-      loaded = true;
+      // نكمل نجرب الباقيين
     }
   }
+  console.warn('[DamagedAssets] no products options found from any endpoint');
+  PRODUCT_OPTIONS = [];
+}
 
-  // ---------- Choices.js ----------
-  function ensureChoicesOn(select, defaultId = '') {
-    // ملاحظة: لازم يكون choices.min.js متحمّل في layout العام (نفس ما هو في صفحة المنتجات)
-    const inst = new Choices(select, {
-      searchEnabled: true,
-      placeholder: true,
-      placeholderValue: loaded ? 'Select a product...' : 'Loading products list...',
-      itemSelectText: '',
-      allowHTML: false,
-      shouldSort: true,
-      position: 'bottom',
-      searchResultLimit: 500,
-      fuseOptions: { keys: ['label'], threshold: 0.3 }
-    });
+// ---------------------- Basic UI helpers ----------------------
+function showToast(message, type = 'info') {
+  if (typeof UI !== 'undefined' && UI.toast) UI.toast({ type, message });
+  else alert(message);
+}
 
-    const outer = inst.containerOuter?.element || select.closest('.choices');
-
-    if (!loaded) {
-      outer?.classList.add('is-loading');
-      inst.disable();
-      pendingChoices.push({ inst, outer, defaultId });
-    } else {
-      inst.clearChoices();
-      inst.setChoices(items.map(i => ({ value: i.id, label: i.name })), 'value', 'label', true);
-      if (defaultId) inst.setChoiceByValue(String(defaultId));
-    }
-    return inst;
+async function handleLogout() {
+  try {
+    const r = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+    location.href = '/login';
+  } catch {
+    location.href = '/login';
   }
+}
 
-  function hydratePending() {
-    pendingChoices.splice(0).forEach(({ inst, outer, defaultId }) => {
-      try {
-        inst.enable();
-        inst.clearChoices();
-        inst.setChoices(items.map(i => ({ value: i.id, label: i.name })), 'value', 'label', true);
-        if (defaultId) inst.setChoiceByValue(String(defaultId));
-        outer?.classList.remove('is-loading');
-      } catch (e) {
-        console.warn('hydrate failed:', e);
-      }
-    });
-  }
+// ---------------------- Searchable select ----------------------
+// يحوّل <select> إلى كومبوبوكس searchable بدون حذف الـ<select> الأصلية
+function makeSearchableSelect(selectEl, options) {
+  if (!selectEl || selectEl.dataset.searchable === '1') return;
+  selectEl.dataset.searchable = '1';
 
-  // ---------- UI rows ----------
-  function buildRowDom(id) {
-    const wrap = document.createElement('div');
-    wrap.className = 'expense-entry';
-    wrap.dataset.itemId = String(id);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'searchable-select-wrapper';
+  wrapper.style.position = 'relative';
+  selectEl.parentNode.insertBefore(wrapper, selectEl);
+  wrapper.appendChild(selectEl);
 
-    wrap.innerHTML = `
-      <div class="expense-header">
-        <h4><i data-feather="package"></i> Component ${id}</h4>
-        <button type="button" class="expense-status remove-expense" title="Delete component" data-item-id="${id}"></button>
-      </div>
+  // نخلي الـ<select> موجودة بس مخفية بصرياً
+  Object.assign(selectEl.style, {
+    position: 'absolute',
+    opacity: '0',
+    pointerEvents: 'none',
+    width: '100%',
+    height: '40px'
+  });
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="product${id}"><i data-feather="box"></i> Products *</label>
-          <select id="product${id}" name="items[${id}][productId]" class="product-select" required>
-            <option value="" disabled selected>${loaded ? 'Select a product...' : 'Loading products list...'}</option>
-          </select>
-        </div>
+  // input ظاهر للمستخدم
+  const input = document.createElement('input');
+  input.type = 'search';
+  input.className = 'form-input';
+  input.placeholder = 'Select product...';
+  input.autocomplete = 'off';
+  input.style.paddingRight = '34px';
+  wrapper.insertBefore(input, selectEl);
 
-        <div class="form-group">
-          <label class="form-label" for="title${id}"><i data-feather="type"></i> Description of issue (Title) *</label>
-          <input id="title${id}" name="items[${id}][title]" class="form-input" type="text" placeholder="Short issue summary..." required />
-        </div>
-      </div>
+  // قائمة منسدلة
+  const dropdown = document.createElement('div');
+  dropdown.className = 'dropdown-panel';
+  Object.assign(dropdown.style, {
+    position: 'absolute',
+    left: '0',
+    right: '0',
+    top: '100%',
+    zIndex: '50',
+    maxHeight: '260px',
+    overflow: 'auto',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    boxShadow: '0 8px 20px rgba(0,0,0,.06)',
+    marginTop: '6px',
+    display: 'none'
+  });
+  wrapper.appendChild(dropdown);
 
-      <div class="form-group">
-        <label class="form-label" for="reason${id}"><i data-feather="message-square"></i> Issue Reason</label>
-        <textarea id="reason${id}" name="items[${id}][reason]" class="form-input" placeholder="Extra details, when/how it happened, etc."></textarea>
-      </div>
+  function render(list, query = '') {
+    dropdown.innerHTML = '';
+    const q = (query || '').trim().toLowerCase();
+    const filtered = !q ? list : list.filter(o => (o.name || '').toLowerCase().includes(q));
 
-      <div class="form-group">
-        <label class="form-label" for="files${id}"><i data-feather="image"></i> Files &amp; media</label>
-        <input id="files${id}" name="items[${id}][files]" class="form-input" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png" />
-        <small class="form-help">Upload photos/screenshots (optional)</small>
-      </div>
-    `;
-    return wrap;
-  }
-
-  function addRow(defaultProductId = '') {
-    itemCounter++;
-    const row = buildRowDom(itemCounter);
-    listEl.appendChild(row);
-    if (window.feather) feather.replace();
-
-    const select = row.querySelector('select.product-select');
-    ensureChoicesOn(select, defaultProductId);
-
-    row.querySelector('.remove-expense').addEventListener('click', () => {
-      const total = document.querySelectorAll('.expense-entry').length;
-      if (total <= 1) return toast('At least one component is required', 'error');
-      row.remove();
-    });
-
-    select.focus();
-  }
-
-  // ---------- validation + payload ----------
-  function validateForm() {
-    const rows = document.querySelectorAll('.expense-entry');
-    for (const r of rows) {
-      const p = r.querySelector('select.product-select');
-      const t = r.querySelector('input[name*="[title]"]');
-      if (p?.value && t?.value?.trim()) return true;
-    }
-    toast('Please add at least one complete component', 'error');
-    return false;
-  }
-
-  function collectPayload() {
-    const out = [];
-    document.querySelectorAll('.expense-entry').forEach(r => {
-      const id = r.dataset.itemId;
-      const sel = r.querySelector(`#product${id}`);
-      const title = r.querySelector(`#title${id}`);
-      const reason = r.querySelector(`#reason${id}`);
-      const files = r.querySelector(`#files${id}`);
-
-      if (!(sel?.value && title?.value?.trim())) return;
-
-      const item = {
-        product: { id: String(sel.value), name: sel.selectedOptions?.[0]?.text || '' },
-        title: title.value.trim(),
-        reason: (reason?.value || '').trim(),
-        files: []
-      };
-      if (files?.files?.length) {
-        for (const f of files.files) item.files.push({ name: f.name, type: f.type, size: f.size });
-      }
-      out.push(item);
-    });
-    return { items: out };
-  }
-
-  // ---------- submit ----------
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i data-feather="loader"></i> Submitting...';
-    if (window.feather) feather.replace();
-
-    try {
-      const payload = collectPayload();
-      const r = await fetch('/api/damaged-assets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload)
-      });
-      const ct = r.headers.get('content-type') || '';
-      const j = ct.includes('application/json') ? await r.json() : { success: false, error: 'Non-JSON response' };
-      if (!r.ok || !j.success) throw new Error(j.error || 'Failed to submit');
-
-      toast(j.message || 'Damage report submitted successfully!', 'success');
-      formEl.reset();
-      listEl.innerHTML = '';
-      itemCounter = 0;
-      addRow();
-    } catch (err) {
-      console.error(err);
-      toast(err.message || 'Failed to submit', 'error');
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i data-feather="save"></i> Submit Report';
-      if (window.feather) feather.replace();
-    }
-  }
-
-  // ---------- init ----------
-  async function init() {
-    if (!listEl || !addBtn || !formEl) {
-      console.error('Damaged Assets: required nodes not found');
+    if (!filtered.length) {
+      const empty = document.createElement('div');
+      empty.style.padding = '10px 12px';
+      empty.style.color = '#6b7280';
+      empty.textContent = 'No results';
+      dropdown.appendChild(empty);
       return;
     }
-    addRow(); // build first row immediately (shows "Loading..." placeholder)
 
-    // load products (components) exactly like products step
-    await loadItems();
-    hydratePending();
-
-    addBtn.addEventListener('click', () => addRow());
-    formEl.addEventListener('submit', handleSubmit);
-    logoutBtn?.addEventListener('click', handleLogout);
+    for (const o of filtered) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'dropdown-item';
+      Object.assign(row.style, {
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '10px 12px',
+        border: '0',
+        background: 'transparent',
+        cursor: 'pointer'
+      });
+      row.onmouseenter = () => (row.style.background = '#f9fafb');
+      row.onmouseleave = () => (row.style.background = 'transparent');
+      row.textContent = o.name || o.id;
+      row.dataset.value = o.id || '';
+      row.addEventListener('click', () => commit(o));
+      dropdown.appendChild(row);
+    }
   }
 
-  document.addEventListener('DOMContentLoaded', init);
-})();
+  function commit(opt) {
+    const v = String(opt.id || '');
+    // حدّث option المختار أو اضف واحد جديد بنفس القيمة/الاسم
+    let found = false;
+    for (const op of selectEl.options) {
+      if (op.value === v) { selectEl.value = v; found = true; break; }
+    }
+    if (!found) {
+      const op = document.createElement('option');
+      op.value = v;
+      op.textContent = opt.name || v;
+      selectEl.appendChild(op);
+      selectEl.value = v;
+    }
+    input.value = opt.name || v;
+    dropdown.style.display = 'none';
+    input.blur();
+  }
+
+  input.addEventListener('focus', () => {
+    render(PRODUCT_OPTIONS);
+    dropdown.style.display = 'block';
+  });
+  input.addEventListener('input', () => render(PRODUCT_OPTIONS, input.value));
+
+  document.addEventListener('click', (e) => {
+    if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
+  });
+
+  // مزامنة الاسم الظاهر لو كان في قيمة مختارة
+  const selected = selectEl.selectedOptions?.[0];
+  if (selected) input.value = selected.textContent || '';
+}
+
+// ---------------------- Entry builder ----------------------
+function buildEntryDom(id) {
+  const wrap = document.createElement('div');
+  wrap.className = 'expense-entry';
+  wrap.dataset.itemId = id;
+
+  wrap.innerHTML = `
+    <div class="expense-header">
+      <h4><i data-feather="package"></i> Component ${id}</h4>
+      <button type="button" class="expense-status remove-expense" title="Delete component" data-item-id="${id}"></button>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="product${id}"><i data-feather="box"></i> Products *</label>
+        <select id="product${id}" name="items[${id}][productId]" class="form-input" required>
+          <option value="">Select product...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="title${id}"><i data-feather="type"></i> Description of issue (Title) *</label>
+        <input id="title${id}" name="items[${id}][title]" class="form-input" type="text" placeholder="Short issue summary..." required/>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="reason${id}"><i data-feather="message-square"></i> Issue Reason</label>
+      <textarea id="reason${id}" name="items[${id}][reason]" class="form-input" placeholder="Extra details, when/how it happened, etc."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="files${id}"><i data-feather="image"></i> Files &amp; media</label>
+      <input id="files${id}" name="items[${id}][files]" class="form-input" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png"/>
+      <small class="form-help">Upload photos/screenshots (optional)</small>
+    </div>
+  `;
+  return wrap;
+}
+
+function populateSelect(selectEl) {
+  if (!selectEl) return;
+  // املاّ الدروبلست
+  selectEl.innerHTML = '<option value="">Select product...</option>';
+  for (const o of PRODUCT_OPTIONS) {
+    const op = document.createElement('option');
+    op.value = String(o.id || '');
+    op.textContent = o.name || o.id || 'Unnamed';
+    selectEl.appendChild(op);
+  }
+  // فعل البحث
+  makeSearchableSelect(selectEl, PRODUCT_OPTIONS);
+}
+
+function addItemEntry() {
+  itemCounter++;
+  const list = document.getElementById('itemsList');
+  const node = buildEntryDom(itemCounter);
+  list.appendChild(node);
+  feather.replace();
+
+  const sel = document.getElementById(`product${itemCounter}`);
+  if (PRODUCT_OPTIONS.length) {
+    populateSelect(sel);
+  } else {
+    // لو الخيارات لسه ماوصلتش، علّم إن ده يحتاج Populate لاحقًا
+    sel.dataset.needsPopulate = '1';
+  }
+
+  node.querySelector('.remove-expense').addEventListener('click', () => {
+    const total = document.querySelectorAll('.expense-entry').length;
+    if (total <= 1) return showToast('At least one component is required', 'error');
+    node.remove();
+  });
+
+  sel.focus();
+}
+
+function validateForm() {
+  const entries = document.querySelectorAll('.expense-entry');
+  for (const e of entries) {
+    const p = e.querySelector('[name*="[productId]"]');
+    const t = e.querySelector('[name*="[title]"]');
+    if (p?.value && t?.value?.trim()) return true;
+  }
+  showToast('Please add at least one complete component', 'error');
+  return false;
+}
+
+async function collectPayload() {
+  const items = [];
+  const entries = document.querySelectorAll('.expense-entry');
+  for (const e of entries) {
+    const id = e.dataset.itemId;
+    const sel = document.getElementById(`product${id}`);
+    const title = document.getElementById(`title${id}`);
+    const reason = document.getElementById(`reason${id}`);
+    const files = document.getElementById(`files${id}`);
+
+    if (!(sel?.value && title?.value?.trim())) continue;
+
+    const productId = sel.value;
+    const productName = sel.selectedOptions?.[0]?.text || '';
+
+    const item = {
+      product: { id: productId, name: productName }, // relation Products
+      title: title.value.trim(),                      // Title
+      reason: (reason?.value || '').trim(),          // Text
+      files: []                                      // meta (اختياري)
+    };
+
+    if (files?.files?.length) {
+      for (const f of files.files) item.files.push({ name: f.name, type: f.type, size: f.size });
+    }
+    items.push(item);
+  }
+  return { items };
+}
+
+async function handleFormSubmit(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('submitBtn');
+
+  try {
+    if (!validateForm()) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
+    feather.replace();
+
+    const payload = await collectPayload();
+    const r = await fetch('/api/damaged-assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
+    });
+
+    const ct = r.headers.get('content-type') || '';
+    const j = ct.includes('application/json') ? await r.json() : { success: false, error: 'Non-JSON response' };
+    if (!r.ok || !j.success) throw new Error(j.error || 'Failed to submit');
+
+    showToast(j.message || 'Damage report submitted successfully!', 'success');
+
+    // reset
+    document.getElementById('damagedForm').reset();
+    document.getElementById('itemsList').innerHTML = '';
+    itemCounter = 0;
+    addItemEntry();
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || 'Failed to submit', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-feather="save"></i> Submit Report';
+    feather.replace();
+  }
+}
+
+// ---------------------- Init ----------------------
+document.addEventListener('DOMContentLoaded', async () => {
+  // ضيف أول سطر فورًا عشان الواجهة تظهر
+  addItemEntry();
+
+  // حمّل المنتجات ثم عبّي أي select منتظر
+  await loadProductOptions();
+  const toPopulate = document.querySelectorAll('select[data-needs-populate="1"], select[id^="product"]');
+  toPopulate.forEach(sel => populateSelect(sel));
+
+  // أحداث الأزرار
+  const addBtn = document.getElementById('addItemBtn');
+  const form = document.getElementById('damagedForm');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  if (addBtn) addBtn.addEventListener('click', addItemEntry);
+  if (form) form.addEventListener('submit', handleFormSubmit);
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+});
