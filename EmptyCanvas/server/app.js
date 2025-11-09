@@ -25,7 +25,7 @@ const REC_PROP_HARDBIND = "Quantity received by operations";
 
 
 // Middleware
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
