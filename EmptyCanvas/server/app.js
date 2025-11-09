@@ -13,6 +13,7 @@ const ordersDatabaseId = process.env.Products_list;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
 const damagedAssetsDatabaseId = process.env.Damaged_Assets;
+const NOTION_VER = process.env.NOTION_VERSION || '2022-06-28'; // المطلوب في أمثلة Notion
 // Team Members DB (from ENV)
 const teamMembersDatabaseId =
   process.env.Team_Members ||
