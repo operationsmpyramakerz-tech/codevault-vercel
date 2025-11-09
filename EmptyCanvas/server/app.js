@@ -1458,44 +1458,83 @@ app.get(
     }
   },
 );
-// == Damaged Assets: searchable products list ==
-// GET options for Damaged Assets dropdown  (front-end expects { options: [{id,name}, ...] })
-app.get('/api/damaged-assets/options', requireAuth, requirePage('Damaged Assets'), async (req, res) => {
-  try {
-    if (!componentsDatabaseId) {
-      return res.status(500).json({ options: [], error: "Products_Database ID is not configured." });
-    }
-
-    // دعم فلترة اختيارية بالاسم (?q=)
-    const q = String(req.query.q || '').trim();
-
-    const options = [];
-    let startCursor, hasMore = true;
-
-    while (hasMore) {
-      const resp = await notion.databases.query({
-        database_id: componentsDatabaseId,                 // ← لازم يكون هو نفس DB بتاع Relation "Products"
-        start_cursor: startCursor,
-        ...(q ? { filter: { property: "Name", title: { contains: q } } } : {}),
-        sorts: [{ property: "Name", direction: "ascending" }],
-      });
-
-      for (const page of resp.results) {
-        const name = page?.properties?.Name?.title?.[0]?.plain_text;
-        if (name) options.push({ id: page.id, name });
+// == Damaged Assets: Products options (works even if title prop isn't named "Name")
+app.get(
+  '/api/damaged-assets/options',
+  requireAuth,
+  requirePage('Damaged Assets'),
+  async (req, res) => {
+    try {
+      // DB بتاع الـ relation "Products"
+      const dbId =
+        process.env.Products_Database || global.componentsDatabaseId;
+      if (!dbId) {
+        return res
+          .status(500)
+          .json({ options: [], error: 'Products_Database is not set' });
       }
 
-      hasMore     = resp.has_more;
-      startCursor = resp.next_cursor;
-    }
+      const q = String(req.query.q || '').trim(); // فلترة اختيارية
 
-    res.set('Cache-Control', 'no-store');
-    return res.json({ options });
-  } catch (e) {
-    console.error("GET /api/damaged-assets/options:", e?.body || e);
-    return res.status(500).json({ options: [], error: "Failed to load products" });
+      const options = [];
+      let startCursor = undefined;
+      let hasMore = true;
+
+      while (hasMore) {
+        const resp = await notion.databases.query({
+          database_id: dbId,
+          start_cursor: startCursor,
+          // نحاول نفلتر بالاسم لو فيه q، ولو اسم العمود مختلف مافيش مشكلة: هنفلتر بعد السحب
+          ...(q
+            ? {
+                filter: {
+                  or: [
+                    { property: 'Name', title: { contains: q } },
+                    { property: 'Title', title: { contains: q } },
+                  ],
+                },
+              }
+            : {}),
+          sorts: [{ property: 'Name', direction: 'ascending' }],
+          page_size: 50,
+        });
+
+        for (const page of resp.results) {
+          // استخرج أول عمود type=title ديناميكيًا مهما كان اسمه
+          let titleText = '';
+          const props = page.properties || {};
+          for (const key in props) {
+            const p = props[key];
+            if (p?.type === 'title') {
+              titleText = (p.title || [])
+                .map((t) => t.plain_text || '')
+                .join('')
+                .trim();
+              break;
+            }
+          }
+          // fallback لو فاضي
+          if (!titleText) titleText = 'Untitled';
+
+          options.push({ id: page.id, name: titleText });
+        }
+
+        hasMore = resp.has_more;
+        startCursor = resp.next_cursor;
+      }
+
+      // فلترة إضافية في السيرفر لو اسم العمود مش "Name"
+      const filtered =
+        q ? options.filter((o) => o.name.toLowerCase().includes(q.toLowerCase())) : options;
+
+      res.set('Cache-Control', 'no-store');
+      return res.json({ options: filtered });
+    } catch (e) {
+      console.error('GET /api/damaged-assets/options:', e?.body || e);
+      return res.status(500).json({ options: [], error: 'Failed to load products' });
+    }
   }
-});
+);
 // Submit Order — requires Create New Order
 app.post(
   "/api/submit-order",
