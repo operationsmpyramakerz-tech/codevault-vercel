@@ -1462,61 +1462,40 @@ app.get(
 // GET options for Damaged Assets dropdown  (front-end expects { options: [{id,name}, ...] })
 app.get('/api/damaged-assets/options', requireAuth, requirePage('Damaged Assets'), async (req, res) => {
   try {
-    const q = (req.query.q || '').trim().toLowerCase();
+    if (!componentsDatabaseId) {
+      return res.status(500).json({ options: [], error: "Products_Database ID is not configured." });
+    }
 
-    // TODO: بدّل السطور التالية بطريقة جلبك من Notion لجدول المنتجات/المكونات
-    // لازم ترجع مصفوفة كائنات { id, name } فقط.
-    // مثال تقريبي لو عندك دالة جاهزة:
-    // const items = await listProductsFromNotion({ q });
-    // res.json({ options: items.map(p => ({ id: p.id, name: p.name })) });
+    // دعم فلترة اختيارية بالاسم (?q=)
+    const q = String(req.query.q || '').trim();
 
-    // Placeholder آمن لو حابب تختبر
-    const items = []; // رجّع نتائجك الفعلية بدل هذا
-    res.json({ options: items });
+    const options = [];
+    let startCursor, hasMore = true;
+
+    while (hasMore) {
+      const resp = await notion.databases.query({
+        database_id: componentsDatabaseId,                 // ← لازم يكون هو نفس DB بتاع Relation "Products"
+        start_cursor: startCursor,
+        ...(q ? { filter: { property: "Name", title: { contains: q } } } : {}),
+        sorts: [{ property: "Name", direction: "ascending" }],
+      });
+
+      for (const page of resp.results) {
+        const name = page?.properties?.Name?.title?.[0]?.plain_text;
+        if (name) options.push({ id: page.id, name });
+      }
+
+      hasMore     = resp.has_more;
+      startCursor = resp.next_cursor;
+    }
+
+    res.set('Cache-Control', 'no-store');
+    return res.json({ options });
   } catch (e) {
-    res.status(500).json({ options: [], error: e.message });
+    console.error("GET /api/damaged-assets/options:", e?.body || e);
+    return res.status(500).json({ options: [], error: "Failed to load products" });
   }
 });
-app.get(
-  "/api/damaged-assets/products",
-  requireAuth,
-  requirePage("Damaged Assets"),
-  async (req, res) => {
-    try {
-      if (!componentsDatabaseId) {
-        return res.status(500).json({ error: "Products_Database ID is not configured." });
-      }
-
-      const q = String(req.query.q || "").trim();
-      const items = [];
-      let startCursor, hasMore = true;
-
-      while (hasMore) {
-        const resp = await notion.databases.query({
-          database_id: componentsDatabaseId,
-          start_cursor: startCursor,
-          ...(q
-            ? { filter: { property: "Name", title: { contains: q } } }
-            : {}),
-          sorts: [{ property: "Name", direction: "ascending" }],
-        });
-
-        resp.results.forEach(p => {
-          const name = p.properties?.Name?.title?.[0]?.plain_text;
-          if (name) items.push({ id: p.id, name });
-        });
-
-        hasMore = resp.has_more;
-        startCursor = resp.next_cursor;
-      }
-
-      res.json({ items });
-    } catch (e) {
-      console.error("damaged-assets/products:", e?.body || e);
-      res.status(500).json({ error: "Failed to load products" });
-    }
-  }
-);
 // Submit Order — requires Create New Order
 app.post(
   "/api/submit-order",
