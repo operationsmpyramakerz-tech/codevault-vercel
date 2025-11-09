@@ -2288,6 +2288,60 @@ async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
   return res.url;
 }
 
+// ---- Helper: Parse DataURL (data:<mime>;base64,...) إلى { mime, buffer } ----
+function parseDataUrlToBuffer(dataUrl) {
+  const m = String(dataUrl || '').match(/^data:(.+?);base64,(.+)$/);
+  if (!m) throw new Error('INVALID_DATA_URL');
+  const mime = m[1];
+  const b64  = m[2];
+  const buf  = Buffer.from(b64, 'base64');
+  return { mime, buf };
+}
+
+// ---- Helper: جهّز عنصر "file" خارجي لخاصية Files & media في Notion ----
+function makeExternalFile(name, url) {
+  return { type: 'external', name: name || 'file', external: { url } };
+}
+
+// ---- Helper: رجّع اسم عمود Files & media وتحقق إنه فعلاً من نوع files ----
+async function ensureFilesPropName(pageId, preferred = 'Files & media') {
+  const page = await notion.pages.retrieve({ page_id: pageId });
+  const props = page?.properties || {};
+  // لو الاسم المفضّل موجود ونوعه files نستخدمه
+  if (props[preferred]?.type === 'files') return preferred;
+  // وإلا دوّر على أي عمود نوعه files
+  const found = Object.keys(props).find(k => props[k]?.type === 'files');
+  if (!found) throw new Error('FILES_PROP_MISSING');
+  return found;
+}
+
+// ---- Helper: append / replace لمحتوى Files & media ----
+async function writeFilesProp(pageId, propName, newFileObject, mode = 'append') {
+  // هات الصفحة علشان تجيب أي ملفات حالية (هنحتفظ فقط بالـ external القديمة لتفادي مشاكل صلاحية Notion-hosted file)
+  const pg = await notion.pages.retrieve({ page_id: pageId });
+  const p  = pg?.properties?.[propName];
+  if (!p || p.type !== 'files') throw new Error('FILES_PROP_NOT_FILES_TYPE');
+
+  const existingExternal = Array.isArray(p.files)
+    ? p.files
+        .map(f => (f?.type === 'external' && f?.external?.url)
+          ? { type: 'external', name: f.name || 'file', external: { url: f.external.url } }
+          : null)
+        .filter(Boolean)
+    : [];
+
+  const files = (mode === 'append')
+    ? existingExternal.concat([ newFileObject ])
+    : [ newFileObject ];
+
+  await notion.pages.update({
+    page_id: pageId,
+    properties: { [propName]: { files } },
+  });
+
+  return { count: files.length };
+}
+
 // Export Express app for Vercel
 
 // ====== S.V schools orders: helpers ======
@@ -2724,22 +2778,38 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
   }
 });
 
-// رفع صورة مباشرةً إلى Notion في عمود Files & media
+// === Notion: رفع صورة DataURL -> Vercel Blob -> ربطها في Files & media ===
 app.post('/api/notion/upload-file', requireAuth, async (req, res) => {
   try {
-    const { pageId, dataUrl, filename, propName } = req.body || {};
-    if (!pageId || !dataUrl) {
-      return res.status(400).json({ ok: false, error: 'pageId و dataUrl مطلوبان' });
-    }
-    const filesProp = (propName || 'Files & media').trim();
+    const { pageId, dataUrl, filename, propName, mode } = req.body || {};
 
-    const out = await uploadDataURLToNotionFiles(pageId, dataUrl, filename || 'upload.png', filesProp);
-    return res.json({ ok: true, ...out, prop: filesProp });
+    if (!pageId)  return res.status(400).json({ ok:false, error:'pageId required' });
+    if (!dataUrl) return res.status(400).json({ ok:false, error:'dataUrl required' });
+
+    // 1) Parse DataURL
+    const { mime, buf } = parseDataUrlToBuffer(dataUrl);
+
+    // 2) تأكد من الحد الأقصى 20MB (على الملف قبل Base64)
+    if (buf.length > 20 * 1024 * 1024) {
+      return res.status(413).json({ ok:false, error:'File > 20MB' });
+    }
+
+    // 3) ارفع الملف على Vercel Blob وخد رابط عام
+    //    (الهيلبر uploadToBlobFromBase64 موجود عندك بالفعل)
+    const publicUrl = await uploadToBlobFromBase64(`data:${mime};base64,${buf.toString('base64')}`, filename || 'upload.jpg');
+
+    // 4) تأكد من اسم عمود Files & media (أو أي عمود files لو الاسم مختلف)
+    const prop = await ensureFilesPropName(pageId, propName || 'Files & media');
+
+    // 5) كوّن عنصر external file واكتبه في الخاصية (append افتراضيًا)
+    const fileObj = makeExternalFile(filename || 'upload.jpg', publicUrl);
+    const { count } = await writeFilesProp(pageId, prop, fileObj, (mode === 'replace' ? 'replace' : 'append'));
+
+    return res.json({ ok: true, pageId, prop, url: publicUrl, totalFiles: count });
   } catch (e) {
-    console.error('upload-file error:', e);
-    return res.status(500).json({ ok: false, error: String(e.message || e) });
+    console.error('upload-file error:', e?.body || e);
+    return res.status(500).json({ ok:false, error: e?.message || 'Upload failed' });
   }
 });
-
 
 module.exports = app;
