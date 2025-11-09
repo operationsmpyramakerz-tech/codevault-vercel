@@ -499,6 +499,17 @@ app.delete(
   },
 );
 
+app.get('/api/damaged-assets/options', async (req, res) => {
+  try {
+    // استخدم نفس دالة قراءة المنتجات الموجودة عندك
+    const products = await listProductsFromNotion(); // موجودة بالفعل لصفحة Create Order
+    // رجّع نفس الشكل المتوقع هنا
+    res.json({ options: products.map(p => ({ id: p.id, name: p.name })) });
+  } catch (e) {
+    res.status(500).json({ options: [] });
+  }
+});
+
 // Orders listing (Current Orders)
 app.get(
   "/api/orders",
