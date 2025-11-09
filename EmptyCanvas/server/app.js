@@ -2581,6 +2581,9 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     // نقرأ خصائص قاعدة Damaged_Assets مرة واحدة
     const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
     const props = db.properties || {};
+    const titleKey =
+      Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
+
     // === Detect "Team Members" relation column on Damaged_Assets DB ===
 let reporterKey = null;
 for (const [k, v] of Object.entries(props)) {
@@ -2589,9 +2592,6 @@ for (const [k, v] of Object.entries(props)) {
     break;
   }
 }
-
-    const titleKey =
-      Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
 
     // Helper للعثور على عمود بنوع معيّن
     const findProp = (wantedType, candidates = [], regexHint = null) => {
