@@ -1,85 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Damaged Assets</title>
-<link href="/css/style.css" rel="stylesheet"/>
-<script src="https://unpkg.com/feather-icons"></script>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Damaged Assets</title>
+
+  <!-- نفس ستايل باقي الصفحات -->
+  <link rel="stylesheet" href="/css/style.css"/>
+  <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body>
 <script>
-  (function() {
+  (function () {
     try {
       if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
         document.body.classList.add('sidebar-mini');
       }
-    } catch(e) {}
+    } catch (e) {}
   })();
 </script>
 
 <div class="app-container">
-  <!-- Sidebar (مطابق Funds) -->
+  <!-- Sidebar مطابق لصفحة Funds -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
-      <button aria-expanded="true" aria-label="Toggle sidebar" class="sidebar-toggle" id="sidebar-toggle">
+      <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
         <i data-feather="chevrons-left"></i>
       </button>
     </div>
 
-    <!-- Sidebar: flat links -->
     <nav class="sidebar-nav">
       <ul class="nav-list">
-        <li>
-          <a class="nav-link" href="/orders">
-            <i data-feather="list"></i>
-            <span class="nav-label">Current Orders</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/orders/requested">
-            <i data-feather="users"></i>
-            <span class="nav-label">Schools Requested Orders</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/orders/assigned">
-            <i data-feather="user-check"></i>
-            <span class="nav-label">Storage</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/orders/new">
-            <i data-feather="plus-circle"></i>
-            <span class="nav-label">Create New Order</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/stocktaking">
-            <i data-feather="archive"></i>
-            <span class="nav-label">Stocktaking</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/logistics">
-            <i data-feather="truck"></i>
-            <span class="nav-label">Logistics</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/funds">
-            <i data-feather="dollar-sign"></i>
-            <span class="nav-label">Funds</span>
-          </a>
-        </li>
-        <li>
-          <a class="nav-link" href="/orders/sv-orders">
-            <i data-feather="award"></i>
-            <span class="nav-label">S.V schools orders</span>
-          </a>
-        </li>
-        <!-- الصفحة الحالية: active -->
+        <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/requested"><i data-feather="users"></i><span class="nav-label">Schools Requested Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/assigned"><i data-feather="user-check"></i><span class="nav-label">Storage</span></a></li>
+        <li><a class="nav-link" href="/orders/new"><i data-feather="plus-circle"></i><span class="nav-label">Create New Order</span></a></li>
+        <li><a class="nav-link" href="/stocktaking"><i data-feather="archive"></i><span class="nav-label">Stocktaking</span></a></li>
+        <li><a class="nav-link" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
+        <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
+        <li><a class="nav-link" href="/orders/sv-orders"><i data-feather="award"></i><span class="nav-label">S.V schools orders</span></a></li>
         <li>
           <a class="nav-link active" href="/damaged-assets">
             <i data-feather="alert-triangle"></i>
@@ -90,34 +50,29 @@
     </nav>
 
     <div class="sidebar-footer">
-      <button class="logout-btn" id="logoutBtn"><i data-feather="log-out"></i> Logout</button>
+      <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
     </div>
   </aside>
 
-  <!-- Main (مطابق Funds) -->
   <div class="main-content">
-    <!-- Header (greeting + title) -->
     <header class="main-header">
       <div class="header-row1">
         <div class="left">
-          <div aria-live="polite" class="greeting-pill">
-            <span class="greeting-avatar">
-              <img alt="Hi icon" src="/images/greeting-icon.png"/>
-            </span>
+          <div class="greeting-pill" aria-live="polite">
+            <span class="greeting-avatar"><img src="/images/greeting-icon.png" alt="Hi icon"/></span>
             <div class="greet-text">
-              <div class="greet-title">Hi, <span data-username="">...</span> 👋</div>
+              <div class="greet-title">Hi, <span data-username>...</span> 👋</div>
               <div class="greet-sub">Start your day with operations</div>
             </div>
           </div>
-          <!-- Hidden searchbar to prevent JS errors -->
-          <div class="searchbar" id="orders-searchbar" role="search" style="display: none;">
+          <div class="searchbar" id="orders-searchbar" role="search" style="display:none;">
             <i data-feather="search"></i>
-            <input aria-label="Search" id="orderSearch" placeholder="Search..." type="search"/>
+            <input id="orderSearch" type="search" placeholder="Search..." aria-label="Search"/>
           </div>
         </div>
         <div class="right topbar-right">
-          <a aria-label="My account" class="account-mini" href="/account" title="My account">
-            <span class="ico-circle"><img alt="Logo" src="/images/logo.png"/></span>
+          <a class="account-mini" href="/account" aria-label="My account" title="My account">
+            <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
             <span class="label">My account</span>
           </a>
         </div>
@@ -127,7 +82,6 @@
       </div>
     </header>
 
-    <!-- Body -->
     <main class="container-full-width">
       <section class="card card--elevated">
         <div class="card-header">
@@ -135,102 +89,25 @@
           <p class="card-subtitle">Report damaged items and attach evidence</p>
         </div>
 
-        <!-- ======= FORM: V2 (متعدد المكوّنات) ======= -->
-        <form class="form-container" id="damagedFormV2">
-          <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-            <h3 style="display:flex;align-items:center;gap:8px;margin:0"><i data-feather="package"></i> Components</h3>
-            <button class="btn btn-outline-pill" id="addComponentBtn" type="button">
-              <i data-feather="plus"></i> Add Component
-            </button>
+        <!-- النموذج متعدد العناصر -->
+        <form id="damagedForm" class="form-container">
+          <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <h3 style="margin:0;display:flex;gap:8px;align-items:center;"><i data-feather="package"></i> Components</h3>
+            <button id="addItemBtn" type="button" class="btn btn-outline-pill"><i data-feather="plus"></i> Add Component</button>
           </div>
 
-          <!-- قائمة العناصر -->
-          <div class="components-list" id="componentsList">
-            <!-- عنصر مبدئي يحتوي جميع الحقول (لن يتعارض مع الحقن الديناميكي) -->
-            <div class="component-entry" data-item-id="1" style="border:1px dashed var(--border,#e5e7eb);border-radius:12px;padding:12px;margin-top:12px">
-              <div class="form-row" style="display:flex;gap:12px;flex-wrap:wrap">
-                <div class="form-group" style="flex:1 1 280px">
-                  <label class="form-label" for="product1"><i data-feather="box"></i> Products *</label>
-                  <select class="form-input" id="product1" name="items[1][productId]" required>
-                    <option value="">Select product...</option>
-                  </select>
-                </div>
-                <div class="form-group" style="flex:1 1 280px">
-                  <label class="form-label" for="title1"><i data-feather="type"></i> Description of issue (Title) *</label>
-                  <input class="form-input" id="title1" name="items[1][title]" type="text" placeholder="Short issue summary..." required/>
-                </div>
-              </div>
-
-              <div class="form-group" style="margin-top:12px">
-                <label class="form-label" for="reason1"><i data-feather="message-square"></i> Issue Reason</label>
-                <textarea class="form-input" id="reason1" name="items[1][reason]" placeholder="Extra details, when/how it happened, etc."></textarea>
-              </div>
-
-              <div class="form-group" style="margin-top:12px">
-                <label class="form-label" for="files1"><i data-feather="image"></i> Files &amp; media</label>
-                <input class="form-input" id="files1" name="items[1][files]" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png"/>
-                <small class="note">Upload photos/screenshots (optional)</small>
-              </div>
-            </div>
-          </div>
-
-          <!-- أزرار الإرسال -->
-          <div class="form-actions">
-            <button class="submit-btn" id="submitBtnV2" type="submit">
-              <i data-feather="save"></i>
-              Submit Report
-            </button>
-            <button class="btn btn-secondary" id="clearV2" type="reset">
-              <i data-feather="x-circle"></i>
-              Clear Form
-            </button>
-          </div>
-
-          <div class="note" id="msgV2" style="margin-top:8px" aria-live="polite"></div>
-        </form>
-        <!-- ======= /V2 ======= -->
-
-        <!-- ======= legacy form (محفوظ ومخفي) ======= -->
-        <form id="damageForm" style="display:none">
-          <div class="form-row" style="display:flex;gap:12px;flex-wrap:wrap">
-            <div class="form-group" style="flex:1 1 280px">
-              <label class="form-label" for="assetName">Asset Name *</label>
-              <input class="form-input" id="assetName" name="assetName" type="text" placeholder="e.g., 3D Printer, Laptop #A-12" required/>
-            </div>
-            <div class="form-group" style="flex:1 1 280px">
-              <label class="form-label" for="location">Location</label>
-              <input class="form-input" id="location" name="location" type="text" placeholder="e.g., Lab A, Storage Room"/>
-            </div>
-            <div class="form-group" style="flex:1 1 280px">
-              <label class="form-label" for="severity">Severity</label>
-              <select class="form-input" id="severity" name="severity">
-                <option value="">-- optional --</option>
-                <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-top:12px">
-            <label class="form-label" for="damageDescription">Damage Description *</label>
-            <textarea class="form-input" id="damageDescription" name="damageDescription" placeholder="Describe the damage, when it happened, and any context..." required></textarea>
-            <div class="note">This will be saved to the Notion column named <b>Damage Description</b>.</div>
-          </div>
+          <div id="itemsList" class="expenses-list"><!-- dynamic entries --></div>
 
           <div class="form-actions">
-            <button class="submit-btn" type="submit">
-              <i data-feather="save"></i>
-              Submit Report
-            </button>
+            <button id="submitBtn" type="submit" class="submit-btn"><i data-feather="save"></i> Submit Report</button>
+            <button type="reset" class="btn btn-secondary"><i data-feather="x-circle"></i> Clear Form</button>
           </div>
-          <div class="note" id="msg" aria-live="polite"></div>
         </form>
-        <!-- ======= /legacy ======= -->
       </section>
     </main>
   </div>
 </div>
 
-<!-- Scripts (مطابق Funds) -->
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/damaged-assets.js"></script>
