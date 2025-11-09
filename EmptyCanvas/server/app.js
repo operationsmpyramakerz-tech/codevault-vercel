@@ -2745,4 +2745,79 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     return res.status(500).json({ ok: false, error: "Failed to save damaged asset report", details: e?.body || String(e) });
   }
 });
+// ========== Damaged Assets: create pages in Notion ==========
+app.post('/api/damaged-assets', express.json(), async (req, res) => {
+  try {
+    const databaseId = process.env.Damaged_Assets;
+    if (!databaseId) {
+      return res.status(500).json({ success: false, error: 'Missing env: Damaged_Assets' });
+    }
+
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'No items to save' });
+    }
+
+    // لو عندك هوية العضو في السيشن علشان نحطها في Teams Members relation
+    // غيّر السطرين دول لمازجتك الحالية (إن لم توجد، هنسيب العمود فاضي بدون خطأ):
+    const teamMemberRelationId =
+      req.user?.notionMemberPageId || req.session?.notionMemberPageId || null;
+
+    const created = [];
+    for (const it of items) {
+      const title = (it?.title || '').slice(0, 2000);
+      const reason = (it?.reason || '').slice(0, 2000);
+      const productId = it?.product?.id ? String(it.product.id) : null;
+
+      const properties = {
+        // Title
+        'Description of issue': {
+          title: [{ type: 'text', text: { content: title || '—' } }],
+        },
+        // Relation -> Products
+        'Products': {
+          relation: productId ? [{ id: productId }] : [],
+        },
+        // Text
+        'Issue Reason': {
+          rich_text: reason ? [{ type: 'text', text: { content: reason } }] : [],
+        },
+      };
+
+      // Relation -> Teams Members (اختياري لو عندك الـ id)
+      if (teamMemberRelationId) {
+        properties['Teams Members'] = { relation: [{ id: String(teamMemberRelationId) }] };
+      }
+
+      // Files & media (لو بتبعت URLs خارجية، نحفظها. لو مفيش URLs بنسيبها فاضية)
+      if (Array.isArray(it.files)) {
+        const files = it.files
+          .filter(f => f && typeof f.url === 'string' && /^https?:\/\//i.test(f.url))
+          .map(f => ({
+            name: f.name || 'file',
+            type: 'external',
+            external: { url: f.url },
+          }));
+        if (files.length) properties['Files & media'] = { files };
+      }
+
+      const page = await notion.pages.create({
+        parent: { database_id: databaseId },
+        properties,
+      });
+
+      created.push({ id: page.id });
+    }
+
+    return res.json({
+      success: true,
+      message: `Saved ${created.length} item(s) to Notion.`,
+      pages: created,
+    });
+  } catch (err) {
+    console.error('POST /api/damaged-assets failed:', err);
+    return res.status(500).json({ success: false, error: 'Failed to save order to Notion' });
+  }
+});
+// ========== /Damaged Assets ==========
 module.exports = app;
