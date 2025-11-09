@@ -2724,5 +2724,22 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
   }
 });
 
+// رفع صورة مباشرةً إلى Notion في عمود Files & media
+app.post('/api/notion/upload-file', requireAuth, async (req, res) => {
+  try {
+    const { pageId, dataUrl, filename, propName } = req.body || {};
+    if (!pageId || !dataUrl) {
+      return res.status(400).json({ ok: false, error: 'pageId و dataUrl مطلوبان' });
+    }
+    const filesProp = (propName || 'Files & media').trim();
+
+    const out = await uploadDataURLToNotionFiles(pageId, dataUrl, filename || 'upload.png', filesProp);
+    return res.json({ ok: true, ...out, prop: filesProp });
+  } catch (e) {
+    console.error('upload-file error:', e);
+    return res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
+
 
 module.exports = app;
