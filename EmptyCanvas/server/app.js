@@ -10,7 +10,6 @@ app.set("trust proxy", 1);
 const notion = new Client({ auth: process.env.Notion_API_Key });
 const componentsDatabaseId = process.env.Products_Database;
 const ordersDatabaseId = process.env.Products_list;
-const teamMembersDatabaseId = process.env.Team_Members;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
 const damagedAssetsDatabaseId = process.env.Damaged_Assets;
@@ -1473,8 +1472,7 @@ app.get(
   async (req, res) => {
     try {
       // DB بتاع الـ relation "Products"
-      const dbId =
-        process.env.Products_Database || global.componentsDatabaseId;
+      const dbId = componentsDatabaseId || process.env.Products_Database || null;
       if (!dbId) {
         return res
           .status(500)
@@ -2589,25 +2587,6 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
     const props = db.properties || {};
 
-  // Detect the relation property that points to Team_Members DB
-let reporterKey = null;
-if (teamMembersDatabaseId) {
-  for (const [k, v] of Object.entries(props)) {
-    if (v?.type === 'relation' && v?.relation?.database_id === teamMembersDatabaseId) {
-      reporterKey = k;
-      break;
-    }
-  }
-}
-// Fallback: اسم العمود يحتوي team/member لو الربط غير مباشر
-if (!reporterKey) {
-  for (const [k, v] of Object.entries(props)) {
-    if (v?.type === 'relation' && /team|member/i.test(k)) {
-      reporterKey = k;
-      break;
-    }
-  }
-}
     const titleKey =
       Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
 
@@ -2634,26 +2613,30 @@ if (!reporterKey) {
     const reasonKey = findProp("rich_text", ["Issue Reason", "Reason"], "(reason)");
     const dateKey   = findProp("date",      ["Date", "Reported On", "Report Date"], "(date|report)");
     const filesKey  = Object.keys(props).find((k) => props[k]?.type === "files");
-
-    // relation على Team Members لو موجود
-    let reporterKey = null;
-    for (const [k, v] of Object.entries(props)) {
-      if (v?.type === "relation" && v?.relation?.database_id === teamMembersDatabaseId) {
-        reporterKey = k; break;
-      }
+    
+// Team Members relation (واحدة فقط)
+let reporterKey = null;
+if (teamMembersDatabaseId) {
+  for (const [k, v] of Object.entries(props)) {
+    if (v?.type === 'relation' && v?.relation?.database_id === teamMembersDatabaseId) {
+      reporterKey = k; break;
     }
-
-    // relation على Products لو موجود
+  }
+}
+// Fallback بالاسم لو الربط غير مباشر
+if (!reporterKey) {
+  for (const [k, v] of Object.entries(props)) {
+    if (v?.type === 'relation' && /team|member/i.test(k)) { reporterKey = k; break; }
+  }
+} 
     let productsKey = null;
-    for (const [k, v] of Object.entries(props)) {
-      if (v?.type === "relation") {
-        if (productsDatabaseId && v?.relation?.database_id === productsDatabaseId) {
-          productsKey = k; break;
-        }
-        // fallback بالاسم
-        if (!productsKey && /product/i.test(k)) productsKey = k;
-      }
-    }
+for (const [k, v] of Object.entries(props)) {
+  if (v?.type === 'relation' && productsDatabaseId && v?.relation?.database_id === productsDatabaseId) {
+    productsKey = k; break;
+  }
+  if (!productsKey && v?.type === 'relation' && /product/i.test(k)) productsKey = k;
+}
+    
 
     // ====== فرع الـ V2: items[] ======
     const items = Array.isArray(req.body?.items) ? req.body.items : null;
