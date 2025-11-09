@@ -2677,10 +2677,6 @@ for (const [k, v] of Object.entries(props)) {
           const today = new Date().toISOString().slice(0, 10);
           properties[dateKey] = { date: { start: today } };
         }
-        // Team Member (المبلّغ)
-if (reporterKey && currentUserId) {
-  properties[reporterKey] = { relation: [{ id: currentUserId }] };
-}
 
         const page = await notion.pages.create({
           parent: { database_id: damagedAssetsDatabaseId },
