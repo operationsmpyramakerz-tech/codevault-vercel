@@ -2557,302 +2557,13 @@ app.post(
     }
   }
 );
-// === Damaged Assets: submit report (supports new items[] and legacy body) ===
+// === Damaged Assets: submit report (يدعم body.items[] أو النموذج القديم) ===
 app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), async (req, res) => {
   try {
     if (!damagedAssetsDatabaseId) {
       return res.status(500).json({ ok: false, error: "Damaged_Assets database ID is not configured." });
     }
 
-    // هنحتاج ID بتاع Products database علشان نربط الـ relation
-    const productsDatabaseId =
-      process.env.Products_Database ||
-      process.env.NOTION_PRODUCTS_DATABASE_ID ||
-      process.env.PRODUCTS_DATABASE_ID ||
-      null;
-
-    // لو عندك relation لـ Team Members هنجيب صفحة المستخدم الحالي
-    let currentUserId = null;
-    try {
-      if (teamMembersDatabaseId) {
-        const userQuery = await notion.databases.query({
-          database_id: teamMembersDatabaseId,
-          filter: { property: "Name", title: { equals: req.session.username } },
-        });
-        currentUserId = userQuery.results?.[0]?.id || null;
-      }
-    } catch {}
-
-    // نقرأ خصائص قاعدة Damaged_Assets مرة واحدة
-    const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
-    const props = db.properties || {};
-
-    const titleKey =
-      Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
-
-    // Helper للعثور على عمود بنوع معيّن
-    const findProp = (wantedType, candidates = [], regexHint = null) => {
-      for (const c of candidates) {
-        const p = props[c];
-        if (p && p.type === wantedType) return c;
-      }
-      if (regexHint) {
-        const rx = new RegExp(regexHint, "i");
-        for (const k of Object.keys(props)) {
-          if (props[k]?.type === wantedType && rx.test(k)) return k;
-        }
-      }
-      for (const k of Object.keys(props)) {
-        if (props[k]?.type === wantedType) return k;
-      }
-      return null;
-    };
-
-    // مفاتيح للأعمدة المتوقعة في الجدول
-    const descKey   = findProp("rich_text", ["Description of issue", "Damage Description", "Description", "Details", "Notes"], "(desc|issue|damage|note|detail)");
-    const reasonKey = findProp("rich_text", ["Issue Reason", "Reason"], "(reason)");
-    const dateKey   = findProp("date",      ["Date", "Reported On", "Report Date"], "(date|report)");
-    const filesKey  = Object.keys(props).find((k) => props[k]?.type === "files");
-    
-// Team Members relation (واحدة فقط)
-let reporterKey = null;
-if (teamMembersDatabaseId) {
-  for (const [k, v] of Object.entries(props)) {
-    if (v?.type === 'relation' && v?.relation?.database_id === teamMembersDatabaseId) {
-      reporterKey = k; break;
-    }
-  }
-}
-// Fallback بالاسم لو الربط غير مباشر
-if (!reporterKey) {
-  for (const [k, v] of Object.entries(props)) {
-    if (v?.type === 'relation' && /team|member/i.test(k)) { reporterKey = k; break; }
-  }
-} 
-    let productsKey = null;
-for (const [k, v] of Object.entries(props)) {
-  if (v?.type === 'relation' && productsDatabaseId && v?.relation?.database_id === productsDatabaseId) {
-    productsKey = k; break;
-  }
-  if (!productsKey && v?.type === 'relation' && /product/i.test(k)) productsKey = k;
-}
-    
-
-    // ====== فرع الـ V2: items[] ======
-    const items = Array.isArray(req.body?.items) ? req.body.items : null;
-    if (items && items.length) {
-      const created = [];
-      // Resolve current user's Team Member page (by email then name)
-let currentUserId =
-  req.session?.notionMemberPageId ||
-  req.user?.notionMemberPageId ||
-  null;
-
-if (!currentUserId && teamMembersDatabaseId) {
-  try {
-    const tmDb = await notion.databases.retrieve({ database_id: teamMembersDatabaseId });
-    const tProps = tmDb.properties || {};
-    const emailProp = Object.keys(tProps).find(k => tProps[k]?.type === 'email') || 'Email';
-    const titleProp = Object.keys(tProps).find(k => tProps[k]?.type === 'title') || 'Name';
-
-    const email = req.user?.email || req.session?.email || null;
-    const name  = req.user?.name  || req.session?.name  || null;
-
-    if (email) {
-      const q1 = await notion.databases.query({
-        database_id: teamMembersDatabaseId,
-        filter: { property: emailProp, email: { equals: String(email).trim() } },
-        page_size: 1
-      });
-      if (q1.results?.[0]?.id) currentUserId = q1.results[0].id;
-    }
-
-    if (!currentUserId && name) {
-      const q2 = await notion.databases.query({
-        database_id: teamMembersDatabaseId,
-        filter: { property: titleProp, title: { contains: String(name).trim() } },
-        page_size: 1
-      });
-      if (q2.results?.[0]?.id) currentUserId = q2.results[0].id;
-    }
-  } catch (e) {
-    console.error('resolve team member failed:', e?.body || e);
-  }
-}
-
-      for (const it of items) {
-        const productId = it?.product?.id || it?.productId || null;
-        const title     = (it?.title || "").toString().trim();
-        const reason    = (it?.reason || "").toString().trim();
-try {
-    if (!damagedAssetsDatabaseId) {
-      return res.status(500).json({ ok: false, error: "Damaged_Assets database ID is not configured." });
-    }
-
-    // DB بتاع الـ relation "Products"
-    const productsDatabaseId =
-      process.env.Products_Database ||
-      process.env.NOTION_PRODUCTS_DATABASE_ID ||
-      process.env.PRODUCTS_DATABASE_ID ||
-      null;
-
-    // هنقرأ خصائص قاعدة Damaged_Assets مرة واحدة
-    const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
-    const props = db.properties || {};
-
-    // --- اكتشاف الأعمدة ديناميكياً ---
-    const titleKey = Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
-
-    const findProp = (wantedType, candidates = [], regexHint = null) => {
-      for (const c of candidates) { const p = props[c]; if (p && p.type === wantedType) return c; }
-      if (regexHint) {
-        const rx = new RegExp(regexHint, "i");
-        for (const k of Object.keys(props)) {
-          if (props[k]?.type === wantedType && rx.test(k)) return k;
-        }
-      }
-      for (const k of Object.keys(props)) { if (props[k]?.type === wantedType) return k; }
-      return null;
-    };
-
-    const descKey   = findProp("rich_text", ["Description of issue","Damage Description","Description","Details","Notes"], "(desc|issue|damage|note|detail)");
-    const reasonKey = findProp("rich_text", ["Issue Reason","Reason"], "(reason)");
-    const dateKey   = findProp("date",      ["Date","Reported On","Report Date"], "(date|report)");
-    const filesKey  = Object.keys(props).find((k) => props[k]?.type === "files");
-
-    // Team Members relation (واحدة فقط) — نحاول نلاقي العمود اللي رابط بقاعدة Team_Members
-    let reporterKey = null;
-    if (teamMembersDatabaseId) {
-      for (const [k, v] of Object.entries(props)) {
-        if (v?.type === "relation" && v?.relation?.database_id === teamMembersDatabaseId) { reporterKey = k; break; }
-      }
-    }
-    if (!reporterKey) {
-      for (const [k, v] of Object.entries(props)) {
-        if (v?.type === "relation" && /team|member/i.test(k)) { reporterKey = k; break; }
-      }
-    }
-
-    // Products relation (اسم العمود قد يختلف)
-    let productsKey = null;
-    for (const [k, v] of Object.entries(props)) {
-      if (v?.type === "relation" && productsDatabaseId && v?.relation?.database_id === productsDatabaseId) { productsKey = k; break; }
-      if (!productsKey && v?.type === "relation" && /product/i.test(k)) productsKey = k;
-    }
-
-    // --------- جِب صفحة العضو الحالي (المستخدم) مرة واحدة بشكل موثوق ---------
-    let currentUserId = null;
-
-    // 1) محاولة مباشرة بالاسم اللي متخزن في السيشن من تسجيل الدخول
-    if (teamMembersDatabaseId && req.session?.username) {
-      try {
-        const q = await notion.databases.query({
-          database_id: teamMembersDatabaseId,
-          filter: { property: "Name", title: { equals: String(req.session.username).trim() } },
-          page_size: 1
-        });
-        currentUserId = q.results?.[0]?.id || null;
-      } catch {}
-    }
-
-    // 2) إن ما نجحناش، نحاول بالإيميل أو contains(name)
-    if (!currentUserId && teamMembersDatabaseId) {
-      try {
-        const tmDb = await notion.databases.retrieve({ database_id: teamMembersDatabaseId });
-        const tProps = tmDb.properties || {};
-        const emailProp = Object.keys(tProps).find(k => tProps[k]?.type === "email");
-        const titleProp = Object.keys(tProps).find(k => tProps[k]?.type === "title") || "Name";
-
-        const email = req.user?.email || req.session?.email || null;
-        const name  = req.user?.name  || req.session?.username || req.session?.name || null;
-
-        if (!currentUserId && email && emailProp) {
-          const q1 = await notion.databases.query({
-            database_id: teamMembersDatabaseId,
-            filter: { property: emailProp, email: { equals: String(email).trim() } },
-            page_size: 1
-          });
-          currentUserId = q1.results?.[0]?.id || currentUserId;
-        }
-
-        if (!currentUserId && name && titleProp) {
-          const q2 = await notion.databases.query({
-            database_id: teamMembersDatabaseId,
-            filter: { property: titleProp, title: { contains: String(name).trim() } },
-            page_size: 1
-          });
-          currentUserId = q2.results?.[0]?.id || currentUserId;
-        }
-      } catch {}
-    }
-
-    // ====== فرع الـ V2: items[] ======
-    const items = Array.isArray(req.body?.items) ? req.body.items : null;
-    if (items && items.length) {
-      const created = [];
-
-      // لاحظ: هنا **مافيش** let تاني؛ بنستخدم currentUserId اللي فوق (بدون Shadow)
-      for (const it of items) {
-        const productId = it?.product?.id || it?.productId || null;
-        const title     = (it?.title || "").toString().trim();
-        const reason    = (it?.reason || "").toString().trim();
-
-        const properties = {};
-
-        // Title
-        properties[titleKey] = { title: [{ text: { content: title || "Damaged asset" } }] };
-
-        // Description of issue (rich_text) — نحفظ العنوان أيضاً إن حبيت
-        if (descKey) { properties[descKey] = { rich_text: [{ text: { content: title } }] }; }
-
-        // Issue Reason
-        if (reasonKey && reason) { properties[reasonKey] = { rich_text: [{ text: { content: reason } }] }; }
-
-        // Products relation
-        if (productsKey && productId) { properties[productsKey] = { relation: [{ id: productId }] }; }
-
-        // Team Member (المبلّغ)
-        if (reporterKey && currentUserId) { properties[reporterKey] = { relation: [{ id: currentUserId }] }; }
-
-        // Date = اليوم
-        if (dateKey) {
-          const today = new Date().toISOString().slice(0, 10);
-          properties[dateKey] = { date: { start: today } };
-        }
-
-        const page = await notion.pages.create({
-          parent: { database_id: damagedAssetsDatabaseId },
-          properties,
-        });
-
-        // Files & media (URLs فقط)
-        if (filesKey && Array.isArray(it?.files) && it.files.some(f => f?.url)) {
-          const files = it.files
-            .filter(f => !!f.url)
-            .slice(0, 10)
-            .map((f, i) => ({ type: "external", name: f.name || `file-${i+1}`, external: { url: f.url } }));
-          try { await notion.pages.update({ page_id: page.id, properties: { [filesKey]: { files } } }); } catch {}
-        }
-
-        created.push(page.id);
-      }
-
-      return res.json({ ok: true, created });
-    }
-
-    // ====== فرع الـ Legacy ======
-    const { assetName, damageDescription, location, severity, photos = [] } = req.body || {};
-
-    const properties = {};
-    properties[titleKey] = { title: [{ text: { content: (assetName || "Damaged asset").toString() } }] };
-// === Damaged Assets: submit report (supports new items[] and legacy body) ===
-app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), async (req, res) => {
-  try {
-    if (!damagedAssetsDatabaseId) {
-      return res.status(500).json({ ok: false, error: "Damaged_Assets database ID is not configured." });
-    }
-
-    // Products DB (لـ relation)
     const productsDatabaseId =
       componentsDatabaseId ||
       process.env.Products_Database ||
@@ -2860,28 +2571,27 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
       process.env.PRODUCTS_DATABASE_ID ||
       null;
 
-    // جِب خصائص DB مرة واحدة
+    // اقرأ خصائص قاعدة Damaged_Assets
     const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
     const props = db.properties || {};
+    const titleKey = Object.keys(props).find(k => props[k]?.type === "title") || "Name";
 
-    // Helpers
-    const titleKey = Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
-    const findProp = (wantedType, candidates = [], regexHint = null) => {
-      for (const c of candidates) { const p = props[c]; if (p && p.type === wantedType) return c; }
-      if (regexHint) {
-        const rx = new RegExp(regexHint, "i");
-        for (const k of Object.keys(props)) { if (props[k]?.type === wantedType && rx.test(k)) return k; }
+    const findProp = (type, cands = [], hint = null) => {
+      for (const c of cands) if (props[c]?.type === type) return c;
+      if (hint) {
+        const rx = new RegExp(hint, "i");
+        for (const k of Object.keys(props)) if (props[k]?.type === type && rx.test(k)) return k;
       }
-      for (const k of Object.keys(props)) { if (props[k]?.type === wantedType) return k; }
+      for (const k of Object.keys(props)) if (props[k]?.type === type) return k;
       return null;
     };
 
     const descKey   = findProp("rich_text", ["Description of issue","Damage Description","Description","Details","Notes"], "(desc|issue|damage|note|detail)");
     const reasonKey = findProp("rich_text", ["Issue Reason","Reason"], "(reason)");
     const dateKey   = findProp("date",      ["Date","Reported On","Report Date"], "(date|report)");
-    const filesKey  = Object.keys(props).find((k) => props[k]?.type === "files");
+    const filesKey  = Object.keys(props).find(k => props[k]?.type === "files");
 
-    // Team Members relation column
+    // Team Members relation
     let reporterKey = null;
     if (teamMembersDatabaseId) {
       for (const [k, v] of Object.entries(props)) {
@@ -2894,17 +2604,15 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
       }
     }
 
-    // Products relation column
+    // Products relation
     let productsKey = null;
     for (const [k, v] of Object.entries(props)) {
       if (v?.type === "relation" && productsDatabaseId && v?.relation?.database_id === productsDatabaseId) { productsKey = k; break; }
       if (!productsKey && v?.type === "relation" && /product/i.test(k)) productsKey = k;
     }
 
-    // ===== Resolve current user ONCE =====
+    // هات صفحة المستخدم الحالي مرّة واحدة
     let currentUserId = null;
-
-    // 1) بالاسم من السيشن
     if (teamMembersDatabaseId && req.session?.username) {
       try {
         const q = await notion.databases.query({
@@ -2915,15 +2623,12 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
         currentUserId = q.results?.[0]?.id || null;
       } catch {}
     }
-
-    // 2) fallback: بالإيميل ثم contains(name)
     if (!currentUserId && teamMembersDatabaseId) {
       try {
         const tmDb = await notion.databases.retrieve({ database_id: teamMembersDatabaseId });
         const tProps = tmDb.properties || {};
         const emailProp = Object.keys(tProps).find(k => tProps[k]?.type === "email") || null;
         const titleProp = Object.keys(tProps).find(k => tProps[k]?.type === "title") || "Name";
-
         const email = req.user?.email || req.session?.email || null;
         const name  = req.user?.name  || req.session?.username || req.session?.name || null;
 
@@ -2935,7 +2640,6 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
           });
           currentUserId = q1.results?.[0]?.id || currentUserId;
         }
-
         if (!currentUserId && name && titleProp) {
           const q2 = await notion.databases.query({
             database_id: teamMembersDatabaseId,
@@ -2947,11 +2651,10 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
       } catch {}
     }
 
-    // ===== V2: items[] =====
+    // === V2: items[] ===
     const items = Array.isArray(req.body?.items) ? req.body.items : null;
     if (items && items.length) {
       const created = [];
-
       for (const it of items) {
         const productId = it?.product?.id || it?.productId || null;
         const title     = (it?.title || "").toString().trim();
@@ -2959,7 +2662,6 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
 
         const properties = {};
         properties[titleKey] = { title: [{ text: { content: title || "Damaged asset" } }] };
-
         if (descKey)                     properties[descKey]   = { rich_text: [{ text: { content: title } }] };
         if (reasonKey && reason)         properties[reasonKey] = { rich_text: [{ text: { content: reason } }] };
         if (productsKey && productId)    properties[productsKey] = { relation: [{ id: productId }] };
@@ -2975,46 +2677,34 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
         });
 
         if (filesKey && Array.isArray(it?.files) && it.files.some(f => f?.url)) {
-          const files = it.files
-            .filter(f => !!f.url)
-            .slice(0, 10)
-            .map((f, i) => ({ type: "external", name: f.name || `file-${i+1}`, external: { url: f.url } }));
+          const files = it.files.filter(f => !!f.url).slice(0,10)
+            .map((f,i) => ({ type:"external", name: f.name || `file-${i+1}`, external:{ url:f.url } }));
           try { await notion.pages.update({ page_id: page.id, properties: { [filesKey]: { files } } }); } catch {}
         }
 
         created.push(page.id);
       }
-
       return res.json({ ok: true, created });
     }
 
-    // ===== Legacy body =====
+    // === Legacy body ===
     const { assetName, damageDescription, location, severity, photos = [] } = req.body || {};
     const properties = {};
     properties[titleKey] = { title: [{ text: { content: (assetName || "Damaged asset").toString() } }] };
-
     if (descKey && (damageDescription || "") !== "") {
       properties[descKey] = { rich_text: [{ text: { content: damageDescription.toString() } }] };
     }
-
     const placeKey = findProp("rich_text", ["Location","Place","Area","Site"], "(locat|place|site|area)");
-    if (placeKey && location) {
-      properties[placeKey] = { rich_text: [{ text: { content: location.toString() } }] };
-    }
-
+    if (placeKey && location) properties[placeKey] = { rich_text: [{ text: { content: location.toString() } }] };
     if (dateKey) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0,10);
       properties[dateKey] = { date: { start: today } };
     }
-
     if (reporterKey && currentUserId) {
       properties[reporterKey] = { relation: [{ id: currentUserId }] };
     }
-
     const severityKey = findProp("select", ["Severity","Level","Priority"], "(severity|level|priority)");
-    if (severityKey && severity) {
-      properties[severityKey] = { select: { name: severity.toString() } };
-    }
+    if (severityKey && severity) properties[severityKey] = { select: { name: severity.toString() } };
 
     const created = await notion.pages.create({
       parent: { database_id: damagedAssetsDatabaseId },
@@ -3022,11 +2712,7 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     });
 
     if (filesKey && Array.isArray(photos) && photos.length) {
-      const files = photos.slice(0, 10).map((u, i) => ({
-        type: "external",
-        name: "photo-" + (i + 1),
-        external: { url: u },
-      }));
+      const files = photos.slice(0,10).map((u,i) => ({ type:"external", name:`photo-${i+1}`, external:{ url:u } }));
       try { await notion.pages.update({ page_id: created.id, properties: { [filesKey]: { files } } }); } catch {}
     }
 
@@ -3036,4 +2722,6 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
     return res.status(500).json({ ok: false, error: "Failed to save damaged asset report", details: e?.body || String(e) });
   }
 });
+
+
 module.exports = app;
