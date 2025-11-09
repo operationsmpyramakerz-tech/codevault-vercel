@@ -87,6 +87,14 @@
         <div class="card-header">
           <h2><i data-feather="clipboard"></i> Damage Report</h2>
           <p class="card-subtitle">Report damaged items and attach evidence</p>
+
+          <!-- تلميحات مهمة للرفع -->
+          <div class="alert info" style="margin-top:10px">
+            <p style="margin:6px 0;">
+              <strong>Note:</strong> Each file ≤ <strong>20MB</strong>.
+              Files are uploaded to <strong>Vercel Blob</strong> and linked into the Notion column <em>“Files &amp; media”</em>.
+            </p>
+          </div>
         </div>
 
         <!-- النموذج متعدد العناصر -->
@@ -96,7 +104,8 @@
             <button id="addItemBtn" type="button" class="btn btn-outline-pill"><i data-feather="plus"></i> Add Component</button>
           </div>
 
-          <div id="itemsList" class="expenses-list"><!-- dynamic entries --></div>
+          <!-- العناصر بتتبني ديناميكياً من damaged-assets.js -->
+          <div id="itemsList" class="expenses-list"></div>
 
           <div class="form-actions">
             <button id="submitBtn" type="submit" class="submit-btn"><i data-feather="save"></i> Submit Report</button>
