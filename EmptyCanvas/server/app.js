@@ -1458,7 +1458,47 @@ app.get(
     }
   },
 );
+// == Damaged Assets: searchable products list ==
+app.get(
+  "/api/damaged-assets/products",
+  requireAuth,
+  requirePage("Damaged Assets"),
+  async (req, res) => {
+    try {
+      if (!componentsDatabaseId) {
+        return res.status(500).json({ error: "Products_Database ID is not configured." });
+      }
 
+      const q = String(req.query.q || "").trim();
+      const items = [];
+      let startCursor, hasMore = true;
+
+      while (hasMore) {
+        const resp = await notion.databases.query({
+          database_id: componentsDatabaseId,
+          start_cursor: startCursor,
+          ...(q
+            ? { filter: { property: "Name", title: { contains: q } } }
+            : {}),
+          sorts: [{ property: "Name", direction: "ascending" }],
+        });
+
+        resp.results.forEach(p => {
+          const name = p.properties?.Name?.title?.[0]?.plain_text;
+          if (name) items.push({ id: p.id, name });
+        });
+
+        hasMore = resp.has_more;
+        startCursor = resp.next_cursor;
+      }
+
+      res.json({ items });
+    } catch (e) {
+      console.error("damaged-assets/products:", e?.body || e);
+      res.status(500).json({ error: "Failed to load products" });
+    }
+  }
+);
 // Submit Order — requires Create New Order
 app.post(
   "/api/submit-order",
