@@ -2676,76 +2676,74 @@ app.post("/api/damaged-assets", requireAuth, requirePage("Damaged Assets"), asyn
         });
 
         // Files & media (لو عندك URLs جاهزة فقط — رفع ملفات فعلية محتاج تخزين خارجي)
-// ===== Damaged Assets: submit (JSON body) =====
-app.post('/api/damaged-assets',
-  requireAuth,
-  requirePage('Damaged Assets'),
-  express.json(),
-  async (req, res) => {
-    try {
-      const dbId = process.env.Damaged_Assets; // تأكد الـENV مضبوط = Database ID
-      if (!dbId) return res.status(500).json({ ok: false, error: 'Missing env Damaged_Assets' });
-
-      const items = Array.isArray(req.body?.items) ? req.body.items : [];
-      if (!items.length) return res.status(400).json({ ok: false, error: 'No items to save' });
-
-      // نقرأ مخطط قاعدة Notion ونختار الأعمدة الصحيحة تلقائيًا
-      const db = await notion.databases.retrieve({ database_id: dbId });
-      const props = db.properties || {};
-      const titleKey  = Object.keys(props).find(k => props[k]?.type === 'title') || 'Name';
-      const filesKey  = Object.keys(props).find(k => props[k]?.type === 'files') || null;
-
-      const pickRich = (prefer=[], rx=null) => {
-        for (const n of prefer) if (props[n]?.type === 'rich_text') return n;
-        if (rx) { const r = new RegExp(rx,'i'); for (const k of Object.keys(props)) if (props[k]?.type==='rich_text' && r.test(k)) return k; }
-        return Object.keys(props).find(k => props[k]?.type === 'rich_text') || null;
-      };
-      const descKey   = pickRich(['Description of issue','Damage Description','Description'], '(desc|issue|damage)');
-      const reasonKey = pickRich(['Issue Reason','Reason'], '(reason)');
-
-      const productsDb = process.env.Products_Database || null;
-      let productsKey = null, reporterKey = null;
-      for (const [k,v] of Object.entries(props)) {
-        if (v?.type !== 'relation') continue;
-        if (!productsKey && (/product/i.test(k) || (productsDb && v?.relation?.database_id === productsDb))) productsKey = k;
-        if (!reporterKey && (/team|member/i.test(k))) reporterKey = k;
-      }
-
-      const teamMemberPageId = req.session?.notionMemberPageId || req.user?.notionMemberPageId || null;
-      const toTitle = s => [{ type:'text', text:{ content:String(s||'').slice(0,2000) } }];
-      const toRich  = s => [{ type:'text', text:{ content:String(s||'').slice(0,2000) } }];
-
-      const created = [];
-      for (const it of items) {
-        const title  = (it?.title || '').trim();
-        if (!title) continue;
-        const reason = (it?.reason || '').trim();
-        const productId = it?.product?.id ? String(it.product.id) : null;
-
-        const properties = {};
-        properties[titleKey] = { title: toTitle(title) };
-        if (descKey)   properties[descKey]   = { rich_text: toRich(title) };
-        if (reasonKey) properties[reasonKey] = { rich_text: toRich(reason) };
-        if (productsKey && productId) properties[productsKey] = { relation: [{ id: productId }] };
-        if (reporterKey && teamMemberPageId) properties[reporterKey] = { relation: [{ id: String(teamMemberPageId) }] };
-
-        const page = await notion.pages.create({ parent:{ database_id: dbId }, properties });
-
-        // Files & media تحتاج URLs خارجية لو متاحة (اختياري)
-        if (filesKey && Array.isArray(it.filesUrls) && it.filesUrls.length) {
-          const files = it.filesUrls.slice(0,10).map((url,i)=>({ type:'external', name:`file-${i+1}`, external:{ url:String(url) } }));
-          try { await notion.pages.update({ page_id: page.id, properties: { [filesKey]: { files } } }); } catch {}
+        if (filesKey && Array.isArray(it?.files) && it.files.some(f => f?.url)) {
+          const files = it.files
+            .filter(f => !!f.url)
+            .slice(0, 10)
+            .map((f, i) => ({ type: "external", name: f.name || `file-${i+1}`, external: { url: f.url } }));
+          try {
+            await notion.pages.update({ page_id: page.id, properties: { [filesKey]: { files } } });
+          } catch {}
         }
+
         created.push(page.id);
       }
 
-      if (!created.length) return res.status(400).json({ ok:false, error:'Nothing created (empty/invalid items)' });
-      return res.json({ ok:true, message:`Saved ${created.length} row(s).`, ids: created });
-    } catch (e) {
-      console.error('POST /api/damaged-assets error:', e?.body || e);
-      return res.status(500).json({ ok:false, error:'Failed to save order to Notion' });
+      return res.json({ ok: true, created });
     }
+
+    // ====== فرع الـ Legacy (السلوك القديم) ======
+    const { assetName, damageDescription, location, severity, photos = [] } = req.body || {};
+
+    const properties = {};
+    properties[titleKey] = { title: [{ text: { content: (assetName || "Damaged asset").toString() } }] };
+
+    if (descKey && (damageDescription || "") !== "") {
+      properties[descKey] = { rich_text: [{ text: { content: damageDescription.toString() } }] };
+    }
+
+    // نحفظ الـ location في أي rich_text مناسب لو عايز (اختياري)
+    const placeKey = findProp("rich_text", ["Location", "Place", "Area", "Site"], "(locat|place|site|area)");
+    if (placeKey && location) {
+      properties[placeKey] = { rich_text: [{ text: { content: location.toString() } }] };
+    }
+
+    if (dateKey) {
+      const today = new Date().toISOString().slice(0, 10);
+      properties[dateKey] = { date: { start: today } };
+    }
+
+    if (reporterKey && currentUserId) {
+      properties[reporterKey] = { relation: [{ id: currentUserId }] };
+    }
+
+    // Severity (select/status) لو موجود
+    const severityKey = findProp("select", ["Severity", "Level", "Priority"], "(severity|level|priority)");
+    if (severityKey && severity) {
+      properties[severityKey] = { select: { name: severity.toString() } };
+    }
+
+    const created = await notion.pages.create({
+      parent: { database_id: damagedAssetsDatabaseId },
+      properties,
+    });
+
+    if (filesKey && Array.isArray(photos) && photos.length) {
+      const files = photos.slice(0, 10).map((u, i) => ({
+        type: "external",
+        name: "photo-" + (i + 1),
+        external: { url: u },
+      }));
+      try {
+        await notion.pages.update({ page_id: created.id, properties: { [filesKey]: { files } } });
+      } catch {}
+    }
+
+    return res.json({ ok: true, id: created.id });
+  } catch (e) {
+    console.error("Damaged Assets submit error:", e?.body || e);
+    return res.status(500).json({ ok: false, error: "Failed to save damaged asset report", details: e?.body || String(e) });
   }
-);
+});
 
 module.exports = app;
