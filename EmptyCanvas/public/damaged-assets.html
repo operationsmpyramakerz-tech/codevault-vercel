@@ -4,28 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Damaged Assets</title>
-  <!-- نحافظ على نفس المسار اللي عندك -->
   <link rel="stylesheet" href="/style.css"/>
-
+  <!-- ميني ستايل خفيف ليتطابق مع شكل باقي الصفحات -->
   <style>
-    /* تنسيقات خفيفة للجزء الجديد فقط (لا تمس style.css) */
     .container{max-width:1100px;margin:24px auto;padding:16px}
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px}
-    .row{display:flex;gap:12px;flex-wrap:wrap}
-    .field{flex:1 1 280px;display:flex;flex-direction:column;gap:6px}
-    label{font-weight:600;color:#111827}
-    input[type="text"], textarea, select{border:1px solid #d1d5db;border-radius:8px;padding:10px}
-    textarea{min-height:120px}
-    .actions{margin-top:16px;display:flex;gap:12px}
+    .components-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .component-entry{border:1px dashed #e5e7eb;border-radius:12px;padding:12px;margin-top:12px;background:#fcfcfc}
+    .component-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap}
+    .form-group{flex:1 1 280px;display:flex;flex-direction:column;gap:6px}
+    .submit-row{display:flex;gap:12px;margin-top:16px}
     .btn{border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
     .btn-primary{background:#111827;color:#fff}
     .btn-outline{background:#fff;border:1px solid #d1d5db}
     .btn-danger{background:#b91c1c;color:#fff}
-    .badge{font-size:12px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:999px;padding:4px 8px}
     .note{color:#6b7280;font-size:12px;margin-top:6px}
-    .ok{color:#065f46}
-    .err{color:#991b1b}
-
+    .ok{color:#065f46}.err{color:#991b1b}
     .layout{display:flex;min-height:100dvh;background:#f7f7f8}
     .sidebar{width:260px;background:#0c1222;color:#fff;display:flex;flex-direction:column}
     .sidebar__header{padding:18px 20px;font-weight:700}
@@ -35,21 +30,12 @@
     .nav-link.active{background:#ffefe9;color:#8b2a00}
     .nav-label{line-height:1}
     .content{flex:1;padding:24px}
-    @media (max-width: 1024px) { .sidebar{display:none} .content{padding:16px} }
-
-    /* block يشبه أسلوب Funds */
-    .components-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-    .component-entry{border:1px dashed #e5e7eb;border-radius:12px;padding:12px;margin-top:12px;background:#fcfcfc}
-    .component-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-    .form-row{display:flex;gap:12px;flex-wrap:wrap}
-    .form-group{flex:1 1 280px;display:flex;flex-direction:column;gap:6px}
-    .submit-row{display:flex;gap:12px;margin-top:16px}
+    @media (max-width:1024px){.sidebar{display:none}.content{padding:16px}}
   </style>
 </head>
 <body>
-
   <div class="layout">
-    <!-- Sidebar -->
+    <!-- نفس شكل السايدبار الموجود في الصفحات الأخرى -->
     <aside class="sidebar">
       <div class="sidebar__header">Dashboard</div>
       <ul class="nav-list">
@@ -66,12 +52,10 @@
       </ul>
     </aside>
 
-    <!-- Content -->
     <main class="content">
       <div class="container">
         <h1>Damaged Assets</h1>
 
-        <!-- ====================== V2: نموذج متعدد المكوّنات (يشبه Funds) ====================== -->
         <div class="card" id="v2-card">
           <div class="components-header">
             <h2><i data-feather="clipboard"></i> Damage Report</h2>
@@ -81,7 +65,7 @@
           </div>
 
           <form id="damagedFormV2">
-            <div id="componentsList"><!-- يتم الحقن ديناميكيًا --></div>
+            <div id="componentsList"></div>
 
             <div class="submit-row">
               <button class="btn btn-primary" id="submitBtnV2" type="submit">
@@ -96,12 +80,12 @@
           </form>
 
           <div class="note" style="margin-top:10px">
-            • <span class="badge">Products</span> (relation) &nbsp; • <span class="badge">Description of issue</span> (Title) &nbsp; • <span class="badge">Issue Reason</span> (text) &nbsp; • <span class="badge">Files &amp; media</span> (uploads) &nbsp; • Teams Members (relation) تُضاف من السيرفر.
+            • Products (relation) • Description of issue (Title) • Issue Reason (text) • Files &amp; media (uploads)  
+            • Teams Members (relation) تُضاف من السيرفر.
           </div>
         </div>
-        <!-- =================== /V2 =================== -->
 
-        <!-- =================== V1: النموذج القديم كما هو (مخفي حفاظًا على المنطق) =================== -->
+        <!-- لوجيك قديم احتياطي (مخفي) — لم أحذفه -->
         <div class="card" id="legacy-card" style="display:none">
           <form id="damageForm">
             <div class="row">
@@ -117,18 +101,15 @@
                 <label for="severity">Severity</label>
                 <select id="severity" name="severity">
                   <option value="">-- optional --</option>
-                  <option>Low</option>
-                  <option>Medium</option>
-                  <option>High</option>
-                  <option>Critical</option>
+                  <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
                 </select>
               </div>
             </div>
             <div class="row">
               <div class="field" style="flex:1 1 100%">
                 <label for="damageDescription">Damage Description *</label>
-                <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage, when it happened, and any context..." required></textarea>
-                <div class="note">This will be saved to the Notion column named <b>Damage Description</b>.</div>
+                <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage..." required></textarea>
+                <div class="note">سيُحفظ في عمود Notion باسم <b>Damage Description</b>.</div>
               </div>
             </div>
             <div class="actions">
@@ -137,253 +118,13 @@
             <div id="msg" class="note" aria-live="polite"></div>
           </form>
         </div>
-        <!-- =================== /V1 =================== -->
 
       </div>
     </main>
   </div>
 
-  <!-- Feather icons -->
   <script src="https://unpkg.com/feather-icons"></script>
   <script>feather.replace();</script>
-
-  <!-- منطق الصفحة الجديد (V2) -->
-  <script>
-  (function(){
-    const $ = (sel,root=document)=>root.querySelector(sel);
-    const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
-
-    let PRODUCT_OPTIONS = [];  // {id,name}
-    let counter = 0;
-
-    async function loadProductOptions(){
-      try{
-        const res = await fetch('/api/damaged-assets/options', {credentials:'same-origin'});
-        const data = await res.json();
-        PRODUCT_OPTIONS = Array.isArray(data.options) ? data.options : [];
-      }catch(e){ PRODUCT_OPTIONS = []; }
-    }
-
-    function optionHTML(opts){
-      const def = '<option value="">Select product...</option>';
-      const rows = opts.map(o=>{
-        const id = (o.id || o.value || o.pageId || '');
-        const name = (o.name || o.title || id || 'Unnamed');
-        return '<option value="'+escapeHtml(id)+'">'+escapeHtml(name)+'</option>';
-      }).join('');
-      return def + rows;
-    }
-
-    function escapeHtml(s){
-      return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
-
-    function addComponent(){
-      counter++;
-      const id = counter;
-
-      const wrap = document.createElement('div');
-      wrap.className = 'component-entry';
-      wrap.dataset.id = id;
-
-      wrap.innerHTML = `
-        <div class="component-head">
-          <h3><i data-feather="package"></i> Component ${id}</h3>
-          <button type="button" class="btn btn-danger" data-remove="${id}">
-            <i data-feather="trash-2"></i> Remove
-          </button>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="product_${id}"><i data-feather="box"></i> Products *</label>
-            <select id="product_${id}" name="items[${id}][productId]" required>
-              ${optionHTML(PRODUCT_OPTIONS)}
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="title_${id}"><i data-feather="type"></i> Description of issue (Title) *</label>
-            <input id="title_${id}" name="items[${id}][title]" type="text" placeholder="Short issue summary..." required/>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group" style="flex:1 1 100%">
-            <label for="reason_${id}"><i data-feather="message-square"></i> Issue Reason</label>
-            <textarea id="reason_${id}" name="items[${id}][reason]" placeholder="Extra details, when/how it happened, etc."></textarea>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group" style="flex:1 1 100%">
-            <label for="files_${id}"><i data-feather="image"></i> Files &amp; media</label>
-            <input id="files_${id}" name="items[${id}][files]" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png"/>
-            <small class="note">Upload photos/screenshots (optional)</small>
-          </div>
-        </div>
-      `;
-
-      $('#componentsList').appendChild(wrap);
-      feather.replace();
-
-      // remove handler
-      $('[data-remove="'+id+'"]', wrap)?.addEventListener('click', () => {
-        const total = $$('.component-entry').length;
-        if (total <= 1) { toast('At least one component is required','error'); return; }
-        wrap.remove();
-      });
-    }
-
-    function toast(message, type='info'){
-      if (window.UI && typeof UI.toast==='function') UI.toast({type,message});
-      else alert(message);
-    }
-
-    function collectPayload(){
-      const items = [];
-      for (const entry of $$('.component-entry')){
-        const id = entry.dataset.id;
-        const sel = $('#product_'+id);
-        const title = $('#title_'+id);
-        const reason = $('#reason_'+id);
-        const files = $('#files_'+id);
-
-        if (!(sel && sel.value && title && title.value.trim())) continue;
-
-        const productId = sel.value;
-        const productName = sel.options[sel.selectedIndex]?.text || '';
-
-        const item = {
-          product: { id: productId, name: productName },  // relation Products
-          title: title.value.trim(),                       // Title
-          reason: (reason?.value || '').trim(),           // Text
-          files: []
-        };
-
-        if (files?.files?.length){
-          for (const f of files.files){
-            item.files.push({ name:f.name, type:f.type, size:f.size });
-          }
-        }
-        items.push(item);
-      }
-      return { items };
-    }
-
-    function validate(){
-      const items = collectPayload().items;
-      if (!items.length){ toast('Please add at least one complete component','error'); return false; }
-      return true;
-    }
-
-    async function submitV2(e){
-      e.preventDefault();
-      if (!validate()) return;
-
-      const btn = $('#submitBtnV2');
-      const msg = $('#msgV2');
-      btn.disabled = true;
-      btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
-      feather.replace();
-      msg.textContent = 'Submitting...'; msg.className = 'note';
-
-      try{
-        const payload = collectPayload();
-
-        const res = await fetch('/api/damaged-assets', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          credentials:'same-origin',
-          body: JSON.stringify(payload)
-        });
-
-        const ct = res.headers.get('content-type') || '';
-        const data = ct.includes('application/json') ? await res.json() : { success:false, error:'Non-JSON response' };
-
-        if (!res.ok || !data?.success){
-          throw new Error(data?.error || 'Failed to submit damage report');
-        }
-
-        msg.textContent = data.message || 'Damage report submitted successfully!';
-        msg.className = 'note ok';
-
-        // reset
-        $('#damagedFormV2').reset();
-        $('#componentsList').innerHTML = '';
-        counter = 0;
-        addComponent();
-      }catch(err){
-        console.error(err);
-        msg.textContent = 'Error: ' + (err.message || 'Failed to submit');
-        msg.className = 'note err';
-      }finally{
-        btn.disabled = false;
-        btn.innerHTML = '<i data-feather="save"></i> Submit Report';
-        feather.replace();
-      }
-    }
-
-    async function init(){
-      await loadProductOptions();
-      $('#addComponentBtn').addEventListener('click', addComponent);
-      $('#damagedFormV2').addEventListener('submit', submitV2);
-      $('#clearV2').addEventListener('click', ()=> {
-        $('#componentsList').innerHTML = '';
-        counter = 0;
-        addComponent();
-        $('#msgV2').textContent='';
-      });
-
-      // أول عنصر تلقائيًا
-      addComponent();
-    }
-
-    document.addEventListener('DOMContentLoaded', init);
-  })();
-  </script>
-
-  <!-- منطق الصفحة القديم كما هو (V1) — بدون حذف -->
-  <script>
-    const el = (id) => document.getElementById(id);
-    const msg = el('msg');
-    const legacyForm = document.getElementById('damageForm');
-    if (legacyForm){
-      legacyForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        msg.textContent = 'Submitting...';
-        msg.className = 'note';
-
-        const payload = {
-          assetName: el('assetName').value.trim(),
-          damageDescription: el('damageDescription').value.trim(),
-          location: el('location').value.trim(),
-          severity: el('severity').value,
-        };
-
-        if (!payload.assetName || !payload.damageDescription) {
-          msg.textContent = 'Please fill the required fields.';
-          msg.className = 'note err';
-          return;
-        }
-
-        try {
-          const r = await fetch('/api/damaged-assets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const data = await r.json();
-          if (!r.ok || !data.ok) throw new Error(data.error || 'Failed');
-          msg.textContent = 'Saved! Notion page created.';
-          msg.className = 'note ok';
-          e.target.reset();
-        } catch (err) {
-          msg.textContent = 'Error: ' + (err.message || 'Failed to save.');
-          msg.className = 'note err';
-        }
-      });
-    }
-  </script>
+  <script src="/damaged-assets.js"></script>
 </body>
 </html>
