@@ -2684,31 +2684,135 @@ if (!currentUserId && teamMembersDatabaseId) {
         const productId = it?.product?.id || it?.productId || null;
         const title     = (it?.title || "").toString().trim();
         const reason    = (it?.reason || "").toString().trim();
+try {
+    if (!damagedAssetsDatabaseId) {
+      return res.status(500).json({ ok: false, error: "Damaged_Assets database ID is not configured." });
+    }
+
+    // DB بتاع الـ relation "Products"
+    const productsDatabaseId =
+      process.env.Products_Database ||
+      process.env.NOTION_PRODUCTS_DATABASE_ID ||
+      process.env.PRODUCTS_DATABASE_ID ||
+      null;
+
+    // هنقرأ خصائص قاعدة Damaged_Assets مرة واحدة
+    const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
+    const props = db.properties || {};
+
+    // --- اكتشاف الأعمدة ديناميكياً ---
+    const titleKey = Object.keys(props).find((k) => props[k]?.type === "title") || "Name";
+
+    const findProp = (wantedType, candidates = [], regexHint = null) => {
+      for (const c of candidates) { const p = props[c]; if (p && p.type === wantedType) return c; }
+      if (regexHint) {
+        const rx = new RegExp(regexHint, "i");
+        for (const k of Object.keys(props)) {
+          if (props[k]?.type === wantedType && rx.test(k)) return k;
+        }
+      }
+      for (const k of Object.keys(props)) { if (props[k]?.type === wantedType) return k; }
+      return null;
+    };
+
+    const descKey   = findProp("rich_text", ["Description of issue","Damage Description","Description","Details","Notes"], "(desc|issue|damage|note|detail)");
+    const reasonKey = findProp("rich_text", ["Issue Reason","Reason"], "(reason)");
+    const dateKey   = findProp("date",      ["Date","Reported On","Report Date"], "(date|report)");
+    const filesKey  = Object.keys(props).find((k) => props[k]?.type === "files");
+
+    // Team Members relation (واحدة فقط) — نحاول نلاقي العمود اللي رابط بقاعدة Team_Members
+    let reporterKey = null;
+    if (teamMembersDatabaseId) {
+      for (const [k, v] of Object.entries(props)) {
+        if (v?.type === "relation" && v?.relation?.database_id === teamMembersDatabaseId) { reporterKey = k; break; }
+      }
+    }
+    if (!reporterKey) {
+      for (const [k, v] of Object.entries(props)) {
+        if (v?.type === "relation" && /team|member/i.test(k)) { reporterKey = k; break; }
+      }
+    }
+
+    // Products relation (اسم العمود قد يختلف)
+    let productsKey = null;
+    for (const [k, v] of Object.entries(props)) {
+      if (v?.type === "relation" && productsDatabaseId && v?.relation?.database_id === productsDatabaseId) { productsKey = k; break; }
+      if (!productsKey && v?.type === "relation" && /product/i.test(k)) productsKey = k;
+    }
+
+    // --------- جِب صفحة العضو الحالي (المستخدم) مرة واحدة بشكل موثوق ---------
+    let currentUserId = null;
+
+    // 1) محاولة مباشرة بالاسم اللي متخزن في السيشن من تسجيل الدخول
+    if (teamMembersDatabaseId && req.session?.username) {
+      try {
+        const q = await notion.databases.query({
+          database_id: teamMembersDatabaseId,
+          filter: { property: "Name", title: { equals: String(req.session.username).trim() } },
+          page_size: 1
+        });
+        currentUserId = q.results?.[0]?.id || null;
+      } catch {}
+    }
+
+    // 2) إن ما نجحناش، نحاول بالإيميل أو contains(name)
+    if (!currentUserId && teamMembersDatabaseId) {
+      try {
+        const tmDb = await notion.databases.retrieve({ database_id: teamMembersDatabaseId });
+        const tProps = tmDb.properties || {};
+        const emailProp = Object.keys(tProps).find(k => tProps[k]?.type === "email");
+        const titleProp = Object.keys(tProps).find(k => tProps[k]?.type === "title") || "Name";
+
+        const email = req.user?.email || req.session?.email || null;
+        const name  = req.user?.name  || req.session?.username || req.session?.name || null;
+
+        if (!currentUserId && email && emailProp) {
+          const q1 = await notion.databases.query({
+            database_id: teamMembersDatabaseId,
+            filter: { property: emailProp, email: { equals: String(email).trim() } },
+            page_size: 1
+          });
+          currentUserId = q1.results?.[0]?.id || currentUserId;
+        }
+
+        if (!currentUserId && name && titleProp) {
+          const q2 = await notion.databases.query({
+            database_id: teamMembersDatabaseId,
+            filter: { property: titleProp, title: { contains: String(name).trim() } },
+            page_size: 1
+          });
+          currentUserId = q2.results?.[0]?.id || currentUserId;
+        }
+      } catch {}
+    }
+
+    // ====== فرع الـ V2: items[] ======
+    const items = Array.isArray(req.body?.items) ? req.body.items : null;
+    if (items && items.length) {
+      const created = [];
+
+      // لاحظ: هنا **مافيش** let تاني؛ بنستخدم currentUserId اللي فوق (بدون Shadow)
+      for (const it of items) {
+        const productId = it?.product?.id || it?.productId || null;
+        const title     = (it?.title || "").toString().trim();
+        const reason    = (it?.reason || "").toString().trim();
 
         const properties = {};
 
-        // Title (Description of issue)
+        // Title
         properties[titleKey] = { title: [{ text: { content: title || "Damaged asset" } }] };
 
-        // Description of issue (rich_text) لو حابب تحفظ العنوان نفسه هناك كمان
-        if (descKey) {
-          properties[descKey] = { rich_text: [{ text: { content: title } }] };
-        }
+        // Description of issue (rich_text) — نحفظ العنوان أيضاً إن حبيت
+        if (descKey) { properties[descKey] = { rich_text: [{ text: { content: title } }] }; }
 
         // Issue Reason
-        if (reasonKey && reason) {
-          properties[reasonKey] = { rich_text: [{ text: { content: reason } }] };
-        }
+        if (reasonKey && reason) { properties[reasonKey] = { rich_text: [{ text: { content: reason } }] }; }
 
         // Products relation
-        if (productsKey && productId) {
-          properties[productsKey] = { relation: [{ id: productId }] };
-        }
+        if (productsKey && productId) { properties[productsKey] = { relation: [{ id: productId }] }; }
 
         // Team Member (المبلّغ)
-        if (reporterKey && currentUserId) {
-          properties[reporterKey] = { relation: [{ id: currentUserId }] };
-        }
+        if (reporterKey && currentUserId) { properties[reporterKey] = { relation: [{ id: currentUserId }] }; }
 
         // Date = اليوم
         if (dateKey) {
@@ -2721,15 +2825,13 @@ if (!currentUserId && teamMembersDatabaseId) {
           properties,
         });
 
-        // Files & media (لو عندك URLs جاهزة فقط — رفع ملفات فعلية محتاج تخزين خارجي)
+        // Files & media (URLs فقط)
         if (filesKey && Array.isArray(it?.files) && it.files.some(f => f?.url)) {
           const files = it.files
             .filter(f => !!f.url)
             .slice(0, 10)
             .map((f, i) => ({ type: "external", name: f.name || `file-${i+1}`, external: { url: f.url } }));
-          try {
-            await notion.pages.update({ page_id: page.id, properties: { [filesKey]: { files } } });
-          } catch {}
+          try { await notion.pages.update({ page_id: page.id, properties: { [filesKey]: { files } } }); } catch {}
         }
 
         created.push(page.id);
@@ -2738,7 +2840,7 @@ if (!currentUserId && teamMembersDatabaseId) {
       return res.json({ ok: true, created });
     }
 
-    // ====== فرع الـ Legacy (السلوك القديم) ======
+    // ====== فرع الـ Legacy ======
     const { assetName, damageDescription, location, severity, photos = [] } = req.body || {};
 
     const properties = {};
@@ -2748,8 +2850,7 @@ if (!currentUserId && teamMembersDatabaseId) {
       properties[descKey] = { rich_text: [{ text: { content: damageDescription.toString() } }] };
     }
 
-    // نحفظ الـ location في أي rich_text مناسب لو عايز (اختياري)
-    const placeKey = findProp("rich_text", ["Location", "Place", "Area", "Site"], "(locat|place|site|area)");
+    const placeKey = findProp("rich_text", ["Location","Place","Area","Site"], "(locat|place|site|area)");
     if (placeKey && location) {
       properties[placeKey] = { rich_text: [{ text: { content: location.toString() } }] };
     }
@@ -2763,8 +2864,7 @@ if (!currentUserId && teamMembersDatabaseId) {
       properties[reporterKey] = { relation: [{ id: currentUserId }] };
     }
 
-    // Severity (select/status) لو موجود
-    const severityKey = findProp("select", ["Severity", "Level", "Priority"], "(severity|level|priority)");
+    const severityKey = findProp("select", ["Severity","Level","Priority"], "(severity|level|priority)");
     if (severityKey && severity) {
       properties[severityKey] = { select: { name: severity.toString() } };
     }
@@ -2780,9 +2880,7 @@ if (!currentUserId && teamMembersDatabaseId) {
         name: "photo-" + (i + 1),
         external: { url: u },
       }));
-      try {
-        await notion.pages.update({ page_id: created.id, properties: { [filesKey]: { files } } });
-      } catch {}
+      try { await notion.pages.update({ page_id: created.id, properties: { [filesKey]: { files } } }); } catch {}
     }
 
     return res.json({ ok: true, id: created.id });
@@ -2790,6 +2888,5 @@ if (!currentUserId && teamMembersDatabaseId) {
     console.error("Damaged Assets submit error:", e?.body || e);
     return res.status(500).json({ ok: false, error: "Failed to save damaged asset report", details: e?.body || String(e) });
   }
-});
 
 module.exports = app;
