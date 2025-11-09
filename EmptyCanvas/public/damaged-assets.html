@@ -1,26 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Damaged Assets</title>
-  <link rel="stylesheet" href="/css/style.css"/>
+
+  <!-- نفس ملف الستايل العام -->
+  <link rel="stylesheet" href="/style.css"/>
+
+  <!-- تنسيقات خفيفة خاصة بالفورم فقط (لا تمسّ الـ Sidebar/هيكل الداشبورد) -->
+  <style>
+    .components-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .component-entry{border:1px dashed #e5e7eb;border-radius:12px;padding:12px;margin-top:12px;background:#fcfcfc}
+    .component-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .form-row{display:flex;gap:12px;flex-wrap:wrap}
+    .form-group{flex:1 1 280px;display:flex;flex-direction:column;gap:6px}
+    .submit-row,.form-actions{display:flex;gap:12px;margin-top:16px}
+    .note{color:#6b7280;font-size:12px}
+    .badge{font-size:12px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:999px;padding:4px 8px}
+  </style>
+
   <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body>
-  <script>
-    (function() {
-      try {
-        if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
-          document.body.classList.add('sidebar-mini');
-        }
-      } catch(e) {}
-    })();
-  </script>
-
+  <!-- نفس هيكل صفحات Funds -->
   <div class="app-container">
-    <!-- Sidebar (نفس Funds) -->
-    <aside class="sidebar">
+    <!-- Sidebar: إمّا يُبنى من common-ui.js أو نعرض روابط ثابتة -->
+    <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <h2>Dashboard</h2>
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
@@ -28,137 +34,83 @@
         </button>
       </div>
 
-      <!-- Sidebar: flat links -->
       <nav class="sidebar-nav">
         <ul class="nav-list">
-          <li>
-            <a class="nav-link" href="/orders">
-              <i data-feather="list"></i>
-              <span class="nav-label">Current Orders</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/orders/requested">
-              <i data-feather="users"></i>
-              <span class="nav-label">Schools Requested Orders</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/orders/assigned">
-              <i data-feather="user-check"></i>
-              <span class="nav-label">Storage</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/orders/new">
-              <i data-feather="plus-circle"></i>
-              <span class="nav-label">Create New Order</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/stocktaking">
-              <i data-feather="archive"></i>
-              <span class="nav-label">Stocktaking</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/logistics">
-              <i data-feather="truck"></i>
-              <span class="nav-label">Logistics</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/funds">
-              <i data-feather="dollar-sign"></i>
-              <span class="nav-label">Funds</span>
-            </a>
-          </li>
-          <li>
-            <a class="nav-link" href="/orders/sv-orders">
-              <i data-feather="award"></i>
-              <span class="nav-label">S.V schools orders</span>
-            </a>
-          </li>
-          <li>
-            <!-- الصفحة الحالية: active -->
-            <a class="nav-link active" href="/damaged-assets">
-              <i data-feather="alert-triangle"></i>
-              <span class="nav-label">Damaged Assets</span>
-            </a>
-          </li>
+          <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
+          <li><a class="nav-link" href="/orders/requested"><i data-feather="inbox"></i><span class="nav-label">Requested Orders</span></a></li>
+          <li><a class="nav-link" href="/orders/assigned"><i data-feather="users"></i><span class="nav-label">Assigned Schools Requested Orders</span></a></li>
+          <li><a class="nav-link" href="/orders/new"><i data-feather="plus-square"></i><span class="nav-label">Create New Order</span></a></li>
+          <li><a class="nav-link" href="/stocktaking"><i data-feather="package"></i><span class="nav-label">Stocktaking</span></a></li>
+          <li><a class="nav-link" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
+          <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
+          <li><a class="nav-link" href="/sv-schools-orders"><i data-feather="check-circle"></i><span class="nav-label">S.V schools orders</span></a></li>
+          <li><a class="nav-link" href="/new-report-request"><i data-feather="file-plus"></i><span class="nav-label">New Report / Request</span></a></li>
+          <!-- الصفحة الحالية -->
+          <li><a class="nav-link active" href="/damaged-assets"><i data-feather="alert-octagon"></i><span class="nav-label">Damaged Assets</span></a></li>
         </ul>
       </nav>
 
       <div class="sidebar-footer">
-        <button id="logoutBtn" class="logout-btn">
-          <i data-feather="log-out"></i> Logout
-        </button>
+        <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
       </div>
     </aside>
 
-    <!-- Main -->
+    <!-- المحتوى الرئيسي -->
     <div class="main-content">
-      <!-- Header (نفس Funds) -->
+      <!-- Header بنفس نمط Funds (greeting + عنوان الصفحة) -->
       <header class="main-header">
         <div class="header-row1">
           <div class="left">
             <div class="greeting-pill" aria-live="polite">
-              <span class="greeting-avatar">
-                <img src="/images/greeting-icon.png" alt="Hi icon"/>
-              </span>
+              <span class="greeting-avatar"><img src="/images/greeting-icon.png" alt="Hi"/></span>
               <div class="greet-text">
                 <div class="greet-title">Hi, <span data-username="">...</span> 👋</div>
                 <div class="greet-sub">Start your day with operations</div>
               </div>
             </div>
-
-            <!-- Hidden searchbar to prevent JS errors (مطابق Funds) -->
+            <!-- Search مخفي للحفاظ على نفس DOM لو موجود في Funds -->
             <div id="orders-searchbar" class="searchbar" role="search" style="display:none;">
               <i data-feather="search"></i>
               <input id="orderSearch" type="search" aria-label="Search" placeholder="Search..."/>
             </div>
           </div>
-
           <div class="right topbar-right">
-            <a class="account-mini" href="/account" title="My account" aria-label="My account">
+            <a class="account-mini" href="/account" aria-label="My account">
               <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
               <span class="label">My account</span>
             </a>
           </div>
         </div>
-
         <div class="header-row2">
           <h1 class="page-title">Damaged Assets</h1>
         </div>
       </header>
 
-      <!-- Page Body -->
+      <!-- جسم الصفحة بنفس وعاء Funds -->
       <main class="container-full-width">
         <section class="card card--elevated">
-          <!-- نُبقي منطق الصفحة كما هو تمامًا -->
           <div class="card-header">
             <h2><i data-feather="clipboard"></i> Damage Report</h2>
             <p class="card-subtitle">Report damaged items and attach evidence</p>
           </div>
 
-          <!-- ===== نموذج V2 (كما هو) ===== -->
+          <!-- ====================== V2: النموذج متعدد المكوّنات (محفوظ كما هو) ====================== -->
           <div class="form-container">
-            <div class="components-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-              <!-- العنوان الاحتياطي داخل الكارد -->
+            <div class="components-header">
               <div></div>
-              <button type="button" id="addComponentBtn" class="btn btn-outline-pill">
+              <button type="button" id="addComponentBtn" class="btn btn-outline">
                 <i data-feather="plus"></i> Add Component
               </button>
             </div>
 
             <form id="damagedFormV2">
-              <div id="componentsList"><!-- يتم حقن المكوّنات ديناميكياً من damaged-assets.js --></div>
+              <div id="componentsList"><!-- يتم الحقن ديناميكيًا من damaged-assets.js --></div>
 
               <div class="form-actions">
-                <button id="submitBtnV2" type="submit" class="submit-btn">
+                <button class="btn btn-primary" id="submitBtnV2" type="submit">
                   <i data-feather="save"></i> Submit Report
                 </button>
-                <button id="clearV2" type="reset" class="btn btn-secondary">
+                <button class="btn" type="reset" id="clearV2">
                   <i data-feather="x-circle"></i> Clear Form
                 </button>
               </div>
@@ -171,9 +123,9 @@
               • <span class="badge">Issue Reason</span> (text) • <span class="badge">Files &amp; media</span> (uploads) • Teams Members (server)
             </div>
           </div>
-          <!-- ===== /V2 ===== -->
+          <!-- =================== /V2 =================== -->
 
-          <!-- ===== النموذج القديم V1 (محفوظ كما هو، ومخفي) ===== -->
+          <!-- =================== V1: النموذج القديم كما هو (مخفي حفاظًا على المنطق) =================== -->
           <form id="damageForm" style="display:none">
             <div class="row">
               <div class="field">
@@ -182,7 +134,7 @@
               </div>
               <div class="field">
                 <label for="location">Location</label>
-                <input id="location" name="location" type="text" placeholder="e.g., Lab A, Storage Room"/>
+                <input id="location" name="location" type="text" placeholder="e.g., Lab A, Storage Room" />
               </div>
               <div class="field">
                 <label for="severity">Severity</label>
@@ -192,31 +144,279 @@
                 </select>
               </div>
             </div>
-
             <div class="row">
               <div class="field" style="flex:1 1 100%">
                 <label for="damageDescription">Damage Description *</label>
-                <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage..." required></textarea>
-                <div class="note">Saved to Notion column <b>Damage Description</b>.</div>
+                <textarea id="damageDescription" name="damageDescription" placeholder="Describe the damage, when it happened, and any context..." required></textarea>
+                <div class="note">This will be saved to the Notion column named <b>Damage Description</b>.</div>
               </div>
             </div>
-
             <div class="form-actions">
-              <button class="submit-btn" type="submit">
-                <i data-feather="save"></i> Submit Report
-              </button>
+              <button class="btn btn-primary" type="submit">Submit Report</button>
             </div>
             <div id="msg" class="note" aria-live="polite"></div>
           </form>
-          <!-- ===== /V1 ===== -->
+          <!-- =================== /V1 =================== -->
         </section>
       </main>
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- منطق الصفحة الجديد (V2) — بدون أي تعديل على منطقك -->
+  <script>
+  (function(){
+    const $ = (sel,root=document)=>root.querySelector(sel);
+    const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
+
+    let PRODUCT_OPTIONS = [];  // {id,name}
+    let counter = 0;
+
+    async function loadProductOptions(){
+      try{
+        const res = await fetch('/api/damaged-assets/options', {credentials:'same-origin'});
+        const data = await res.json();
+        PRODUCT_OPTIONS = Array.isArray(data.options) ? data.options : [];
+      }catch(e){ PRODUCT_OPTIONS = []; }
+    }
+
+    function optionHTML(opts){
+      const def = '<option value="">Select product...</option>';
+      const rows = opts.map(o=>{
+        const id = (o.id || o.value || o.pageId || '');
+        const name = (o.name || o.title || id || 'Unnamed');
+        return '<option value="'+escapeHtml(id)+'">'+escapeHtml(name)+'</option>';
+      }).join('');
+      return def + rows;
+    }
+
+    function escapeHtml(s){
+      return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    function addComponent(){
+      counter++;
+      const id = counter;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'component-entry';
+      wrap.dataset.id = id;
+
+      wrap.innerHTML = `
+        <div class="component-head">
+          <h3><i data-feather="package"></i> Component ${id}</h3>
+          <button type="button" class="btn btn-danger" data-remove="${id}">
+            <i data-feather="trash-2"></i> Remove
+          </button>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="product_${id}"><i data-feather="box"></i> Products *</label>
+            <select id="product_${id}" name="items[${id}][productId]" required>
+              ${optionHTML(PRODUCT_OPTIONS)}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="title_${id}"><i data-feather="type"></i> Description of issue (Title) *</label>
+            <input id="title_${id}" name="items[${id}][title]" type="text" placeholder="Short issue summary..." required/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="flex:1 1 100%">
+            <label for="reason_${id}"><i data-feather="message-square"></i> Issue Reason</label>
+            <textarea id="reason_${id}" name="items[${id}][reason]" placeholder="Extra details, when/how it happened, etc."></textarea>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="flex:1 1 100%">
+            <label for="files_${id}"><i data-feather="image"></i> Files &amp; media</label>
+            <input id="files_${id}" name="items[${id}][files]" type="file" multiple accept="image/*,.pdf,.heic,.jpg,.jpeg,.png"/>
+            <small class="note">Upload photos/screenshots (optional)</small>
+          </div>
+        </div>
+      `;
+
+      $('#componentsList').appendChild(wrap);
+      feather.replace();
+
+      // remove handler
+      $('[data-remove="'+id+'"]', wrap)?.addEventListener('click', () => {
+        const total = $$('.component-entry').length;
+        if (total <= 1) { toast('At least one component is required','error'); return; }
+        wrap.remove();
+      });
+    }
+
+    function toast(message, type='info'){
+      if (window.UI && typeof UI.toast==='function') UI.toast({type,message});
+      else alert(message);
+    }
+
+    function collectPayload(){
+      const items = [];
+      for (const entry of $$('.component-entry')){
+        const id = entry.dataset.id;
+        const sel = $('#product_'+id);
+        const title = $('#title_'+id);
+        const reason = $('#reason_'+id);
+        const files = $('#files_'+id);
+
+        if (!(sel && sel.value && title && title.value.trim())) continue;
+
+        const productId = sel.value;
+        const productName = sel.options[sel.selectedIndex]?.text || '';
+
+        const item = {
+          product: { id: productId, name: productName },  // relation Products
+          title: title.value.trim(),                       // Title
+          reason: (reason?.value || '').trim(),           // Text
+          files: []
+        };
+
+        if (files?.files?.length){
+          for (const f of files.files){
+            item.files.push({ name:f.name, type:f.type, size:f.size });
+          }
+        }
+        items.push(item);
+      }
+      return { items };
+    }
+
+    function validate(){
+      const items = collectPayload().items;
+      if (!items.length){ toast('Please add at least one complete component','error'); return false; }
+      return true;
+    }
+
+    async function submitV2(e){
+      e.preventDefault();
+      if (!validate()) return;
+
+      const btn = $('#submitBtnV2');
+      const msg = $('#msgV2');
+      btn.disabled = true;
+      btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
+      feather.replace();
+      msg.textContent = 'Submitting...'; msg.className = 'note';
+
+      try{
+        const payload = collectPayload();
+
+        const res = await fetch('/api/damaged-assets', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify(payload)
+        });
+
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : { success:false, error:'Non-JSON response' };
+
+        if (!res.ok || !data?.success){
+          throw new Error(data?.error || 'Failed to submit damage report');
+        }
+
+        msg.textContent = data.message || 'Damage report submitted successfully!';
+        msg.className = 'note ok';
+
+        // reset
+        $('#damagedFormV2').reset();
+        $('#componentsList').innerHTML = '';
+        counter = 0;
+        addComponent();
+      }catch(err){
+        console.error(err);
+        msg.textContent = 'Error: ' + (err.message || 'Failed to submit');
+        msg.className = 'note err';
+      }finally{
+        btn.disabled = false;
+        btn.innerHTML = '<i data-feather="save"></i> Submit Report';
+        feather.replace();
+      }
+    }
+
+    async function init(){
+      await loadProductOptions();
+      $('#addComponentBtn').addEventListener('click', addComponent);
+      $('#damagedFormV2').addEventListener('submit', submitV2);
+      $('#clearV2').addEventListener('click', ()=> {
+        $('#componentsList').innerHTML = '';
+        counter = 0;
+        addComponent();
+        $('#msgV2').textContent='';
+      });
+
+      // أول عنصر تلقائيًا
+      addComponent();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  })();
+  </script>
+
+  <!-- منطق الصفحة القديم كما هو (V1) — محفوظ بالكامل -->
+  <script>
+    const el = (id) => document.getElementById(id);
+    const msg = el('msg');
+    const legacyForm = document.getElementById('damageForm');
+    if (legacyForm){
+      legacyForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.textContent = 'Submitting...';
+        msg.className = 'note';
+
+        const payload = {
+          assetName: el('assetName').value.trim(),
+          damageDescription: el('damageDescription').value.trim(),
+          location: el('location').value.trim(),
+          severity: el('severity').value,
+        };
+
+        if (!payload.assetName || !payload.damageDescription) {
+          msg.textContent = 'Please fill the required fields.';
+          msg.className = 'note err';
+          return;
+        }
+
+        try {
+          const r = await fetch('/api/damaged-assets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await r.json();
+          if (!r.ok || !data.ok) throw new Error(data.error || 'Failed');
+          msg.textContent = 'Saved! Notion page created.';
+          msg.className = 'note ok';
+          e.target.reset();
+        } catch (err) {
+          msg.textContent = 'Error: ' + (err.message || 'Failed to save.');
+          msg.className = 'note err';
+        }
+      });
+    }
+  </script>
+
+  <!-- أيقونات -->
   <script>feather.replace();</script>
-  <script src="/js/common-ui.js"></script>
-  <script src="/js/damaged-assets.js"></script>
+
+  <!-- في حالة وجود منطق Sidebar ديناميكي -->
+  <script src="/common-ui.js"></script>
+  <script>
+    (function () {
+      var ACTIVE = "Damaged Assets";
+      var mount = document.getElementById("sidebar");
+      if (window.UI) {
+        if (typeof UI.mountSidebar === "function") UI.mountSidebar(mount, ACTIVE);
+        else if (typeof UI.renderSidebar === "function") UI.renderSidebar({ mount, active: ACTIVE });
+        else if (typeof UI.initSidebar === "function") UI.initSidebar(ACTIVE);
+        else if (typeof UI.buildSidebar === "function") UI.buildSidebar({ el: mount, active: ACTIVE });
+      }
+    })();
+  </script>
 </body>
 </html>
