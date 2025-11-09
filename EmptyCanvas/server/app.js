@@ -227,6 +227,24 @@ function requirePage(pageName) {
 }
 
 // --- Page Serving Routes ---
+
+// أعلى الملف غالبًا عندك:
+const path = require('path');
+const PUBLIC_DIR = path.join(process.cwd(), 'public'); // أو نفس الثابت اللي بتستخدمه
+
+// نفس الميدلويرز اللي بتستخدمها لباقي الصفحات:
+const requireAuth = /* موجود عندك */;
+const requirePage = /* الموجود عندك اللي بيفحص Allowed pages */;
+
+// NEW: Damaged Assets page
+app.get(
+  '/damaged-assets',
+  requireAuth,
+  requirePage('Damaged Assets'), // اسمها لازم يطابق اللي في عمود Allowed pages
+  (req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'damaged-assets.html'));
+  }
+);
 app.get("/login", (req, res) => {
   if (req.session?.authenticated)
     return res.redirect(firstAllowedPath(req.session.allowedPages || ALL_PAGES));
