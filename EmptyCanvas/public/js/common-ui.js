@@ -17,9 +17,11 @@ document.addEventListener('DOMContentLoaded', () => {
     'requested orders':          'a[href="/orders/requested"]',
     'schools requested orders':  'a[href="/orders/requested"]',
     'assigned schools requested orders': 'a[href="/orders/assigned"]',
-    'funds': 'a[href="/funds"]',
+    'funds':                     'a[href="/funds"]',
+    // ★ موجودة عندك مسبقًا:
+    's.v schools orders':        'a[href="/orders/sv-orders"]',
     // ★ NEW:
-    's.v schools orders':        'a[href="/orders/sv-orders"]'
+    'damaged assets':            'a[href="/damaged-assets"]'
   };
   const toKey = (s) => String(s || '').trim().toLowerCase();
 
@@ -67,6 +69,22 @@ document.addEventListener('DOMContentLoaded', () => {
     li.appendChild(a);
     nav.appendChild(li);
     if (window.feather) feather.replace();
+  }
+
+  // ★ NEW: Inject Damaged Assets link مرة واحدة بنفس أسلوب S.V
+  function ensureDamagedAssetsLink() {
+    const nav = document.querySelector('.sidebar .nav-list, .sidebar nav ul, .sidebar ul');
+    if (!nav) return;
+    if (nav.querySelector('a[href="/damaged-assets"]')) return; // already inserted
+
+    const li = document.createElement('li');
+    const a  = document.createElement('a');
+    a.className = 'nav-link';
+    a.href = '/damaged-assets'; // هتتخبي/تظهر حسب Allowed pages
+    a.innerHTML = '<i data-feather="alert-octagon"></i><span class="nav-label">Damaged Assets</span>';
+    li.appendChild(a);
+    nav.appendChild(li);
+    if (window.feather && typeof feather.replace === 'function') feather.replace();
   }
 
   // لا نطبق الكاش القديم قبل جلب /api/account لتجنّب الإخفاء الخاطئ
@@ -164,7 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Init
   applyInitial();
   ensureSVOrdersLink();
-// ★ ensure link exists before we apply allowed pages
+  ensureDamagedAssetsLink();  // ★ NEW: لازم قبل ensureGreetingAndPages()
+  // ★ ensure link exists before we apply allowed pages
   ensureGreetingAndPages();
 
   window.addEventListener('user:updated', () => {
@@ -181,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (window.feather) feather.replace();
 });
+
 
 // UI Toast — modern notifications
 (() => {
