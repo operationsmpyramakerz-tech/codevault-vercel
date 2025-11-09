@@ -1459,6 +1459,24 @@ app.get(
   },
 );
 // == Damaged Assets: searchable products list ==
+// GET options for Damaged Assets dropdown  (front-end expects { options: [{id,name}, ...] })
+app.get('/api/damaged-assets/options', requireAuth, requirePage('Damaged Assets'), async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim().toLowerCase();
+
+    // TODO: بدّل السطور التالية بطريقة جلبك من Notion لجدول المنتجات/المكونات
+    // لازم ترجع مصفوفة كائنات { id, name } فقط.
+    // مثال تقريبي لو عندك دالة جاهزة:
+    // const items = await listProductsFromNotion({ q });
+    // res.json({ options: items.map(p => ({ id: p.id, name: p.name })) });
+
+    // Placeholder آمن لو حابب تختبر
+    const items = []; // رجّع نتائجك الفعلية بدل هذا
+    res.json({ options: items });
+  } catch (e) {
+    res.status(500).json({ options: [], error: e.message });
+  }
+});
 app.get(
   "/api/damaged-assets/products",
   requireAuth,
