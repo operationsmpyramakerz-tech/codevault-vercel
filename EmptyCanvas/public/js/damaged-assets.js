@@ -42,7 +42,7 @@ function safeFeatherReplace() {
 }
 
 // ---------------------- Success Overlay (center message) ----------------------
-function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح') {
+function showSuccessOverlay(message = 'The report has been successfully recorded.') {
   const old = document.getElementById('reportSuccessOverlay');
   if (old) old.remove();
 
@@ -93,7 +93,7 @@ function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح
   Object.assign(title.style, { margin: '6px 0 8px', fontSize: '20px', color: '#111827' });
 
   const sub = document.createElement('p');
-  sub.textContent = 'تم حفظ البلاغ وإرساله بنجاح.';
+  sub.textContent = 'Thank you';
   Object.assign(sub.style, { margin: '0 0 18px', color: '#6b7280', fontSize: '14px' });
 
   const btn = document.createElement('button');
