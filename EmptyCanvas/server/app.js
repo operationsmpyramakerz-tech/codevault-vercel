@@ -2885,7 +2885,7 @@ app.get('/api/sv-assets', requireAuth, requirePage('S.V Schools Assets'), async 
     }
 
     res.set('Cache-Control', 'no-store');
-    res.json({ ok: true, items });
+    res.json({ ok: true, rows: items });
   } catch (e) {
     console.error('GET /api/sv-assets error:', e?.body || e);
     res.status(500).json({ ok: false, error: 'Failed to load user assets' });
