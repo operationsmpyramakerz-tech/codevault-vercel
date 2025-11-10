@@ -429,7 +429,7 @@ async function handleFormSubmit(ev) {
     }
 
     showToast('Damage report submitted successfully!', 'success');
-    showSuccessOverlay('تم تسجيل التقرير بنجاح');
+    showSuccessOverlay('The report has been successfully recorded.');
 
     document.getElementById('damagedForm').reset();
     document.getElementById('itemsList').innerHTML = '';
