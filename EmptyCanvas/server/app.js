@@ -329,7 +329,9 @@ app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
 app.get("/damaged-assets", requireAuth, requirePage("Damaged Assets"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "damaged-assets.html"));
 });
-
+app.get('/sv-assets', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'sv-assets.html'));
+});
 // --- API Routes ---
 
 // Login
