@@ -42,7 +42,7 @@ function safeFeatherReplace() {
 }
 
 // ---------------------- Success Overlay (center message) ----------------------
-function showSuccessOverlay(message = 'The report has been successfully recorded.') {
+function showSuccessOverlay(message = 'The report has been successfully recorded') {
   const old = document.getElementById('reportSuccessOverlay');
   if (old) old.remove();
 
@@ -429,7 +429,7 @@ async function handleFormSubmit(ev) {
     }
 
     showToast('Damage report submitted successfully!', 'success');
-    showSuccessOverlay('The report has been successfully recorded.');
+    showSuccessOverlay('The report has been successfully recorded');
 
     document.getElementById('damagedForm').reset();
     document.getElementById('itemsList').innerHTML = '';
