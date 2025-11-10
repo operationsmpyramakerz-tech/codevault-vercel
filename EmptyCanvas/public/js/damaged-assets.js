@@ -32,26 +32,104 @@ async function handleLogout() {
   }
 }
 
+// ===== NEW: Success Center Overlay =====
+function showCenterSuccess(message = 'تم تسجيل التقرير بنجاح') {
+  const old = document.getElementById('successOverlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'successOverlay';
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    inset: '0',
+    background: 'rgba(17,24,39,.55)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: '1000',
+    padding: '20px',
+  });
+
+  const card = document.createElement('div');
+  Object.assign(card.style, {
+    width: '100%',
+    maxWidth: '520px',
+    background: '#fff',
+    borderRadius: '16px',
+    boxShadow: '0 20px 50px rgba(0,0,0,.15)',
+    textAlign: 'center',
+    padding: '28px 24px',
+    direction: 'rtl',
+  });
+
+  const iconWrap = document.createElement('div');
+  Object.assign(iconWrap.style, {
+    width: '64px',
+    height: '64px',
+    margin: '0 auto 12px',
+    background: '#ECFDF5',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  });
+  iconWrap.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6L9 17l-5-5"></path>
+    </svg>
+  `;
+
+  const title = document.createElement('h3');
+  title.textContent = message;
+  Object.assign(title.style, { margin: '6px 0 8px', fontSize: '20px', color: '#111827' });
+
+  const sub = document.createElement('p');
+  sub.textContent = 'تم حفظ البلاغ وإرساله إلى Notion بنجاح.';
+  Object.assign(sub.style, { margin: '0 0 18px', color: '#6b7280', fontSize: '14px' });
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'حسناً';
+  btn.className = 'btn btn-primary';
+  Object.assign(btn.style, {
+    padding: '10px 16px',
+    borderRadius: '10px',
+    border: '0',
+    cursor: 'pointer',
+  });
+
+  btn.addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  card.appendChild(iconWrap);
+  card.appendChild(title);
+  card.appendChild(sub);
+  card.appendChild(btn);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  setTimeout(() => {
+    if (document.body.contains(overlay)) overlay.remove();
+  }, 4000);
+}
+
 // ---------------------- Searchable select ----------------------
 // يحوّل <select> عادية إلى كومبوبوكس بمحرّك بحث داخلي (من غير ما نحذف الـ<select> الأصلية)
 function makeSearchableSelect(selectEl, options) {
   if (!selectEl) return;
 
-  // لفّ الـ<select> بكونتينر
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
   wrapper.className = 'searchable-select';
   selectEl.parentNode.insertBefore(wrapper, selectEl);
   wrapper.appendChild(selectEl);
 
-  // أخفي الـ<select> بصريًا (نحتفظ بها للنموذج/الفالديشن)
   selectEl.style.position = 'absolute';
   selectEl.style.opacity = '0';
   selectEl.style.pointerEvents = 'none';
   selectEl.style.width = '100%';
   selectEl.style.height = '40px';
 
-  // input يظهر للمستخدم + قائمة منسدلة
   const input = document.createElement('input');
   input.type = 'search';
   input.className = 'form-input';
@@ -127,12 +205,10 @@ function makeSearchableSelect(selectEl, options) {
   input.addEventListener('focus', () => { render(PRODUCT_OPTIONS); dropdown.style.display = 'block'; });
   input.addEventListener('input', () => render(PRODUCT_OPTIONS, input.value));
 
-  // إغلاق عند الضغط خارج
   document.addEventListener('click', (e) => {
     if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
   });
 
-  // مزامنة العرض الأولي من select
   const selected = selectEl.selectedOptions?.[0];
   if (selected) input.value = selected.textContent || '';
 }
@@ -232,7 +308,6 @@ function validateForm() {
 }
 
 async function collectPayload() {
-  // نُرجع البيانات التي ستُرسل للسيرفر + مراجع الملفات المحلية للرفع اللاحق
   const items = [];
   const localUploads = []; // [{ files: File[], input: <input>, index }]
   const entries = document.querySelectorAll('.expense-entry');
@@ -259,7 +334,7 @@ async function collectPayload() {
     if (filesEl?.files?.length) {
       for (const f of filesEl.files) {
         item.files.push({ name: f.name, type: f.type, size: f.size });
-        localFiles.push(f); // هنستخدمها للرفع الفعلي بعد إنشاء صفحات Notion
+        localFiles.push(f);
       }
     }
 
@@ -293,7 +368,7 @@ async function handleFormSubmit(ev) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ items }) // نرسل العناصر فقط
+      body: JSON.stringify({ items })
     });
 
     const ct = r.headers.get('content-type') || '';
@@ -301,13 +376,12 @@ async function handleFormSubmit(ev) {
 
     if (!r.ok || !(j?.ok || j?.success)) throw new Error(j?.error || 'Failed to submit');
 
-    // الـ API بيرجّع IDs للصفحات التي اتعملت بنفس ترتيب items
+    // IDs للصفحات التي اتعملت بنفس ترتيب items
     const createdIds = j.created || j.ids || [];
     if (!Array.isArray(createdIds) || createdIds.length !== items.length) {
-      // لو العدد مختلف، نكمّل بدون رفع ملفات لتجنب ربط خاطئ
       console.warn('Mismatch between created pages and items; skipping file uploads.');
     } else {
-      // 3) ارفع الملفات فعليًا (واحدة واحدة) إلى Notion عبر /api/notion/upload-file
+      // 3) رفع الملفات الفعلي
       let totalToUpload = 0;
       localUploads.forEach(u => { totalToUpload += (u?.files?.length || 0); });
 
@@ -322,7 +396,6 @@ async function handleFormSubmit(ev) {
             showToast(`${f.name} is larger than 20MB — skipped`, 'warning');
             continue;
           }
-          // تحديث نص الزر للتوضيح (اختياري)
           done += 1;
           btn.innerHTML = `<i data-feather="loader"></i> Uploading files… (${done}/${totalToUpload})`;
           feather.replace();
@@ -336,7 +409,7 @@ async function handleFormSubmit(ev) {
               pageId,
               dataUrl,
               filename: f.name,
-              propName: 'Files & media' // اسم العمود في Notion
+              propName: 'Files & media'
             })
           });
 
@@ -357,6 +430,9 @@ async function handleFormSubmit(ev) {
     document.getElementById('itemsList').innerHTML = '';
     itemCounter = 0;
     addItemEntry();
+
+    // NEW: إظهار رسالة النجاح في منتصف الصفحة
+    showCenterSuccess('تم تسجيل التقرير بنجاح');
   } catch (e) {
     console.error(e);
     showToast(e.message || 'Failed to submit', 'error');
@@ -381,3 +457,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   addItemEntry(); // أول عنصر
 });
+```0
