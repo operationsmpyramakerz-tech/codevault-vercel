@@ -32,104 +32,26 @@ async function handleLogout() {
   }
 }
 
-// ===== NEW: Success Center Overlay =====
-function showCenterSuccess(message = 'تم تسجيل التقرير بنجاح') {
-  const old = document.getElementById('successOverlay');
-  if (old) old.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'successOverlay';
-  Object.assign(overlay.style, {
-    position: 'fixed',
-    inset: '0',
-    background: 'rgba(17,24,39,.55)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: '1000',
-    padding: '20px',
-  });
-
-  const card = document.createElement('div');
-  Object.assign(card.style, {
-    width: '100%',
-    maxWidth: '520px',
-    background: '#fff',
-    borderRadius: '16px',
-    boxShadow: '0 20px 50px rgba(0,0,0,.15)',
-    textAlign: 'center',
-    padding: '28px 24px',
-    direction: 'rtl',
-  });
-
-  const iconWrap = document.createElement('div');
-  Object.assign(iconWrap.style, {
-    width: '64px',
-    height: '64px',
-    margin: '0 auto 12px',
-    background: '#ECFDF5',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  });
-  iconWrap.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M20 6L9 17l-5-5"></path>
-    </svg>
-  `;
-
-  const title = document.createElement('h3');
-  title.textContent = message;
-  Object.assign(title.style, { margin: '6px 0 8px', fontSize: '20px', color: '#111827' });
-
-  const sub = document.createElement('p');
-  sub.textContent = 'تم حفظ البلاغ وإرساله إلى Notion بنجاح.';
-  Object.assign(sub.style, { margin: '0 0 18px', color: '#6b7280', fontSize: '14px' });
-
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.textContent = 'حسناً';
-  btn.className = 'btn btn-primary';
-  Object.assign(btn.style, {
-    padding: '10px 16px',
-    borderRadius: '10px',
-    border: '0',
-    cursor: 'pointer',
-  });
-
-  btn.addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-
-  card.appendChild(iconWrap);
-  card.appendChild(title);
-  card.appendChild(sub);
-  card.appendChild(btn);
-  overlay.appendChild(card);
-  document.body.appendChild(overlay);
-
-  setTimeout(() => {
-    if (document.body.contains(overlay)) overlay.remove();
-  }, 4000);
-}
-
 // ---------------------- Searchable select ----------------------
 // يحوّل <select> عادية إلى كومبوبوكس بمحرّك بحث داخلي (من غير ما نحذف الـ<select> الأصلية)
 function makeSearchableSelect(selectEl, options) {
   if (!selectEl) return;
 
+  // لفّ الـ<select> بكونتينر
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
   wrapper.className = 'searchable-select';
   selectEl.parentNode.insertBefore(wrapper, selectEl);
   wrapper.appendChild(selectEl);
 
+  // أخفي الـ<select> بصريًا (نحتفظ بها للنموذج/الفالديشن)
   selectEl.style.position = 'absolute';
   selectEl.style.opacity = '0';
   selectEl.style.pointerEvents = 'none';
   selectEl.style.width = '100%';
   selectEl.style.height = '40px';
 
+  // input يظهر للمستخدم + قائمة منسدلة
   const input = document.createElement('input');
   input.type = 'search';
   input.className = 'form-input';
@@ -205,10 +127,12 @@ function makeSearchableSelect(selectEl, options) {
   input.addEventListener('focus', () => { render(PRODUCT_OPTIONS); dropdown.style.display = 'block'; });
   input.addEventListener('input', () => render(PRODUCT_OPTIONS, input.value));
 
+  // إغلاق عند الضغط خارج
   document.addEventListener('click', (e) => {
     if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
   });
 
+  // مزامنة العرض الأولي من select
   const selected = selectEl.selectedOptions?.[0];
   if (selected) input.value = selected.textContent || '';
 }
@@ -284,17 +208,6 @@ function addItemEntry() {
   sel.focus();
 }
 
-// ---------------------- Helpers: File -> DataURL ----------------------
-const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB
-function fileToDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
 // ---------------------- Validation + Payload ----------------------
 function validateForm() {
   const entries = document.querySelectorAll('.expense-entry');
@@ -309,14 +222,13 @@ function validateForm() {
 
 async function collectPayload() {
   const items = [];
-  const localUploads = []; // [{ files: File[], input: <input>, index }]
   const entries = document.querySelectorAll('.expense-entry');
   for (const e of entries) {
     const id = e.dataset.itemId;
     const sel = document.getElementById(`product${id}`);
     const title = document.getElementById(`title${id}`);
     const reason = document.getElementById(`reason${id}`);
-    const filesEl = document.getElementById(`files${id}`);
+    const files = document.getElementById(`files${id}`);
 
     if (!(sel?.value && title?.value?.trim())) continue;
 
@@ -327,21 +239,16 @@ async function collectPayload() {
       product: { id: productId, name: productName }, // relation Products
       title: title.value.trim(),                      // Title
       reason: (reason?.value || '').trim(),          // Text
-      files: []                                      // metadata فقط للسيرفر (اختياري)
+      files: []                                      // NOTE: رفع فعلي للملفات يحتاج URLs أو تخزين خارجي
     };
 
-    let localFiles = [];
-    if (filesEl?.files?.length) {
-      for (const f of filesEl.files) {
-        item.files.push({ name: f.name, type: f.type, size: f.size });
-        localFiles.push(f);
-      }
+    // مبدئيًا: نرسل ميتاداتا فقط (الـ API سيضيف ملفات لو كان فيها url)
+    if (files?.files?.length) {
+      for (const f of files.files) item.files.push({ name: f.name, type: f.type, size: f.size });
     }
-
     items.push(item);
-    localUploads.push({ files: localFiles, input: filesEl });
   }
-  return { items, localUploads };
+  return { items };
 }
 
 // ---------------------- Submit ----------------------
@@ -356,72 +263,18 @@ async function handleFormSubmit(ev) {
     btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
     feather.replace();
 
-    // 1) اجمع البيانات
-    const { items, localUploads } = await collectPayload();
-    if (!items.length) {
-      showToast('Please add at least one complete component', 'error');
-      return;
-    }
-
-    // 2) أنشئ الصفحات في Notion (بدون ملفات)
+    const payload = await collectPayload();
     const r = await fetch('/api/damaged-assets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ items })
+      body: JSON.stringify(payload)
     });
 
     const ct = r.headers.get('content-type') || '';
     const j = ct.includes('application/json') ? await r.json() : { ok: false, error: 'Non-JSON response' };
 
-    if (!r.ok || !(j?.ok || j?.success)) throw new Error(j?.error || 'Failed to submit');
-
-    // IDs للصفحات التي اتعملت بنفس ترتيب items
-    const createdIds = j.created || j.ids || [];
-    if (!Array.isArray(createdIds) || createdIds.length !== items.length) {
-      console.warn('Mismatch between created pages and items; skipping file uploads.');
-    } else {
-      // 3) رفع الملفات الفعلي
-      let totalToUpload = 0;
-      localUploads.forEach(u => { totalToUpload += (u?.files?.length || 0); });
-
-      let done = 0;
-      for (let i = 0; i < createdIds.length; i++) {
-        const pageId = createdIds[i];
-        const u = localUploads[i];
-        if (!u || !u.files || !u.files.length) continue;
-
-        for (const f of u.files) {
-          if (f.size > MAX_FILE_BYTES) {
-            showToast(`${f.name} is larger than 20MB — skipped`, 'warning');
-            continue;
-          }
-          done += 1;
-          btn.innerHTML = `<i data-feather="loader"></i> Uploading files… (${done}/${totalToUpload})`;
-          feather.replace();
-
-          const dataUrl = await fileToDataURL(f);
-          const up = await fetch('/api/notion/upload-file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-              pageId,
-              dataUrl,
-              filename: f.name,
-              propName: 'Files & media'
-            })
-          });
-
-          const ujCt = up.headers.get('content-type') || '';
-          const uj = ujCt.includes('application/json') ? await up.json() : {};
-          if (!up.ok || !uj?.ok) {
-            console.error('upload-file error:', uj);
-            throw new Error(uj?.error || `Failed to upload ${f.name}`);
-          }
-        }
-      }
-    }
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed to submit');
 
     showToast('Damage report submitted successfully!', 'success');
 
@@ -430,9 +283,6 @@ async function handleFormSubmit(ev) {
     document.getElementById('itemsList').innerHTML = '';
     itemCounter = 0;
     addItemEntry();
-
-    // NEW: إظهار رسالة النجاح في منتصف الصفحة
-    showCenterSuccess('تم تسجيل التقرير بنجاح');
   } catch (e) {
     console.error(e);
     showToast(e.message || 'Failed to submit', 'error');
@@ -457,4 +307,3 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   addItemEntry(); // أول عنصر
 });
-```0
