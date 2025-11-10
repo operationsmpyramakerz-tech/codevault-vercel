@@ -32,6 +32,95 @@ async function handleLogout() {
   }
 }
 
+// ---------------------- NEW: Center Success Overlay ----------------------
+function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح') {
+  // لو فيه Overlay قديم شيله
+  const old = document.getElementById('reportSuccessOverlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'reportSuccessOverlay';
+  Object.assign(overlay.style, {
+    position: 'fixed',
+    inset: '0',
+    background: 'rgba(17,24,39,.55)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: '1000',
+    padding: '20px'
+  });
+
+  const card = document.createElement('div');
+  Object.assign(card.style, {
+    width: '100%',
+    maxWidth: '520px',
+    background: '#fff',
+    borderRadius: '16px',
+    boxShadow: '0 20px 50px rgba(0,0,0,.15)',
+    textAlign: 'center',
+    padding: '28px 24px',
+    direction: 'rtl'
+  });
+
+  const iconWrap = document.createElement('div');
+  Object.assign(iconWrap.style, {
+    width: '64px',
+    height: '64px',
+    margin: '0 auto 12px',
+    background: '#ECFDF5',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  });
+  iconWrap.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6L9 17l-5-5"></path>
+    </svg>
+  `;
+
+  const title = document.createElement('h3');
+  title.textContent = message;
+  Object.assign(title.style, { margin: '6px 0 8px', fontSize: '20px', color: '#111827' });
+
+  const sub = document.createElement('p');
+  sub.textContent = 'تم حفظ البلاغ وإرساله بنجاح.';
+  Object.assign(sub.style, { margin: '0 0 18px', color: '#6b7280', fontSize: '14px' });
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'حسناً';
+  btn.className = 'btn btn-primary';
+  Object.assign(btn.style, {
+    padding: '10px 16px',
+    borderRadius: '10px',
+    border: '0',
+    cursor: 'pointer'
+  });
+
+  btn.addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.addEventListener('keydown', function escClose(ev) {
+    if (ev.key === 'Escape') {
+      overlay.remove();
+      document.removeEventListener('keydown', escClose);
+    }
+  });
+
+  card.appendChild(iconWrap);
+  card.appendChild(title);
+  card.appendChild(sub);
+  card.appendChild(btn);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  // اختياري: إغلاق تلقائي بعد 4 ثواني
+  setTimeout(() => {
+    if (document.body.contains(overlay)) overlay.remove();
+  }, 4000);
+}
+
 // ---------------------- Searchable select ----------------------
 // يحوّل <select> عادية إلى كومبوبوكس بمحرّك بحث داخلي (من غير ما نحذف الـ<select> الأصلية)
 function makeSearchableSelect(selectEl, options) {
@@ -352,6 +441,9 @@ async function handleFormSubmit(ev) {
 
     showToast('Damage report submitted successfully!', 'success');
 
+    // NEW: رسالة تأكيد في منتصف الصفحة
+    showSuccessOverlay('تم تسجيل التقرير بنجاح');
+
     // reset
     document.getElementById('damagedForm').reset();
     document.getElementById('itemsList').innerHTML = '';
@@ -381,3 +473,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   addItemEntry(); // أول عنصر
 });
+```0
