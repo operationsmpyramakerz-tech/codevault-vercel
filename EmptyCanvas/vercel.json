@@ -4,6 +4,6 @@
     { "source": "/orders/new/details",   "destination": "/create-order-details.html" },
     { "source": "/orders/new/products",  "destination": "/create-order-products.html" },
     { "source": "/orders/new/review",    "destination": "/create-order-review.html" },
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/(.*)", "destination": "/public/login.html" }
   ]
 }
