@@ -64,6 +64,7 @@ const ALL_PAGES = [
   "Logistics",
   "S.V schools orders",
   "Damaged Assets",
+  "S.V Schools Assets",
 ];
 
 const norm = (s) => String(s || "").trim().toLowerCase();
