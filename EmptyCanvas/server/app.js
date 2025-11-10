@@ -2844,7 +2844,7 @@ app.get('/api/sv-assets', requireAuth, requirePage('S.V Schools Assets'), async 
       const resp = await notion.databases.query({
         database_id: damagedAssetsDatabaseId,
         start_cursor: startCursor,
-        filter: { property: 'Team Member', relation: { contains: userId } },
+        filter: { property: 'Teams Members', relation: { contains: userId } },
         sorts: [{ timestamp: 'created_time', direction: 'descending' }],
       });
 
