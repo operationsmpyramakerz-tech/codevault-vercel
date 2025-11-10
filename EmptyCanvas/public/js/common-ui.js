@@ -215,12 +215,17 @@ function ensureSVAssetsLink() {
   });
 
   // Init
-  applyInitial();
-  ensureSVOrdersLink();
-  ensureDamagedAssetsLink();  // ★ NEW: لازم قبل ensureGreetingAndPages()
-  // ★ ensure link exists before we apply allowed pages
-  ensureSVAssetsLink(); // ★ Add this new link before permission check
-  ensureGreetingAndPages();
+ ensureSVOrdersLink();
+ensureDamagedAssetsLink();
+ensureSVAssetsLink();
+
+// hide newly injected links before permissions load
+document.querySelectorAll('.sidebar .nav-link').forEach(a => {
+  a.style.display = 'none';
+  a.dataset.visible = 'false';
+});
+
+ensureGreetingAndPages();
 
   window.addEventListener('user:updated', () => {
     renderGreeting(getCachedName());
