@@ -2892,4 +2892,34 @@ app.get('/api/sv-assets', requireAuth, requirePage('S.V Schools Assets'), async 
   }
 });
 
+// === API: Update S.V Comment for a specific asset ===
+app.post('/api/sv-assets/:id/comment', requireAuth, requirePage('S.V Schools Assets'), async (req, res) => {
+  try {
+    const pageId = req.params.id;
+    const comment = String(req.body?.comment || '').trim();
+    if (!pageId) return res.status(400).json({ ok: false, error: 'Missing asset id' });
+
+    // جلب خصائص قاعدة البيانات لتحديد اسم عمود S.V Comment
+    const db = await notion.databases.retrieve({ database_id: damagedAssetsDatabaseId });
+    const props = db.properties || {};
+    const svCommentProp =
+      Object.keys(props).find(k =>
+        k.toLowerCase().includes('s.v comment') ||
+        k.toLowerCase().includes('sv comment')
+      ) || 'S.V Comment';
+
+    await notion.pages.update({
+      page_id: pageId,
+      properties: {
+        [svCommentProp]: { rich_text: [{ text: { content: comment } }] },
+      },
+    });
+
+    res.json({ ok: true, id: pageId, comment });
+  } catch (e) {
+    console.error('POST /api/sv-assets/:id/comment error:', e?.body || e);
+    res.status(500).json({ ok: false, error: 'Failed to save S.V Comment' });
+  }
+});
+
 module.exports = app;
