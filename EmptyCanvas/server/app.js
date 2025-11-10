@@ -92,6 +92,8 @@ function normalizePages(names = []) {
   if (set.has("funds")) out.push("Funds");
   if (set.has("logistics")) out.push("Logistics");  if (set.has("s.v schools orders") || set.has("sv schools orders")) out.push("S.V schools orders");
   if (set.has("damaged assets")) out.push("Damaged Assets");
+  if (set.has("s.v schools assets") || set.has("sv schools assets")) 
+  out.push("S.V Schools Assets");
 
   return out;
 }
