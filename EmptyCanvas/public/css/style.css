@@ -2690,3 +2690,17 @@ body:not(.sidebar-mini) .container-full-width { padding-left: 16px !important; }
 
 body.sidebar-mini .main-header,
 body.sidebar-mini .container-full-width { padding-left: 24px !important; }
+/* ===== Hide all sidebar links initially until permissions load ===== */
+.sidebar .nav-link {
+  display: none;                /* Hide all links immediately on load */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity .2s ease;
+}
+
+/* When JS allows a link, it will re-display it */
+.sidebar .nav-link[data-visible="true"] {
+  display: flex !important;     /* restore layout */
+  visibility: visible;
+  opacity: 1;
+}
