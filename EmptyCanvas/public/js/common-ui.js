@@ -21,7 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★ موجودة عندك مسبقًا:
     's.v schools orders':        'a[href="/orders/sv-orders"]',
     // ★ NEW:
-    'damaged assets':            'a[href="/damaged-assets"]'
+    'damaged assets':            'a[href="/damaged-assets"]',
+    's.v schools assets':         'a[href="/sv-assets"]'
   };
   const toKey = (s) => String(s || '').trim().toLowerCase();
 
@@ -86,7 +87,23 @@ document.addEventListener('DOMContentLoaded', () => {
     nav.appendChild(li);
     if (window.feather && typeof feather.replace === 'function') feather.replace();
   }
+  
+// ★ NEW: Inject S.V Schools Assets link dynamically
+function ensureSVAssetsLink() {
+  const nav = document.querySelector('.sidebar .nav-list, .sidebar nav ul, .sidebar ul');
+  if (!nav) return;
+  if (nav.querySelector('a[href="/sv-assets"]')) return; // already inserted
 
+  const li = document.createElement('li');
+  const a  = document.createElement('a');
+  a.className = 'nav-link';
+  a.href = '/sv-assets'; // hidden until allowed
+  a.innerHTML = `<i data-feather="layers"></i><span class="nav-label">S.V Schools Assets</span>`;
+  li.appendChild(a);
+  nav.appendChild(li);
+  if (window.feather) feather.replace();
+}
+  
   // لا نطبق الكاش القديم قبل جلب /api/account لتجنّب الإخفاء الخاطئ
   // const early = getCachedAllowedPages(); if (early) applyAllowedPages(early);
 
@@ -184,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   ensureSVOrdersLink();
   ensureDamagedAssetsLink();  // ★ NEW: لازم قبل ensureGreetingAndPages()
   // ★ ensure link exists before we apply allowed pages
+  ensureSVAssetsLink(); // ★ Add this new link before permission check
   ensureGreetingAndPages();
 
   window.addEventListener('user:updated', () => {
