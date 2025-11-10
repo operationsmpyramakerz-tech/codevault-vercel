@@ -208,6 +208,17 @@ function addItemEntry() {
   sel.focus();
 }
 
+// ---------------------- Helpers: File -> DataURL ----------------------
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
 // ---------------------- Validation + Payload ----------------------
 function validateForm() {
   const entries = document.querySelectorAll('.expense-entry');
@@ -221,14 +232,16 @@ function validateForm() {
 }
 
 async function collectPayload() {
+  // نُرجع البيانات التي ستُرسل للسيرفر + مراجع الملفات المحلية للرفع اللاحق
   const items = [];
+  const localUploads = []; // [{ files: File[], input: <input>, index }]
   const entries = document.querySelectorAll('.expense-entry');
   for (const e of entries) {
     const id = e.dataset.itemId;
     const sel = document.getElementById(`product${id}`);
     const title = document.getElementById(`title${id}`);
     const reason = document.getElementById(`reason${id}`);
-    const files = document.getElementById(`files${id}`);
+    const filesEl = document.getElementById(`files${id}`);
 
     if (!(sel?.value && title?.value?.trim())) continue;
 
@@ -239,16 +252,21 @@ async function collectPayload() {
       product: { id: productId, name: productName }, // relation Products
       title: title.value.trim(),                      // Title
       reason: (reason?.value || '').trim(),          // Text
-      files: []                                      // NOTE: رفع فعلي للملفات يحتاج URLs أو تخزين خارجي
+      files: []                                      // metadata فقط للسيرفر (اختياري)
     };
 
-    // مبدئيًا: نرسل ميتاداتا فقط (الـ API سيضيف ملفات لو كان فيها url)
-    if (files?.files?.length) {
-      for (const f of files.files) item.files.push({ name: f.name, type: f.type, size: f.size });
+    let localFiles = [];
+    if (filesEl?.files?.length) {
+      for (const f of filesEl.files) {
+        item.files.push({ name: f.name, type: f.type, size: f.size });
+        localFiles.push(f); // هنستخدمها للرفع الفعلي بعد إنشاء صفحات Notion
+      }
     }
+
     items.push(item);
+    localUploads.push({ files: localFiles, input: filesEl });
   }
-  return { items };
+  return { items, localUploads };
 }
 
 // ---------------------- Submit ----------------------
@@ -263,18 +281,74 @@ async function handleFormSubmit(ev) {
     btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
     feather.replace();
 
-    const payload = await collectPayload();
+    // 1) اجمع البيانات
+    const { items, localUploads } = await collectPayload();
+    if (!items.length) {
+      showToast('Please add at least one complete component', 'error');
+      return;
+    }
+
+    // 2) أنشئ الصفحات في Notion (بدون ملفات)
     const r = await fetch('/api/damaged-assets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ items }) // نرسل العناصر فقط
     });
 
     const ct = r.headers.get('content-type') || '';
     const j = ct.includes('application/json') ? await r.json() : { ok: false, error: 'Non-JSON response' };
 
-    if (!r.ok || !j.ok) throw new Error(j.error || 'Failed to submit');
+    if (!r.ok || !(j?.ok || j?.success)) throw new Error(j?.error || 'Failed to submit');
+
+    // الـ API بيرجّع IDs للصفحات التي اتعملت بنفس ترتيب items
+    const createdIds = j.created || j.ids || [];
+    if (!Array.isArray(createdIds) || createdIds.length !== items.length) {
+      // لو العدد مختلف، نكمّل بدون رفع ملفات لتجنب ربط خاطئ
+      console.warn('Mismatch between created pages and items; skipping file uploads.');
+    } else {
+      // 3) ارفع الملفات فعليًا (واحدة واحدة) إلى Notion عبر /api/notion/upload-file
+      let totalToUpload = 0;
+      localUploads.forEach(u => { totalToUpload += (u?.files?.length || 0); });
+
+      let done = 0;
+      for (let i = 0; i < createdIds.length; i++) {
+        const pageId = createdIds[i];
+        const u = localUploads[i];
+        if (!u || !u.files || !u.files.length) continue;
+
+        for (const f of u.files) {
+          if (f.size > MAX_FILE_BYTES) {
+            showToast(`${f.name} is larger than 20MB — skipped`, 'warning');
+            continue;
+          }
+          // تحديث نص الزر للتوضيح (اختياري)
+          done += 1;
+          btn.innerHTML = `<i data-feather="loader"></i> Uploading files… (${done}/${totalToUpload})`;
+          feather.replace();
+
+          const dataUrl = await fileToDataURL(f);
+          const up = await fetch('/api/notion/upload-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              pageId,
+              dataUrl,
+              filename: f.name,
+              propName: 'Files & media' // اسم العمود في Notion
+            })
+          });
+
+          const ujCt = up.headers.get('content-type') || '';
+          const uj = ujCt.includes('application/json') ? await up.json() : {};
+          if (!up.ok || !uj?.ok) {
+            console.error('upload-file error:', uj);
+            throw new Error(uj?.error || `Failed to upload ${f.name}`);
+          }
+        }
+      }
+    }
 
     showToast('Damage report submitted successfully!', 'success');
 
