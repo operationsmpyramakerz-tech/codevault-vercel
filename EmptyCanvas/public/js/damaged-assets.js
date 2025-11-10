@@ -25,16 +25,24 @@ function showToast(message, type = 'info') {
 
 async function handleLogout() {
   try {
-    const r = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+    await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
     location.href = '/login';
   } catch {
     location.href = '/login';
   }
 }
 
-// ---------------------- NEW: Center Success Overlay ----------------------
+// ---------------------- Feather safe replace (to avoid breaking UI) ----------------------
+function safeFeatherReplace() {
+  try {
+    if (window.feather && typeof feather.replace === 'function') feather.replace();
+  } catch (e) {
+    console.warn('feather.replace failed:', e);
+  }
+}
+
+// ---------------------- Success Overlay (center message) ----------------------
 function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح') {
-  // لو فيه Overlay قديم شيله
   const old = document.getElementById('reportSuccessOverlay');
   if (old) old.remove();
 
@@ -101,12 +109,8 @@ function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح
 
   btn.addEventListener('click', () => overlay.remove());
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.addEventListener('keydown', function escClose(ev) {
-    if (ev.key === 'Escape') {
-      overlay.remove();
-      document.removeEventListener('keydown', escClose);
-    }
-  });
+  const escClose = (ev) => { if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escClose); } };
+  document.addEventListener('keydown', escClose);
 
   card.appendChild(iconWrap);
   card.appendChild(title);
@@ -115,10 +119,7 @@ function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 
-  // اختياري: إغلاق تلقائي بعد 4 ثواني
-  setTimeout(() => {
-    if (document.body.contains(overlay)) overlay.remove();
-  }, 4000);
+  setTimeout(() => { if (document.body.contains(overlay)) overlay.remove(); }, 4000);
 }
 
 // ---------------------- Searchable select ----------------------
@@ -126,21 +127,18 @@ function showSuccessOverlay(message = 'تم تسجيل التقرير بنجاح
 function makeSearchableSelect(selectEl, options) {
   if (!selectEl) return;
 
-  // لفّ الـ<select> بكونتينر
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
   wrapper.className = 'searchable-select';
   selectEl.parentNode.insertBefore(wrapper, selectEl);
   wrapper.appendChild(selectEl);
 
-  // أخفي الـ<select> بصريًا (نحتفظ بها للنموذج/الفالديشن)
   selectEl.style.position = 'absolute';
   selectEl.style.opacity = '0';
   selectEl.style.pointerEvents = 'none';
   selectEl.style.width = '100%';
   selectEl.style.height = '40px';
 
-  // input يظهر للمستخدم + قائمة منسدلة
   const input = document.createElement('input');
   input.type = 'search';
   input.className = 'form-input';
@@ -216,12 +214,10 @@ function makeSearchableSelect(selectEl, options) {
   input.addEventListener('focus', () => { render(PRODUCT_OPTIONS); dropdown.style.display = 'block'; });
   input.addEventListener('input', () => render(PRODUCT_OPTIONS, input.value));
 
-  // إغلاق عند الضغط خارج
   document.addEventListener('click', (e) => {
     if (!wrapper.contains(e.target)) dropdown.style.display = 'none';
   });
 
-  // مزامنة العرض الأولي من select
   const selected = selectEl.selectedOptions?.[0];
   if (selected) input.value = selected.textContent || '';
 }
@@ -283,7 +279,7 @@ function addItemEntry() {
   const list = document.getElementById('itemsList');
   const node = buildEntryDom(itemCounter);
   list.appendChild(node);
-  feather.replace();
+  safeFeatherReplace(); // بدل feather.replace()
 
   const sel = document.getElementById(`product${itemCounter}`);
   populateSelect(sel);
@@ -321,9 +317,8 @@ function validateForm() {
 }
 
 async function collectPayload() {
-  // نُرجع البيانات التي ستُرسل للسيرفر + مراجع الملفات المحلية للرفع اللاحق
   const items = [];
-  const localUploads = []; // [{ files: File[], input: <input>, index }]
+  const localUploads = [];
   const entries = document.querySelectorAll('.expense-entry');
   for (const e of entries) {
     const id = e.dataset.itemId;
@@ -338,17 +333,17 @@ async function collectPayload() {
     const productName = sel.selectedOptions?.[0]?.text || '';
 
     const item = {
-      product: { id: productId, name: productName }, // relation Products
-      title: title.value.trim(),                      // Title
-      reason: (reason?.value || '').trim(),          // Text
-      files: []                                      // metadata فقط للسيرفر (اختياري)
+      product: { id: productId, name: productName },
+      title: title.value.trim(),
+      reason: (reason?.value || '').trim(),
+      files: []
     };
 
     let localFiles = [];
     if (filesEl?.files?.length) {
       for (const f of filesEl.files) {
         item.files.push({ name: f.name, type: f.type, size: f.size });
-        localFiles.push(f); // هنستخدمها للرفع الفعلي بعد إنشاء صفحات Notion
+        localFiles.push(f);
       }
     }
 
@@ -368,21 +363,19 @@ async function handleFormSubmit(ev) {
 
     btn.disabled = true;
     btn.innerHTML = '<i data-feather="loader"></i> Submitting...';
-    feather.replace();
+    safeFeatherReplace();
 
-    // 1) اجمع البيانات
     const { items, localUploads } = await collectPayload();
     if (!items.length) {
       showToast('Please add at least one complete component', 'error');
       return;
     }
 
-    // 2) أنشئ الصفحات في Notion (بدون ملفات)
     const r = await fetch('/api/damaged-assets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ items }) // نرسل العناصر فقط
+      body: JSON.stringify({ items })
     });
 
     const ct = r.headers.get('content-type') || '';
@@ -390,13 +383,8 @@ async function handleFormSubmit(ev) {
 
     if (!r.ok || !(j?.ok || j?.success)) throw new Error(j?.error || 'Failed to submit');
 
-    // الـ API بيرجّع IDs للصفحات التي اتعملت بنفس ترتيب items
     const createdIds = j.created || j.ids || [];
-    if (!Array.isArray(createdIds) || createdIds.length !== items.length) {
-      // لو العدد مختلف، نكمّل بدون رفع ملفات لتجنب ربط خاطئ
-      console.warn('Mismatch between created pages and items; skipping file uploads.');
-    } else {
-      // 3) ارفع الملفات فعليًا (واحدة واحدة) إلى Notion عبر /api/notion/upload-file
+    if (Array.isArray(createdIds) && createdIds.length === items.length) {
       let totalToUpload = 0;
       localUploads.forEach(u => { totalToUpload += (u?.files?.length || 0); });
 
@@ -411,10 +399,9 @@ async function handleFormSubmit(ev) {
             showToast(`${f.name} is larger than 20MB — skipped`, 'warning');
             continue;
           }
-          // تحديث نص الزر للتوضيح (اختياري)
           done += 1;
           btn.innerHTML = `<i data-feather="loader"></i> Uploading files… (${done}/${totalToUpload})`;
-          feather.replace();
+          safeFeatherReplace();
 
           const dataUrl = await fileToDataURL(f);
           const up = await fetch('/api/notion/upload-file', {
@@ -425,7 +412,7 @@ async function handleFormSubmit(ev) {
               pageId,
               dataUrl,
               filename: f.name,
-              propName: 'Files & media' // اسم العمود في Notion
+              propName: 'Files & media'
             })
           });
 
@@ -437,14 +424,13 @@ async function handleFormSubmit(ev) {
           }
         }
       }
+    } else {
+      console.warn('Mismatch between created pages and items; skipping file uploads.');
     }
 
     showToast('Damage report submitted successfully!', 'success');
-
-    // NEW: رسالة تأكيد في منتصف الصفحة
     showSuccessOverlay('تم تسجيل التقرير بنجاح');
 
-    // reset
     document.getElementById('damagedForm').reset();
     document.getElementById('itemsList').innerHTML = '';
     itemCounter = 0;
@@ -455,7 +441,7 @@ async function handleFormSubmit(ev) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i data-feather="save"></i> Submit Report';
-    feather.replace();
+    safeFeatherReplace();
   }
 }
 
@@ -473,4 +459,3 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   addItemEntry(); // أول عنصر
 });
-```0
