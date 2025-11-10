@@ -2817,4 +2817,79 @@ app.post('/api/notion/upload-file', requireAuth, async (req, res) => {
   }
 });
 
+// === API: List Damaged Assets for the logged-in user ===
+app.get('/api/sv-assets', requireAuth, requirePage('S.V Schools Assets'), async (req, res) => {
+  try {
+    if (!damagedAssetsDatabaseId || !teamMembersDatabaseId) {
+      return res.status(500).json({ error: 'Database IDs are not configured.' });
+    }
+
+    // 1. حدد المستخدم الحالي
+    const userQuery = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: 'Name', title: { equals: req.session.username } },
+    });
+
+    if (!userQuery.results.length) {
+      return res.status(404).json({ error: 'User not found in Team Members.' });
+    }
+
+    const userId = userQuery.results[0].id;
+    const items = [];
+    let hasMore = true;
+    let startCursor = undefined;
+
+    // 2. جلب البيانات من Damaged_Assets المرتبطة بالمستخدم
+    while (hasMore) {
+      const resp = await notion.databases.query({
+        database_id: damagedAssetsDatabaseId,
+        start_cursor: startCursor,
+        filter: { property: 'Team Member', relation: { contains: userId } },
+        sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+      });
+
+      for (const page of resp.results) {
+        const props = page.properties || {};
+
+        // تحديد اسم العنوان والوصف والملفات لو موجودة
+        const title =
+          props.Name?.title?.[0]?.plain_text ||
+          props['Title']?.title?.[0]?.plain_text ||
+          'Untitled';
+        const reason =
+          props['Issue Reason']?.rich_text?.[0]?.plain_text ||
+          props['Reason']?.rich_text?.[0]?.plain_text ||
+          '';
+        const createdTime = page.created_time;
+
+        // استخراج الملفات
+        let files = [];
+        const fileProp = Object.values(props).find(p => p?.type === 'files');
+        if (fileProp?.files?.length) {
+          files = fileProp.files.map(f =>
+            f?.type === 'external' ? f.external.url : f.file.url
+          );
+        }
+
+        items.push({
+          id: page.id,
+          title,
+          reason,
+          createdTime,
+          files,
+        });
+      }
+
+      hasMore = resp.has_more;
+      startCursor = resp.next_cursor;
+    }
+
+    res.set('Cache-Control', 'no-store');
+    res.json({ ok: true, items });
+  } catch (e) {
+    console.error('GET /api/sv-assets error:', e?.body || e);
+    res.status(500).json({ ok: false, error: 'Failed to load user assets' });
+  }
+});
+
 module.exports = app;
