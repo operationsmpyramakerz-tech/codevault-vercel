@@ -1,10 +1,5 @@
 // public/js/common-ui.js
 document.addEventListener('DOMContentLoaded', () => {
-  // Hide all sidebar links until permissions are loaded
-document.querySelectorAll('.sidebar .nav-link').forEach(a => {
-  a.style.display = 'none';
-  a.dataset.visible = 'false';
-});
   const logoutBtn     = document.getElementById('logoutBtn');
   const menuToggle    = document.getElementById('menu-toggle');   // قد لا يوجد
   const sidebarToggle = document.getElementById('sidebar-toggle'); // موجود
@@ -26,26 +21,12 @@ document.querySelectorAll('.sidebar .nav-link').forEach(a => {
     // ★ موجودة عندك مسبقًا:
     's.v schools orders':        'a[href="/orders/sv-orders"]',
     // ★ NEW:
-    'damaged assets':            'a[href="/damaged-assets"]',
-    's.v schools assets':         'a[href="/sv-assets"]'
+    'damaged assets':            'a[href="/damaged-assets"]'
   };
   const toKey = (s) => String(s || '').trim().toLowerCase();
 
-function hideEl(el) {
-  if (el) {
-    el.style.display = 'none';
-    el.dataset.visible = 'false';
-    el.setAttribute('aria-hidden', 'true');
-  }
-}
-
-function showEl(el) {
-  if (el) {
-    el.style.display = '';
-    el.dataset.visible = 'true';
-    el.removeAttribute('aria-hidden');
-  }
-}
+  function hideEl(el){ if (el){ el.style.display = 'none'; el.setAttribute('aria-hidden','true'); } }
+  function showEl(el){ if (el){ el.style.display = ''; el.removeAttribute('aria-hidden'); } }
 
   // أظهر المسموح وأخفِ غير المسموح (حتمي)
   function applyAllowedPages(allowed){
@@ -105,23 +86,7 @@ function showEl(el) {
     nav.appendChild(li);
     if (window.feather && typeof feather.replace === 'function') feather.replace();
   }
-  
-// ★ NEW: Inject S.V Schools Assets link dynamically
-function ensureSVAssetsLink() {
-  const nav = document.querySelector('.sidebar .nav-list, .sidebar nav ul, .sidebar ul');
-  if (!nav) return;
-  if (nav.querySelector('a[href="/sv-assets"]')) return; // already inserted
 
-  const li = document.createElement('li');
-  const a  = document.createElement('a');
-  a.className = 'nav-link';
-  a.href = '/sv-assets'; // hidden until allowed
-  a.innerHTML = `<i data-feather="layers"></i><span class="nav-label">S.V Schools Assets</span>`;
-  li.appendChild(a);
-  nav.appendChild(li);
-  if (window.feather) feather.replace();
-}
-  
   // لا نطبق الكاش القديم قبل جلب /api/account لتجنّب الإخفاء الخاطئ
   // const early = getCachedAllowedPages(); if (early) applyAllowedPages(early);
 
@@ -215,17 +180,11 @@ function ensureSVAssetsLink() {
   });
 
   // Init
- ensureSVOrdersLink();
-ensureDamagedAssetsLink();
-ensureSVAssetsLink();
-
-// hide newly injected links before permissions load
-document.querySelectorAll('.sidebar .nav-link').forEach(a => {
-  a.style.display = 'none';
-  a.dataset.visible = 'false';
-});
-
-ensureGreetingAndPages();
+  applyInitial();
+  ensureSVOrdersLink();
+  ensureDamagedAssetsLink();  // ★ NEW: لازم قبل ensureGreetingAndPages()
+  // ★ ensure link exists before we apply allowed pages
+  ensureGreetingAndPages();
 
   window.addEventListener('user:updated', () => {
     renderGreeting(getCachedName());
