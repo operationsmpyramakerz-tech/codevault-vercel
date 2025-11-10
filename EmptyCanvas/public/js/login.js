@@ -1,13 +1,3 @@
-// login.js
-if (window.location.pathname === "/login" && document.cookie.includes("session=")) {
-  // Optional: verify auth status
-  fetch("/api/me", { credentials: "same-origin" })
-    .then(r => r.ok ? r.json() : null)
-    .then(j => {
-      if (j?.authenticated) window.location.href = "/orders"; // or your home page
-    })
-    .catch(() => {});
-}
 document.addEventListener('DOMContentLoaded', function () {
   const loginForm = document.getElementById('loginForm');
   const errorMessage = document.getElementById('error-message');
