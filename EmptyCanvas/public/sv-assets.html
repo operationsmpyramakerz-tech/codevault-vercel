@@ -79,35 +79,47 @@
     </header>
 
     <main class="container-full-width">
-      <section class="card card--elevated">
-        <div class="card-header">
-          <h2><i data-feather="layers"></i> Assets Batches</h2>
-          <p class="card-subtitle">Each card groups all components created in the same timestamp (batch).</p>
-        </div>
+  <section class="card card--elevated">
+    <div class="card-header">
+      <h2><i data-feather="layers"></i> Assets Batches</h2>
+      <p class="card-subtitle">Each card groups all components created in the same timestamp (batch).</p>
+    </div>
 
-        <div class="toolbar" style="display:flex;gap:10px;align-items:center;">
-          <button id="refreshBtn" class="btn btn-outline-pill" type="button"><i data-feather="refresh-ccw"></i> Refresh</button>
-          <span id="totalBatches" class="muted"></span>
-          <span id="fetchStatus" class="muted" style="margin-left:auto;"></span>
-        </div>
+    <!-- Tabs -->
+    <div class="tabs" style="display:flex;gap:10px;border-bottom:1px solid #ddd;margin-bottom:10px;">
+      <button id="tabNotStarted" class="tab-btn active" style="padding:8px 16px;border:none;background:none;border-bottom:3px solid var(--primary);cursor:pointer;">
+        Not Started
+      </button>
+      <button id="tabReviewed" class="tab-btn" style="padding:8px 16px;border:none;background:none;cursor:pointer;">
+        Reviewed
+      </button>
+    </div>
 
-        <div id="assetsLoader" class="loader" style="display:none;margin:20px 0;">
-          <div class="spinner"></div>
-        </div>
+    <div class="toolbar" style="display:flex;gap:10px;align-items:center;">
+      <button id="refreshBtn" class="btn btn-outline-pill" type="button"><i data-feather="refresh-ccw"></i> Refresh</button>
+      <span id="totalBatches" class="muted"></span>
+      <span id="fetchStatus" class="muted" style="margin-left:auto;"></span>
+    </div>
 
-        <div id="emptyState" class="empty-state" style="display:none;">
-          <div class="empty-illustration"><i data-feather="inbox"></i></div>
-          <h3>No assets yet</h3>
-          <p>Try changing your search.</p>
-        </div>
+    <div id="assetsLoader" class="loader" style="display:none;margin:20px 0;">
+      <div class="spinner"></div>
+    </div>
 
-        <!-- نفس شبكة الكروت بتاعة Current Orders -->
-        <div id="assetsGrid" class="orders-grid"><!-- cards injected here --></div>
-        <div id="endOfList" style="text-align:center;margin:20px 0;color:#6b7280;">
-  End of assets list
-</div>
-      </section>
-    </main>
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <div class="empty-illustration"><i data-feather="inbox"></i></div>
+      <h3>No assets yet</h3>
+      <p>Try changing your search.</p>
+    </div>
+
+    <!-- Grids -->
+    <div id="assetsGridNotStarted" class="orders-grid"></div>
+    <div id="assetsGridReviewed" class="orders-grid" style="display:none;"></div>
+
+    <div id="endOfList" style="text-align:center;margin:20px 0;color:#6b7280;">
+      End of assets list
+    </div>
+  </section>
+</main>
   </div>
 </div>
 
