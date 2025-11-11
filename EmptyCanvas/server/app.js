@@ -2870,14 +2870,23 @@ app.get('/api/sv-assets', requireAuth, requirePage('S.V Schools Assets'), async 
             f?.type === 'external' ? f.external.url : f.file.url
           );
         }
+// قراءة S.V Comment إن وجد
+const svCommentKey = Object.keys(props).find(k =>
+  k.toLowerCase().includes("s.v comment") || k.toLowerCase().includes("sv comment")
+);
+const svComment =
+  svCommentKey && props[svCommentKey]?.rich_text?.length
+    ? props[svCommentKey].rich_text.map(t => t.plain_text || "").join(" ").trim()
+    : "";
 
-        items.push({
-          id: page.id,
-          title,
-          reason,
-          createdTime,
-          files,
-        });
+items.push({
+  id: page.id,
+  title,
+  reason,
+  createdTime,
+  files,
+  "S.V Comment": svComment,
+});
       }
 
       hasMore = resp.has_more;
