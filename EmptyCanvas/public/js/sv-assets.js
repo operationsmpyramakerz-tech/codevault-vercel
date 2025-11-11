@@ -116,53 +116,36 @@
 
   // ---------- render ----------
   function render() {
-    els.grid.innerHTML = "";
-    if (!state.groups.length) {
-      show(els.empty);
-      els.total.textContent = "";
-      featherSafeReplace();
-      return;
-    }
-    hide(els.empty);
-    els.total.textContent = `${state.groups.length} batch${state.groups.length > 1 ? 'es' : ''}`;
+  const notStartedGrid = document.getElementById("assetsGridNotStarted");
+  const reviewedGrid = document.getElementById("assetsGridReviewed");
 
-    for (const g of state.groups) els.grid.appendChild(renderBatchCard(g));
+  notStartedGrid.innerHTML = "";
+  reviewedGrid.innerHTML = "";
+
+  if (!state.groups.length) {
+    show(els.empty);
+    els.total.textContent = "";
     featherSafeReplace();
+    return;
   }
 
-  function renderBatchCard(group) {
-    const card = document.createElement("article");
-    card.className = "order-card";
-    const count = group.items?.length || 0;
-    const when = fmtDateTime(group.createdAt);
+  hide(els.empty);
 
-    card.innerHTML = `
-      <div class="order-card__header" style="display:flex;justify-content:space-between;align-items:center;">
-        <div style="display:flex;gap:10px;align-items:center;">
-          <span class="badge badge--pill"><i data-feather="clock"></i></span>
-          <div>
-            <h3 style="margin:0;font-size:1.05rem;">Batch at ${when}</h3>
-            <div class="muted">${count} component${count !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
-        <button class="btn btn-ghost btn-sm" data-expand><i data-feather="chevron-down"></i></button>
-      </div>
-      <div class="order-card__body" data-body style="display:block;margin-top:10px;">
-        ${renderItemsTable(group.items)}
-      </div>
-    `;
+  let notStarted = [];
+  let reviewed = [];
 
-    const body = card.querySelector("[data-body]");
-    const btnExpand = card.querySelector("[data-expand]");
-    if (btnExpand && body) {
-      btnExpand.addEventListener("click", () => {
-        const isHidden = body.style.display === "none";
-        body.style.display = isHidden ? "block" : "none";
-        btnExpand.innerHTML = isHidden
-          ? '<i data-feather="chevron-down"></i>'
-          : '<i data-feather="chevron-right"></i>';
-        featherSafeReplace();
-      });
+  for (const g of state.groups) {
+    const hasUncommented = g.items.some(it => !it["S.V Comment"] || it["S.V Comment"].trim() === "");
+    if (hasUncommented) notStarted.push(g);
+    else reviewed.push(g);
+  }
+
+  notStarted.forEach(g => notStartedGrid.appendChild(renderBatchCard(g)));
+  reviewed.forEach(g => reviewedGrid.appendChild(renderBatchCard(g)));
+
+  els.total.textContent = `${state.groups.length} batch${state.groups.length > 1 ? 'es' : ''}`;
+  featherSafeReplace();
+});
     }
     return card;
   }
@@ -281,4 +264,29 @@
     fetchAssets();
     wireEvents();
   });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const tabNotStarted = document.getElementById("tabNotStarted");
+  const tabReviewed = document.getElementById("tabReviewed");
+  const gridNotStarted = document.getElementById("assetsGridNotStarted");
+  const gridReviewed = document.getElementById("assetsGridReviewed");
+
+  function switchTab(tab) {
+    if (tab === "not") {
+      tabNotStarted.classList.add("active");
+      tabReviewed.classList.remove("active");
+      gridNotStarted.style.display = "";
+      gridReviewed.style.display = "none";
+    } else {
+      tabNotStarted.classList.remove("active");
+      tabReviewed.classList.add("active");
+      gridNotStarted.style.display = "none";
+      gridReviewed.style.display = "";
+    }
+    feather.replace();
+  }
+
+  tabNotStarted.addEventListener("click", () => switchTab("not"));
+  tabReviewed.addEventListener("click", () => switchTab("rev"));
+});
 })();
