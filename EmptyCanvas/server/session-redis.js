@@ -1,38 +1,50 @@
+// server/session.js  أو  server/app.js
 const session = require("express-session");
 const RedisStore = require("connect-redis").default;
-const { createClient } = require("redis");
+const { Redis } = require("@upstash/redis");
 
-// Robust session config for Vercel (Upstash Redis) with safe fallback
+// 🔹 تأكد إن القيم موجودة في Vercel
 const hasSecret = !!process.env.SESSION_SECRET;
-const hasUrl = !!process.env.UPSTASH_REDIS_URL;
+const hasUrl = !!process.env.UPSTASH_REDIS_REST_URL;
+const hasToken = !!process.env.UPSTASH_REDIS_REST_TOKEN;
 
 let store = null;
-if (hasSecret && hasUrl) {
+
+if (hasSecret && hasUrl && hasToken) {
   try {
-    const redisClient = createClient({
-      url: process.env.UPSTASH_REDIS_URL, // must be rediss://
-      socket: { tls: true, keepAlive: 30000 },
+    // ✅ استخدم REST API بدلاً من TCP socket
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
     });
-    redisClient.on("error", (err) => console.error("[Redis] error", err?.message || err));
-    redisClient.on("connect", () => console.log("[Redis] connecting..."));
-    redisClient.on("ready", () => console.log("[Redis] ready ✓"));
-    // connect lazily; don't await
-    redisClient.connect().catch((e) => console.error("[Redis] connect failed:", e?.message || e));
-    store = new RedisStore({ client: redisClient, prefix: "op:" });
+
+    // لا يوجد connect() هنا — REST client مش socket
+    store = new RedisStore({
+      client: {
+        get: async (key) => await redis.get(key),
+        set: async (key, val, ttl) => await redis.set(key, val, { ex: ttl }),
+        del: async (key) => await redis.del(key),
+      },
+      prefix: "op:",
+    });
+
+    console.log("[Redis] Connected to Upstash via REST ✓");
   } catch (e) {
     console.error("[session-redis] Failed to init RedisStore:", e?.message || e);
   }
 } else {
   console.warn("[session-redis] Missing env; using MemoryStore TEMPORARILY for debugging.", {
     SESSION_SECRET: hasSecret ? "OK" : "MISSING",
-    UPSTASH_REDIS_URL: hasUrl ? "OK" : "MISSING",
+    UPSTASH_REDIS_REST_URL: hasUrl ? "OK" : "MISSING",
+    UPSTASH_REDIS_REST_TOKEN: hasToken ? "OK" : "MISSING",
   });
 }
 
+// ✅ إعداد الـ Session
 const sessionMiddleware = session({
-  store: store || undefined, // MemoryStore if not provided (not for production)
+  store: store || undefined,
   secret: process.env.SESSION_SECRET || "dev-fallback-secret",
-  proxy: true, // trust reverse proxy for secure cookies
+  proxy: true,
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -40,9 +52,9 @@ const sessionMiddleware = session({
   cookie: {
     httpOnly: true,
     sameSite: "lax",
-    secure: "auto", // secure on HTTPS (Vercel), not on local HTTP
+    secure: "auto",
     path: "/",
-    maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+    maxAge: 1000 * 60 * 60 * 24 * 30, // 30 يوم
   },
 });
 
