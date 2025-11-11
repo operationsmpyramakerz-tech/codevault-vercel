@@ -124,7 +124,7 @@
       return;
     }
     hide(els.empty);
-    els.total.textContent = `${state.groups.length} batch${state.groups.length>1?'es':''}`;
+    els.total.textContent = `${state.groups.length} batch${state.groups.length > 1 ? 'es' : ''}`;
 
     for (const g of state.groups) els.grid.appendChild(renderBatchCard(g));
     featherSafeReplace();
@@ -142,90 +142,7 @@
           <span class="badge badge--pill"><i data-feather="clock"></i></span>
           <div>
             <h3 style="margin:0;font-size:1.05rem;">Batch at ${when}</h3>
-            <div class="muted">${count} componentfunction renderItemsTable(items) {
-  if (!items || !items.length) return `<div class="muted">No components in this batch.</div>`;
-  const rows = items.map((it, i) => {
-    const name = it.productName || it.product?.name || it.product?.title || "—";
-    const qty  = it.qty ?? it.quantity ?? 1;
-    const note = it.note || it.reason || "";
-    const files = Array.isArray(it.files) ? it.files : [];
-    const filesHtml = files.length
-      ? files.map(f => `<span class="chip" title="${f.name || 'file'}"><i data-feather="paperclip"></i> ${f.name || 'file'}</span>`).join(" ")
-      : "";
-
-    // خانة S.V Comment
-    const commentInputId = `sv-comment-${it.id}`;
-    const existingComment = it["S.V Comment"] || it.svComment || ""; // ← تحقق من وجود تعليق مسبق
-    const isLocked = existingComment && existingComment.trim().length > 0;
-
-    return `
-      <tr>
-        <td style="width:36px;text-align:right;">${i+1}</td>
-        <td>${name}</td>
-        <td style="white-space:nowrap;text-align:center;">${qty}</td>
-        <td>${note}</td>
-        <td style="white-space:nowrap;">${filesHtml}</td>
-        <td>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <input type="text" id="${commentInputId}" 
-                   placeholder="S.V Comment"
-                   value="${existingComment || ''}"
-                   ${isLocked ? 'disabled' : ''}
-                   style="flex:1; padding:4px 6px; border:1px solid #ccc; border-radius:6px; background:${isLocked ? '#f5f5f5' : 'white'};">
-            <button class="btn btn-sm btn-primary" 
-                    data-send-comment data-id="${it.id}" data-input="${commentInputId}"
-                    ${isLocked ? 'disabled' : ''}>${isLocked ? 'Saved' : 'Send'}</button>
-          </div>
-        </td>
-      </tr>`;
-  }).join("");
-
-  // الجدول مع عمود إضافي
-  setTimeout(() => {
-    document.querySelectorAll("[data-send-comment]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (btn.disabled) return;
-        const pageId = btn.dataset.id;
-        const inputId = btn.dataset.input;
-        const input = document.getElementById(inputId);
-        const comment = input.value.trim();
-        if (!comment) return showToast("Please enter a comment before sending.", "warning");
-
-        btn.disabled = true;
-        input.disabled = true;
-        btn.textContent = "Sending...";
-        try {
-          const res = await fetch(`/api/sv-assets/${pageId}/comment`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ comment }),
-          });
-          const j = await res.json();
-          if (!res.ok || !j.ok) throw new Error(j.error || "Failed to save comment");
-          showToast("Comment saved successfully!", "success");
-          btn.textContent = "Saved";
-          input.style.background = "#f5f5f5";
-        } catch (e) {
-          console.error(e);
-          showToast("Failed to send comment", "error");
-          btn.disabled = false;
-          input.disabled = false;
-          btn.textContent = "Send";
-        }
-      });
-    });
-  }, 100);
-
-  return `
-    <div class="table-responsive">
-      <table class="table">
-        <thead>
-          <tr><th>#</th><th>Product</th><th>Qty</th><th>Note</th><th>Files</th><th>S.V Comment</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-}${count!==1?'s':''}</div>
+            <div class="muted">${count} component${count !== 1 ? 's' : ''}</div>
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" data-expand><i data-feather="chevron-down"></i></button>
@@ -250,23 +167,87 @@
     return card;
   }
 
+  function renderItemsTable(items) {
+    if (!items || !items.length) return `<div class="muted">No components in this batch.</div>`;
+    const rows = items.map((it, i) => {
+      const name = it.productName || it.product?.name || it.product?.title || "—";
+      const qty = it.qty ?? it.quantity ?? 1;
+      const note = it.note || it.reason || "";
+      const files = Array.isArray(it.files) ? it.files : [];
+      const filesHtml = files.length
+        ? files.map(f => `<span class="chip" title="${f.name || 'file'}"><i data-feather="paperclip"></i> ${f.name || 'file'}</span>`).join(" ")
+        : "";
 
-  // ★ NEW: handle comment send
-  async function updateSVComment(recordId, commentText) {
-    if (!recordId) return;
-    try {
-      const res = await fetch("/api/update-sv-comment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: recordId, comment: commentText }),
+      const commentInputId = `sv-comment-${it.id}`;
+      const existingComment = it["S.V Comment"] || it.svComment || "";
+      const isLocked = existingComment && existingComment.trim().length > 0;
+
+      return `
+        <tr>
+          <td style="width:36px;text-align:right;">${i + 1}</td>
+          <td>${name}</td>
+          <td style="white-space:nowrap;text-align:center;">${qty}</td>
+          <td>${note}</td>
+          <td style="white-space:nowrap;">${filesHtml}</td>
+          <td>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="text" id="${commentInputId}"
+                     placeholder="S.V Comment"
+                     value="${existingComment || ''}"
+                     ${isLocked ? 'disabled' : ''}
+                     style="flex:1; padding:4px 6px; border:1px solid #ccc; border-radius:6px; background:${isLocked ? '#f5f5f5' : 'white'};">
+              <button class="btn btn-sm btn-primary"
+                      data-send-comment data-id="${it.id}" data-input="${commentInputId}"
+                      ${isLocked ? 'disabled' : ''}>${isLocked ? 'Saved' : 'Send'}</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join("");
+
+    setTimeout(() => {
+      document.querySelectorAll("[data-send-comment]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (btn.disabled) return;
+          const pageId = btn.dataset.id;
+          const inputId = btn.dataset.input;
+          const input = document.getElementById(inputId);
+          const comment = input.value.trim();
+          if (!comment) return showToast("Please enter a comment before sending.", "warning");
+
+          btn.disabled = true;
+          input.disabled = true;
+          btn.textContent = "Sending...";
+          try {
+            const res = await fetch(`/api/sv-assets/${pageId}/comment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ comment }),
+            });
+            const j = await res.json();
+            if (!res.ok || !j.ok) throw new Error(j.error || "Failed to save comment");
+            showToast("Comment saved successfully!", "success");
+            btn.textContent = "Saved";
+            input.style.background = "#f5f5f5";
+          } catch (e) {
+            console.error(e);
+            showToast("Failed to send comment", "error");
+            btn.disabled = false;
+            input.disabled = false;
+            btn.textContent = "Send";
+          }
+        });
       });
-      const j = await res.json();
-      if (!res.ok || !j.success) throw new Error(j.error || "Update failed");
-      showToast("Comment updated ✅", "success");
-    } catch (err) {
-      console.error(err);
-      showToast(err.message || "Failed to update comment", "error");
-    }
+    }, 100);
+
+    return `
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr><th>#</th><th>Product</th><th>Qty</th><th>Note</th><th>Files</th><th>S.V Comment</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   }
 
   function updateFetchStatus() {
@@ -276,7 +257,6 @@
     else els.fetchStatus.textContent = "";
   }
 
-  // ---------- events ----------
   function wireEvents() {
     if (els.search) {
       let t = null;
@@ -287,21 +267,8 @@
       });
     }
     if (els.refresh) els.refresh.addEventListener("click", fetchAssets);
-
-    // ★ listen to Send buttons dynamically
-    document.addEventListener("click", (e) => {
-      if (e.target.classList.contains("sv-comment-send")) {
-        const row = e.target.closest("tr");
-        const id = row?.dataset?.id;
-        const input = row?.querySelector(".sv-comment-input");
-        const value = input?.value?.trim() || "";
-        if (!id) return showToast("Missing record ID", "error");
-        updateSVComment(id, value);
-      }
-    });
   }
 
-  // ---------- init ----------
   document.addEventListener("DOMContentLoaded", () => {
     els.grid = $("#assetsGrid");
     els.loader = $("#assetsLoader");
