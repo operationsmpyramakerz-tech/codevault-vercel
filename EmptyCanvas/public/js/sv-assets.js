@@ -145,7 +145,6 @@
 
   els.total.textContent = `${state.groups.length} batch${state.groups.length > 1 ? 'es' : ''}`;
   featherSafeReplace();
-});
     }
     return card;
   }
@@ -253,7 +252,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    els.grid = $("#assetsGrid");
+    els.grid = null;
     els.loader = $("#assetsLoader");
     els.empty = $("#emptyState");
     els.total = $("#totalBatches");
@@ -261,12 +260,7 @@
     els.search = $("#assetsSearch");
     els.refresh = $("#refreshBtn");
 
-    fetchAssets();
-    wireEvents();
-  });
-
-document.addEventListener("DOMContentLoaded", () => {
-  const tabNotStarted = document.getElementById("tabNotStarted");
+    const tabNotStarted = document.getElementById("tabNotStarted");
   const tabReviewed = document.getElementById("tabReviewed");
   const gridNotStarted = document.getElementById("assetsGridNotStarted");
   const gridReviewed = document.getElementById("assetsGridReviewed");
@@ -288,5 +282,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   tabNotStarted.addEventListener("click", () => switchTab("not"));
   tabReviewed.addEventListener("click", () => switchTab("rev"));
-});
-})();
+
+    fetchAssets();
+    wireEvents();
+  });
+
+  
