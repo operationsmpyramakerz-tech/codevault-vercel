@@ -5,13 +5,11 @@
   const state = {
     q: "",
     loading: false,
-    groups: [],  // [{ key, createdAt, items: [...] }]
+    groups: [],
     lastFetchAt: null,
   };
 
   const els = {};
-
-  // ---------- utils ----------
   function $(sel) { return document.querySelector(sel); }
   function show(el) { if (el) el.style.display = ""; }
   function hide(el) { if (el) el.style.display = "none"; }
@@ -30,7 +28,6 @@
     } catch { return String(d || ""); }
   }
 
-  // round to minute (fallback key if no batchId comes from server)
   function minuteKey(iso) {
     const d = new Date(iso || Date.now());
     const y = d.getUTCFullYear();
@@ -43,7 +40,7 @@
 
   function featherSafeReplace() { try { feather.replace(); } catch {} }
 
-  // ---------- fetch & adapt ----------
+  // ---------- fetch ----------
   async function fetchAssets() {
     state.loading = true;
     updateFetchStatus();
@@ -59,17 +56,13 @@
       const j = await r.json();
 
       let groups = [];
-
-      // (A) Already grouped from server: { ok:true, groups:[{ key/batchId/createdAt, items:[] }] }
       if (Array.isArray(j.groups)) {
         groups = j.groups.map(g => ({
           key: g.key || g.batchId || g.createdAt || minuteKey(g.createdAt || Date.now()),
-          createdAt: g.createdAt || g.key || g.batchId || Date.now(),
+          createdAt: g.createdAt || Date.now(),
           items: Array.isArray(g.items) ? g.items : [],
         }));
-      }
-      // (B) Flat rows: { ok:true, rows:[{ id, productName, qty, note, createdAt, batchId, files:[] }] }
-      else if (Array.isArray(j.rows)) {
+      } else if (Array.isArray(j.rows)) {
         const map = new Map();
         for (const row of j.rows) {
           const key = row.batchId || minuteKey(row.createdAt);
@@ -77,9 +70,7 @@
           map.get(key).items.push(row);
         }
         groups = Array.from(map.values());
-      }
-      // (C) Plain array
-      else if (Array.isArray(j)) {
+      } else if (Array.isArray(j)) {
         const map = new Map();
         for (const row of j) {
           const key = row.batchId || minuteKey(row.createdAt);
@@ -87,11 +78,8 @@
           map.get(key).items.push(row);
         }
         groups = Array.from(map.values());
-      } else {
-        throw new Error(j.error || "Unexpected response");
-      }
+      } else throw new Error(j.error || "Unexpected response");
 
-      // client-side search filter
       const q = state.q.trim().toLowerCase();
       if (q) {
         groups = groups
@@ -99,9 +87,10 @@
             ...g,
             items: g.items.filter(it => {
               const s = [
-                it.productName || it.product?.name || "",
-                it.note || it.reason || "",
-                it.createdAt || ""
+                it.productName || "",
+                it.note || "",
+                it.createdAt || "",
+                it["S.V Comment"] || ""
               ].join(" ").toLowerCase();
               return s.includes(q);
             })
@@ -109,7 +98,6 @@
           .filter(g => g.items.length);
       }
 
-      // newest first
       groups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       state.groups = groups;
       state.lastFetchAt = new Date();
@@ -136,7 +124,7 @@
       return;
     }
     hide(els.empty);
-    els.total.textContent = `${state.groups.length} batch${state.groups.length>1?'es':''}`;
+    els.total.textContent = `${state.groups.length} batch${state.groups.length > 1 ? 'es' : ''}`;
 
     for (const g of state.groups) els.grid.appendChild(renderBatchCard(g));
     featherSafeReplace();
@@ -145,24 +133,19 @@
   function renderBatchCard(group) {
     const card = document.createElement("article");
     card.className = "order-card";
-    card.style.borderRadius = "16px";
-    card.style.boxShadow = "0 8px 20px rgba(0,0,0,.06)";
-
     const count = group.items?.length || 0;
     const when = fmtDateTime(group.createdAt);
 
     card.innerHTML = `
-      <div class="order-card__header" style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
+      <div class="order-card__header" style="display:flex;justify-content:space-between;align-items:center;">
         <div style="display:flex;gap:10px;align-items:center;">
           <span class="badge badge--pill"><i data-feather="clock"></i></span>
           <div>
             <h3 style="margin:0;font-size:1.05rem;">Batch at ${when}</h3>
-            <div class="muted">${count} component${count!==1?'s':''}</div>
+            <div class="muted">${count} component${count !== 1 ? 's' : ''}</div>
           </div>
         </div>
-        <div>
-          <button class="btn btn-ghost btn-sm" data-expand><i data-feather="chevron-down"></i></button>
-        </div>
+        <button class="btn btn-ghost btn-sm" data-expand><i data-feather="chevron-down"></i></button>
       </div>
       <div class="order-card__body" data-body style="display:block;margin-top:10px;">
         ${renderItemsTable(group.items)}
@@ -175,12 +158,12 @@
       btnExpand.addEventListener("click", () => {
         const isHidden = body.style.display === "none";
         body.style.display = isHidden ? "block" : "none";
-        btnExpand.innerHTML = isHidden ? '<i data-feather="chevron-down"></i>'
-                                       : '<i data-feather="chevron-right"></i>';
+        btnExpand.innerHTML = isHidden
+          ? '<i data-feather="chevron-down"></i>'
+          : '<i data-feather="chevron-right"></i>';
         featherSafeReplace();
       });
     }
-
     return card;
   }
 
@@ -188,27 +171,79 @@
     if (!items || !items.length) return `<div class="muted">No components in this batch.</div>`;
     const rows = items.map((it, i) => {
       const name = it.productName || it.product?.name || it.product?.title || "—";
-      const qty  = it.qty ?? it.quantity ?? 1;
+      const qty = it.qty ?? it.quantity ?? 1;
       const note = it.note || it.reason || "";
       const files = Array.isArray(it.files) ? it.files : [];
       const filesHtml = files.length
         ? files.map(f => `<span class="chip" title="${f.name || 'file'}"><i data-feather="paperclip"></i> ${f.name || 'file'}</span>`).join(" ")
         : "";
+
+      const commentInputId = `sv-comment-${it.id}`;
+      const existingComment = it["S.V Comment"] || it.svComment || "";
+      const isLocked = existingComment && existingComment.trim().length > 0;
+
       return `
         <tr>
-          <td style="width:36px;text-align:right;">${i+1}</td>
+          <td style="width:36px;text-align:right;">${i + 1}</td>
           <td>${name}</td>
           <td style="white-space:nowrap;text-align:center;">${qty}</td>
           <td>${note}</td>
           <td style="white-space:nowrap;">${filesHtml}</td>
+          <td>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="text" id="${commentInputId}"
+                     placeholder="S.V Comment"
+                     value="${existingComment || ''}"
+                     ${isLocked ? 'disabled' : ''}
+                     style="flex:1; padding:4px 6px; border:1px solid #ccc; border-radius:6px; background:${isLocked ? '#f5f5f5' : 'white'};">
+              <button class="btn btn-sm btn-primary"
+                      data-send-comment data-id="${it.id}" data-input="${commentInputId}"
+                      ${isLocked ? 'disabled' : ''}>${isLocked ? 'Saved' : 'Send'}</button>
+            </div>
+          </td>
         </tr>`;
     }).join("");
+
+    setTimeout(() => {
+      document.querySelectorAll("[data-send-comment]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          if (btn.disabled) return;
+          const pageId = btn.dataset.id;
+          const inputId = btn.dataset.input;
+          const input = document.getElementById(inputId);
+          const comment = input.value.trim();
+          if (!comment) return showToast("Please enter a comment before sending.", "warning");
+
+          btn.disabled = true;
+          input.disabled = true;
+          btn.textContent = "Sending...";
+          try {
+            const res = await fetch(`/api/sv-assets/${pageId}/comment`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ comment }),
+            });
+            const j = await res.json();
+            if (!res.ok || !j.ok) throw new Error(j.error || "Failed to save comment");
+            showToast("Comment saved successfully!", "success");
+            btn.textContent = "Saved";
+            input.style.background = "#f5f5f5";
+          } catch (e) {
+            console.error(e);
+            showToast("Failed to send comment", "error");
+            btn.disabled = false;
+            input.disabled = false;
+            btn.textContent = "Send";
+          }
+        });
+      });
+    }, 100);
 
     return `
       <div class="table-responsive">
         <table class="table">
           <thead>
-            <tr><th>#</th><th>Product</th><th>Qty</th><th>Note</th><th>Files</th></tr>
+            <tr><th>#</th><th>Product</th><th>Qty</th><th>Note</th><th>Files</th><th>S.V Comment</th></tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
@@ -222,7 +257,6 @@
     else els.fetchStatus.textContent = "";
   }
 
-  // ---------- events ----------
   function wireEvents() {
     if (els.search) {
       let t = null;
@@ -232,25 +266,17 @@
         t = setTimeout(fetchAssets, 250);
       });
     }
-
     if (els.refresh) els.refresh.addEventListener("click", fetchAssets);
-
-    const logoutBtn = $("#logoutBtn");
-    if (logoutBtn) logoutBtn.addEventListener("click", async () => {
-      try { await fetch("/api/logout", { method: "POST", credentials: "same-origin" }); } catch {}
-      location.href = "/login";
-    });
   }
 
-  // ---------- init ----------
   document.addEventListener("DOMContentLoaded", () => {
-    els.grid = document.querySelector("#assetsGrid");
-    els.loader = document.querySelector("#assetsLoader");
-    els.empty = document.querySelector("#emptyState");
-    els.total = document.querySelector("#totalBatches");
-    els.fetchStatus = document.querySelector("#fetchStatus");
-    els.search = document.querySelector("#assetsSearch");
-    els.refresh = document.querySelector("#refreshBtn");
+    els.grid = $("#assetsGrid");
+    els.loader = $("#assetsLoader");
+    els.empty = $("#emptyState");
+    els.total = $("#totalBatches");
+    els.fetchStatus = $("#fetchStatus");
+    els.search = $("#assetsSearch");
+    els.refresh = $("#refreshBtn");
 
     fetchAssets();
     wireEvents();
