@@ -135,27 +135,31 @@
     });
 
     btnDownload.addEventListener("click", async () => {
-      try {
-        btnDownload.disabled = true;
-        btnDownload.innerHTML = '<i data-feather="loader"></i>';
-        featherSafeReplace();
-        const pdfUrl = `/api/damaged-assets/${item.id}/pdf`;
-        const a = document.createElement("a");
-        a.href = pdfUrl;
-        a.download = `${item.title || "report"}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        btnDownload.innerHTML = '<i data-feather="download"></i> PDF';
-        btnDownload.disabled = false;
-        featherSafeReplace();
-      } catch (e) {
-        showToast("Failed to download PDF", "error");
-        btnDownload.disabled = false;
-        btnDownload.innerHTML = '<i data-feather="download"></i> PDF';
-        featherSafeReplace();
-      }
-    });
+  try {
+    btnDownload.disabled = true;
+    btnDownload.innerHTML = '<i data-feather="loader"></i>';
+    featherSafeReplace();
+
+    const reportId = item.title; // assuming title or a field contains "DA-xxx"
+    const pdfUrl = `/api/damaged-assets/report/${encodeURIComponent(reportId)}/pdf`;
+
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = `${reportId}_Report.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    btnDownload.innerHTML = '<i data-feather="download"></i> PDF';
+    btnDownload.disabled = false;
+    featherSafeReplace();
+  } catch (e) {
+    showToast("Failed to download PDF", "error");
+    btnDownload.disabled = false;
+    btnDownload.innerHTML = '<i data-feather="download"></i> PDF';
+    featherSafeReplace();
+  }
+});
 
     return card;
   }
