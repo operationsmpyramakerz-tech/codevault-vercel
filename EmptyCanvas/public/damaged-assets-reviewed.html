@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reviewed Damaged Assets</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <h1>Reviewed Damaged Assets</h1>
+      <button id="refreshBtn" class="btn btn-primary">Refresh</button>
+    </header>
+
+    <section id="assetsLoader" class="loader" style="display:none;">Loading...</section>
+    <section id="emptyState" style="display:none;">No reviewed reports found.</section>
+    <section id="assetsGrid" class="assets-grid"></section>
+  </main>
+
+  <script src="https://unpkg.com/feather-icons"></script>
+  <script src="/js/damaged-assets-reviewed.js"></script>
+</body>
+</html>
