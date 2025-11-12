@@ -335,6 +335,9 @@ app.get("/damaged-assets", requireAuth, requirePage("Damaged Assets"), (req, res
 app.get("/sv-assets", requireAuth, requirePage("S.V Schools Assets"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "sv-assets.html"));
 });
+app.get("/damaged-assets-reviewed", requireAuth, requirePage("Damaged Assets"), (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "damaged-assets-reviewed.html"));
+});
 // --- API Routes ---
 
 // Login
@@ -2930,5 +2933,58 @@ app.post('/api/sv-assets/:id/comment', requireAuth, requirePage('S.V Schools Ass
     res.status(500).json({ ok: false, error: 'Failed to save S.V Comment' });
   }
 });
+app.get('/api/damaged-assets/reviewed', requireAuth, requirePage('Damaged Assets'), async (req, res) => {
+  try {
+    if (!damagedAssetsDatabaseId) {
+      return res.status(500).json({ error: 'Database ID not configured.' });
+    }
 
+    const all = [];
+    let startCursor;
+    let hasMore = true;
+
+    while (hasMore) {
+      const resp = await notion.databases.query({
+        database_id: damagedAssetsDatabaseId,
+        start_cursor: startCursor,
+        sorts: [{ timestamp: "created_time", direction: "descending" }],
+      });
+
+      for (const page of resp.results) {
+        const props = page.properties || {};
+        const comment = props["S.V Comment"]?.rich_text?.[0]?.plain_text || "";
+        if (!comment.trim()) continue; // فقط اللي عندهم comment
+
+        const title =
+          props.Name?.title?.[0]?.plain_text ||
+          props.Title?.title?.[0]?.plain_text ||
+          "Untitled";
+
+        let files = [];
+        const fileProp = Object.values(props).find(p => p?.type === 'files');
+        if (fileProp?.files?.length) {
+          files = fileProp.files.map(f =>
+            f?.type === 'external' ? f.external.url : f.file.url
+          );
+        }
+
+        all.push({
+          id: page.id,
+          title,
+          comment,
+          files,
+          createdTime: page.created_time,
+        });
+      }
+
+      hasMore = resp.has_more;
+      startCursor = resp.next_cursor;
+    }
+
+    res.json({ ok: true, rows: all });
+  } catch (e) {
+    console.error('GET /api/damaged-assets/reviewed error:', e?.body || e);
+    res.status(500).json({ ok: false, error: 'Failed to load reviewed assets' });
+  }
+});
 module.exports = app;
