@@ -106,7 +106,14 @@
             <div class="muted">${when}</div>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" data-expand><i data-feather="chevron-down"></i></button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-download data-id="${item.id}">
+            <i data-feather="download"></i> PDF
+          </button>
+          <button class="btn btn-ghost btn-sm" data-expand>
+            <i data-feather="chevron-down"></i>
+          </button>
+        </div>
       </div>
       <div class="order-card__body" data-body style="display:block;margin-top:10px;">
         <p><strong>Comment:</strong> ${item.comment || "(No comment)"}</p>
@@ -116,6 +123,8 @@
 
     const body = card.querySelector("[data-body]");
     const btnExpand = card.querySelector("[data-expand]");
+    const btnDownload = card.querySelector("[data-download]");
+
     btnExpand.addEventListener("click", () => {
       const isHidden = body.style.display === "none";
       body.style.display = isHidden ? "block" : "none";
@@ -123,6 +132,29 @@
         ? '<i data-feather="chevron-down"></i>'
         : '<i data-feather="chevron-right"></i>';
       featherSafeReplace();
+    });
+
+    btnDownload.addEventListener("click", async () => {
+      try {
+        btnDownload.disabled = true;
+        btnDownload.innerHTML = '<i data-feather="loader"></i>';
+        featherSafeReplace();
+        const pdfUrl = `/api/damaged-assets/${item.id}/pdf`;
+        const a = document.createElement("a");
+        a.href = pdfUrl;
+        a.download = `${item.title || "report"}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        btnDownload.innerHTML = '<i data-feather="download"></i> PDF';
+        btnDownload.disabled = false;
+        featherSafeReplace();
+      } catch (e) {
+        showToast("Failed to download PDF", "error");
+        btnDownload.disabled = false;
+        btnDownload.innerHTML = '<i data-feather="download"></i> PDF';
+        featherSafeReplace();
+      }
     });
 
     return card;
