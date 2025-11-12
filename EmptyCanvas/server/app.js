@@ -2989,92 +2989,81 @@ app.get('/api/damaged-assets/reviewed', requireAuth, requirePage('Damaged Assets
 });
 
 // === API: Generate PDF for a reviewed damaged asset ===
-app.get('/api/damaged-assets/:id/pdf', requireAuth, requirePage('Damaged Assets'), async (req, res) => {
+// === Generate one PDF per report (ID), not per component ===
+app.get('/api/damaged-assets/report/:reportId/pdf', requireAuth, requirePage('Damaged Assets'), async (req, res) => {
   try {
-    const pageId = req.params.id;
-    if (!pageId) return res.status(400).json({ error: 'Missing asset ID' });
+    const reportId = req.params.reportId;
+    if (!reportId) return res.status(400).json({ error: 'Missing report ID' });
 
-    const page = await notion.pages.retrieve({ page_id: pageId });
-    const props = page.properties || {};
+    // 1️⃣ Fetch all pages with this ID value
+    const resp = await notion.databases.query({
+      database_id: damagedAssetsDatabaseId,
+      filter: {
+        property: 'ID',
+        rich_text: { equals: reportId }
+      },
+      sorts: [{ timestamp: 'created_time', direction: 'ascending' }],
+    });
 
-    const title =
-      props.Name?.title?.[0]?.plain_text ||
-      props.Title?.title?.[0]?.plain_text ||
-      "Untitled";
-    const comment =
-      props["S.V Comment"]?.rich_text?.[0]?.plain_text ||
-      props["SV Comment"]?.rich_text?.[0]?.plain_text ||
-      "(No comment)";
-    const reason =
-      props["Issue Reason"]?.rich_text?.[0]?.plain_text ||
-      props["Reason"]?.rich_text?.[0]?.plain_text ||
-      "";
-
-    let files = [];
-    const fileProp = Object.values(props).find(p => p?.type === "files");
-    if (fileProp?.files?.length) {
-      files = fileProp.files.map(f =>
-        f?.type === "external" ? f.external.url : f.file.url
-      );
+    if (!resp.results.length) {
+      return res.status(404).json({ error: 'No pages found for this report ID' });
     }
 
-    const fname = `${title.replace(/\s+/g, "_")}_Report.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+    // 2️⃣ Prepare PDF
+    const fname = `${reportId}_Report.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
 
-    const doc = new PDFDocument({ size: "A4", margin: 36 });
+    const doc = new PDFDocument({ size: 'A4', margin: 36 });
     doc.pipe(res);
 
-    // Header
-    doc.font("Helvetica-Bold").fontSize(18).text("Damaged Asset Report", { align: "left" });
+    doc.font('Helvetica-Bold').fontSize(18).text(`Damaged Report (${reportId})`, { align: 'left' });
     doc.moveDown(0.3);
-    doc.font("Helvetica").fontSize(11).fillColor("#555")
+    doc.font('Helvetica').fontSize(10).fillColor('#555')
       .text(`Generated: ${new Date().toLocaleString()}`);
-
-    doc.moveDown(1);
-    doc.font("Helvetica-Bold").fontSize(13).fillColor("#111").text("Asset Title:");
-    doc.font("Helvetica").fontSize(12).text(title || "Untitled");
-    doc.moveDown(0.8);
-
-    if (reason) {
-      doc.font("Helvetica-Bold").fontSize(13).text("Reason:");
-      doc.font("Helvetica").fontSize(12).text(reason);
-      doc.moveDown(0.8);
-    }
-
-    doc.font("Helvetica-Bold").fontSize(13).text("S.V Comment:");
-    doc.font("Helvetica").fontSize(12).text(comment || "(No comment)");
     doc.moveDown(1);
 
-    if (files.length) {
-      doc.font("Helvetica-Bold").fontSize(13).text("Attached Photos:");
+    for (const page of resp.results) {
+      const props = page.properties || {};
+      const title =
+        props.Name?.title?.[0]?.plain_text ||
+        props.Title?.title?.[0]?.plain_text ||
+        'Untitled';
+      const reason =
+        props['Issue Reason']?.rich_text?.[0]?.plain_text ||
+        props['Reason']?.rich_text?.[0]?.plain_text || '';
+      const comment =
+        props['S.V Comment']?.rich_text?.[0]?.plain_text ||
+        props['SV Comment']?.rich_text?.[0]?.plain_text || '';
+
+      doc.font('Helvetica-Bold').fontSize(13).fillColor('#111').text(`Component: ${title}`);
+      if (reason) doc.font('Helvetica').fontSize(12).fillColor('#222').text(`Reason: ${reason}`);
+      if (comment) doc.font('Helvetica').fontSize(12).fillColor('#333').text(`S.V Comment: ${comment}`);
       doc.moveDown(0.5);
-      for (const url of files) {
-        try {
-          const response = await fetch(url);
-          const buffer = await response.arrayBuffer();
-          doc.image(Buffer.from(buffer), {
-            fit: [400, 250],
-            align: "center",
-            valign: "center",
-          });
-          doc.moveDown(0.5);
-        } catch {
-          doc.font("Helvetica").fontSize(10).fillColor("#888")
-            .text(`(Image failed to load: ${url})`);
-          doc.moveDown(0.3);
+
+      const fileProp = Object.values(props).find(p => p?.type === 'files');
+      if (fileProp?.files?.length) {
+        for (const f of fileProp.files) {
+          try {
+            const url = f.type === 'external' ? f.external.url : f.file.url;
+            const response = await fetch(url);
+            const buf = Buffer.from(await response.arrayBuffer());
+            doc.image(buf, { fit: [400, 250], align: 'center', valign: 'center' });
+            doc.moveDown(0.5);
+          } catch {}
         }
       }
+
+      doc.moveDown(1);
+      doc.moveTo(doc.x, doc.y).lineTo(doc.page.width - 36, doc.y).strokeColor('#ccc').stroke();
+      doc.moveDown(1);
     }
 
-    doc.moveDown(1);
-    doc.font("Helvetica").fontSize(10).fillColor("#555")
-      .text("Generated by Pyramakerz Dashboard");
-
+    doc.font('Helvetica').fontSize(10).fillColor('#555').text('Generated by Pyramakerz Dashboard');
     doc.end();
   } catch (e) {
-    console.error("GET /api/damaged-assets/:id/pdf error:", e?.body || e);
-    res.status(500).json({ error: "Failed to generate PDF" });
+    console.error('GET /api/damaged-assets/report/:reportId/pdf error:', e?.body || e);
+    res.status(500).json({ error: 'Failed to generate report PDF' });
   }
 });
 module.exports = app;
