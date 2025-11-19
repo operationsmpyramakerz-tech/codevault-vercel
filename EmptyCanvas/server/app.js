@@ -278,22 +278,21 @@ app.get(
 );
 
 // 3-step order pages
+
 app.get(
   "/orders/new",
   requireAuth,
   requirePage("Create New Order"),
   (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "public", "create-order-details.html"));
-  },
+    return res.redirect("/orders/new/products");
+  }
 );
+
 app.get(
   "/orders/new/products",
   requireAuth,
   requirePage("Create New Order"),
   (req, res) => {
-    if (!req.session.orderDraft || !req.session.orderDraft.reason) {
-      return res.redirect("/orders/new");
-    }
     res.sendFile(path.join(__dirname, "..", "public", "create-order-products.html"));
   },
 );
@@ -303,7 +302,6 @@ app.get(
   requirePage("Create New Order"),
   (req, res) => {
     const d = req.session.orderDraft || {};
-    if (!d.reason) return res.redirect("/orders/new");
     if (!Array.isArray(d.products) || d.products.length === 0) {
       return res.redirect("/orders/new/products");
     }
@@ -462,20 +460,6 @@ app.get(
   requirePage("Create New Order"),
   (req, res) => {
     res.json(req.session.orderDraft || {});
-  },
-);
-app.post(
-  "/api/order-draft/details",
-  requireAuth,
-  requirePage("Create New Order"),
-  (req, res) => {
-    const { reason } = req.body;
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({ error: "Reason is required." });
-    }
-    req.session.orderDraft = req.session.orderDraft || {};
-    req.session.orderDraft.reason = reason.trim();
-    return res.json({ ok: true });
   },
 );
 app.post(
