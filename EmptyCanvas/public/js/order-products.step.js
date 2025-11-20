@@ -126,6 +126,14 @@
     qtyInput.className = 'qty-input';
     qtyCell.appendChild(qtyInput);
 
+    // Reason cell
+const reasonCell = document.createElement('div');
+const reasonInput = document.createElement('input');
+reasonInput.type = 'text';
+reasonInput.placeholder = 'Reason...';
+reasonInput.className = 'reason-input';
+reasonCell.appendChild(reasonInput);
+
     // Actions cell (icon link + remove)
     const actionsCell = document.createElement('div');
     actionsCell.className = 'field actions-cell';
@@ -170,6 +178,7 @@
 
     row.appendChild(productCell);
     row.appendChild(qtyCell);
+    row.appendChild(reasonCell);
     row.appendChild(actionsCell);
     rowsContainer.appendChild(row);
 
@@ -200,8 +209,9 @@
       const selectEl = r.querySelector('select');
       const id = selectEl?.value;
       const qty = Number(r.querySelector('input[type="number"]')?.value);
+      const reason = r.querySelector('.reason-input')?.value.trim() || "";
       if (id && Number.isFinite(qty) && qty > 0) {
-        payload.push({ id, quantity: qty });
+        payload.push({ id, quantity: qty, reason });
       }
     }
 
