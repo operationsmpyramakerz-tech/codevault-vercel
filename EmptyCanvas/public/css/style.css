@@ -411,13 +411,17 @@ body.sidebar-collapsed .sidebar-toggle svg{ transform:rotate(180deg); }
 }
 .create-order-layout .form-row-headers {
   display: grid;
-  grid-template-columns: 1fr 120px 44px;
+  grid-template-columns: 1.6fr 100px 1.2fr 48px; /* نفس الأعمدة بتاعة product-row */
   gap: 12px;
   align-items: center;
   font-size: 0.9rem;
   color: #6B7280;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+.create-order-layout .form-row-headers div:nth-child(4) {
+  visibility: hidden; /* مكان زر X */
 }
 
 .create-order-layout .product-row {
