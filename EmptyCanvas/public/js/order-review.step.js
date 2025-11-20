@@ -105,36 +105,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const draft = await draftRes.json().catch(() => ({}));
     const components = await compRes.json().catch(() => []);
 
-    if (!draft?.reason) {
-      location.replace('/orders/new');
-      return;
-    }
+  
     if (!Array.isArray(draft.products) || draft.products.length === 0) {
       location.replace('/orders/new/products');
       return;
     }
-
-    if (reasonEl) reasonEl.textContent = draft.reason || '-';
     if (totalEl) totalEl.textContent = String(draft.products.length);
 
     const byId = new Map(
       Array.isArray(components) ? components.map(c => [String(c.id), c]) : []
     );
 
-    if (listEl) {
-      listEl.innerHTML = '';
-      draft.products.forEach(p => {
-        const comp = byId.get(String(p.id));
-        const name = comp?.name || 'Unknown product';
+    draft.products.forEach(p => {
+  const comp = byId.get(String(p.id));
+  const name = comp?.name || 'Unknown product';
 
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.innerHTML = `
-          <span class="badge badge--name" title="${escapeHTML(name)}">${escapeHTML(name)}</span>
-          <span class="badge badge--qty">Qty: ${Number(p.quantity) || 0}</span>
-        `;
-        listEl.appendChild(card);
-      });
+  const card = document.createElement('div');
+  card.className = 'product-card';
+
+  card.innerHTML = `
+    <div class="badge badge--name" title="${name}">${name}</div>
+    <div class="badge badge--qty">Qty: ${p.quantity}</div>
+    <div class="badge badge--reason">Reason: ${p.reason ? p.reason : '-'}</div>
+  `;
+
+  listEl.appendChild(card);
+});
     }
 
     showContent();
@@ -167,7 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({})
+          body: JSON.stringify({ products: draft.products })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) throw new Error(data?.message || 'Failed to submit');
