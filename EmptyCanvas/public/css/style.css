@@ -631,7 +631,7 @@ body.sidebar-collapsed .sidebar-toggle svg{ transform:rotate(180deg); }
 
 .create-order-layout .form-row-headers {
   display: grid;
-  grid-template-columns: 1fr 120px 44px;
+ grid-template-columns: 1.6fr 100px 1.2fr 48px;
   gap: 12px;
   align-items: center;
   font-size: 0.9rem;
