@@ -2028,11 +2028,11 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 }
 
 #products-container .product-row .actions-cell {
-  display: inline-flex;  /* أيقونة اللينك + زر الحذف */
+  display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  min-width: 52px;
+  justify-content: center;
+  gap: 10px;
+  min-width: 48px;
 }
 
 /* أيقونة اللينك – نفس القيم اللي بيحطها الـ JS لكن هنا لضمان التخطيط */
@@ -2050,12 +2050,20 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
   background: #EFF6FF;
 }
 
-/* خلى زر الـ X نفس مقاسات الأيقونة لتوازن الشكل */
 #products-container .product-row .icon-btn--x {
-  width: 28px;
-  height: 28px;
-  line-height: 28px;
-  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #ff0000;
+  border: 1px solid #FEE2E2;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+#products-container .product-row .icon-btn--x:hover {
+  background: #d40000;
 }
 
 /* موبايل: صغّر خانة الكمية شوية */
