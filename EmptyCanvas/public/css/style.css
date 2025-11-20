@@ -2038,6 +2038,9 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 
 /* أيقونة اللينك – نفس القيم اللي بيحطها الـ JS لكن هنا لضمان التخطيط */
 #products-container .product-row .product-url-link {
+  margin-left: 6px;              /* تبعد قليلاً عن خانة Reason */
+  transform: translateY(2px);    /* تنزل تحت شوية تبقى مظبوطة بصريًا */
+}
   display: none;         /* هيظهرها الـ JS لما يكون في URL */
   width: 28px;
   height: 28px;
