@@ -2009,7 +2009,7 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 /* ===== Create Order » Products row layout ===== */
 #products-container .product-row {
   display: grid;                          /* 3 أعمدة: المنتج | الكمية | أكشنز */
-  grid-template-columns: 1fr 112px auto;  /* ثبّت عرض خانة الكمية */
+  grid-template-columns: 1.6fr 100px 1.2fr 48px;  /* ثبّت عرض خانة الكمية */
   column-gap: 12px;
   align-items: center;
 }
