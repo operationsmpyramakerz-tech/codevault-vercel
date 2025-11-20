@@ -2013,7 +2013,7 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 /* ===== Create Order » Products row layout ===== */
 #products-container .product-row {
   display: grid;
-  grid-template-columns: 1.6fr 100px 1.5fr 48px;  
+  grid-template-columns: 1.6fr 100px 1.2fr 48px;  
   /* product | qty | reason | actions */
   column-gap: 12px;
   align-items: center;
