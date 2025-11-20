@@ -1544,21 +1544,31 @@ app.post(
         .status(500)
         .json({ success: false, message: "Database IDs are not configured." });
     }
+let { products } = req.body || {};
+if (!Array.isArray(products) || products.length === 0) {
+  const d = req.session.orderDraft;
+  if (d && Array.isArray(d.products) && d.products.length > 0) {
+    products = d.products;
+  }
+}
 
-    let { reason, products } = req.body || {};
-    if (!reason || !Array.isArray(products) || products.length === 0) {
-      const d = req.session.orderDraft;
-      if (d && d.reason && Array.isArray(d.products) && d.products.length > 0) {
-        reason = d.reason;
-        products = d.products;
-      }
-    }
+if (!Array.isArray(products) || products.length === 0) {
+  return res.status(400).json({ success: false, message: "Missing products." });
+}
 
-    if (!reason || !Array.isArray(products) || products.length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing reason or products." });
-    }
+// الآن نتأكد أن كل منتج معه reason خاص به
+const cleanedProducts = products
+  .map(p => ({
+    id: String(p.id),
+    quantity: Number(p.quantity),
+    reason: String(p.reason || "").trim()
+  }))
+  .filter(p => p.id && p.quantity > 0);
+
+if (cleanedProducts.some(p => !p.reason)) {
+  return res.status(400).json({ success: false, message: "Each product must include a reason." });
+}
+    
 
     try {
       const userQuery = await notion.databases.query({
@@ -1576,7 +1586,7 @@ app.post(
           const created = await notion.pages.create({
             parent: { database_id: ordersDatabaseId },
             properties: {
-              Reason: { title: [{ text: { content: reason || "" } }] },
+              Reason: { title: [{ text: { content: product.reason } }] },
               "Quantity Requested": { number: Number(product.quantity) },
               Product: { relation: [{ id: product.id }] },
               "Status": { select: { name: "Pending" } },
@@ -1605,13 +1615,13 @@ app.post(
       );
 
       const recentOrders = creations.map((c) => ({
-        id: c.orderPageId,
-        reason,
-        productName: c.productName,
-        quantity: c.quantity,
-        status: "Pending",
-        createdTime: c.createdTime,
-      }));
+  id: c.orderPageId,
+  reason: c.reason,
+  productName: c.productName,
+  quantity: c.quantity,
+  status: "Pending",
+  createdTime: c.createdTime,
+}));
       req.session.recentOrders = (req.session.recentOrders || []).concat(
         recentOrders,
       );
