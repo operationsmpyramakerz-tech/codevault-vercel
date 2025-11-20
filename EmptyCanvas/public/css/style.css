@@ -2717,3 +2717,20 @@ body.sidebar-mini .container-full-width { padding-left: 24px !important; }
     grid-template-columns: 1fr !important;
     width: 100% !important;
 }
+/* Fix link icon alignment */
+.product-url-link {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 32px !important;
+  height: 32px !important;
+  margin-left: 6px !important;     /* تبعد عن الـ Reason */
+  transform: translateY(1px);       /* تزبطها عموديًا */
+  padding: 0 !important;
+}
+
+.product-url-link i {
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 2;
+}
