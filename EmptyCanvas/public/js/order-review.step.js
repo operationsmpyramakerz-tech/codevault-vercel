@@ -131,8 +131,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   listEl.appendChild(card);
 });
-    }
-
+    
     showContent();
   } catch (error) {
     console.error('Failed to load order review:', error);
