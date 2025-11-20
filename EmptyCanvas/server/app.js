@@ -472,11 +472,12 @@ app.post(
       return res.status(400).json({ error: "No products provided." });
     }
     const clean = products
-      .map((p) => ({
-        id: String(p.id),
-        quantity: Number(p.quantity) || 0,
-      }))
-      .filter((p) => p.id && p.quantity > 0);
+  .map((p) => ({
+    id: String(p.id),
+    quantity: Number(p.quantity) || 0,
+    reason: String(p.reason || "").trim(),   // ← أضف هذا السطر
+  }))
+  .filter((p) => p.id && p.quantity > 0 && p.reason);
 
     if (clean.length === 0) {
       return res
