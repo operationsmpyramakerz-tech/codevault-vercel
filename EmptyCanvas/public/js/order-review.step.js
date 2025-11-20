@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[c]));
 
   showLoading();
-
+let draft = {};
   try {
     // تحميل الدِرافْت + قائمة المنتجات
     const [draftRes, compRes] = await Promise.all([
@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       fetch('/api/components', { credentials: 'same-origin' })
     ]);
 
-    const draft = await draftRes.json().catch(() => ({}));
+    draft = await draftRes.json().catch(() => ({}));
     const components = await compRes.json().catch(() => []);
 
   
