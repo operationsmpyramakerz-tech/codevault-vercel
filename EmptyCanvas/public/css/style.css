@@ -2713,10 +2713,10 @@ body.sidebar-mini .container-full-width { padding-left: 24px !important; }
     padding: 0 1rem !important;
 }
 
-/*.create-order-layout {
+.create-order-layout {
     grid-template-columns: 1fr !important;
     width: 100% !important;
-}*/
+}
 /* Fix link icon alignment */
 .product-url-link {
   display: flex !important;
