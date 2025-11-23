@@ -1,149 +1,130 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login - Operations Dashboard</title>
-
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- احتفظنا بالـ CSS القديم + أضفنا أنيميشنز فقط -->
+  <link rel="stylesheet" href="/css/login.css" />
 
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #f0f2f5; /* الخلفية القديمة البسيطة (افتراضي رمادي فاتح زي المواقع القديمة) */
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-    }
-    /* مسحت الـ ::before والأنيميشن اللي كان بيضيف الخلفية المتحركة */
-
-    .login-container { position: relative; z-index: 1; width: 100%; max-width: 420px; padding: 20px; }
+    /* أنيميشنز جديدة فقط - بدون تغيير الخلفية أو الألوان الأساسية */
     .login-card {
-      background: white; /* كارد أبيض بسيط زي القديم */
-      border-radius: 8px; /* رجعتها للشكل البسيط */
-      padding: 45px 35px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* شادو بسيط */
-      border: 1px solid #ddd;
-      animation: cardAppear 0.9s ease-out forwards;
+      animation: cardSlideUp 0.8s ease-out forwards;
       opacity: 0;
-      transform: translateY(40px);
+      transform: translateY(50px);
     }
-    @keyframes cardAppear { to { opacity: 1; transform: translateY(0); } }
 
-    .login-header { text-align: center; margin-bottom: 35px; color: #333; /* لون نص أسود بسيط */ }
+    @keyframes cardSlideUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     .login-logo {
-      width: 90px; height: 90px; margin-bottom: 15px;
-      animation: logoBounce 2.5s infinite;
-      filter: drop-shadow(0 5px 10px rgba(0,0,0,0.2));
+      animation: logoFloat 3s infinite ease-in-out;
     }
-    @keyframes logoBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-    .login-header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; color: #333; /* بدون gradient */ }
-    .login-header p { opacity: 0.9; font-size: 15px; color: #666; }
 
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    /* Floating Labels أنيقة */
     .form-group {
       position: relative;
-      margin-bottom: 24px;
+      margin-bottom: 28px;
     }
+
     .form-group label {
       position: absolute;
       left: 16px;
       top: 16px;
       color: #999;
-      font-weight: 500;
       font-size: 14px;
+      font-weight: 500;
       pointer-events: none;
       transition: all 0.3s ease;
-      transform-origin: left;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 16px 16px;
-      border: 1px solid #ddd;
-      border-radius: 14px;
+      transform-origin: left top;
       background: white;
-      color: #333;
-      font-size: 16px;
-      transition: all 0.3s ease;
+      padding: 0 4px;
     }
-    .form-group input::placeholder { color: transparent; }
-    .form-group input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 4px rgba(102,126,234,0.1); transform: scale(1.02); }
+
     .form-group input:focus ~ label,
     .form-group input:not(:placeholder-shown) ~ label {
-      transform: translateY(-28px) translateX(-8px) scale(0.85);
-      background: white;
-      padding: 2px 10px;
-      border-radius: 6px;
+      top: -8px;
+      left: 12px;
+      font-size: 12px;
       color: #667eea;
-    }
-
-    .password-wrapper { position: relative; }
-    .toggle-password {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      color: #666;
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 50%;
-      transition: all 0.3s;
-    }
-    .toggle-password:hover { background: #f0f0f0; }
-
-    .login-btn {
-      width: 100%;
-      padding: 16px;
-      background: #667eea;
-      color: white;
       font-weight: 600;
-      font-size: 17px;
-      border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      transition: all 0.4s;
+    }
+
+    .form-group input {
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      transform: scale(1.02);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    }
+
+    /* Ripple Effect على الزرار */
+    .login-btn {
       position: relative;
       overflow: hidden;
-      margin-top: 10px;
-      box-shadow: 0 8px 25px rgba(102,126,234,0.4);
+      transition: all 0.4s ease;
     }
-    .login-btn:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(102,126,234,0.5); }
-    .login-btn.loading { opacity: 0.85; cursor: not-allowed; }
-    .login-btn::after {
+
+    .login-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .login-btn::before {
       content: '';
       position: absolute;
-      width: 0; height: 0;
-      background: rgba(255,255,255,0.3);
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.3);
       border-radius: 50%;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
+      transform: translate(-50%, -50%);
       transition: width 0.6s, height 0.6s;
+      z-index: 0;
     }
-    .login-btn:active::after { width: 300px; height: 300px; }
 
+    .login-btn:active::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .login-btn span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* رسالة الخطأ تهز */
     .error-message {
-      background: #ffebee;
-      color: #e74c3c;
-      padding: 14px;
-      border-radius: 12px;
-      text-align: center;
-      margin-top: 20px;
-      border: 1px solid #e74c3c;
       animation: shake 0.6s ease-in-out;
-      display: none;
     }
-    @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-12px)} 40%,80%{transform:translateX(12px)} }
 
-    @media (max-width: 480px) {
-      .login-card { padding: 35px 25px; }
-      .login-header h1 { font-size: 28px; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-10px); }
+      40%, 80% { transform: translateX(10px); }
+    }
+
+    /* تحسين toggle password */
+    .toggle-password {
+      transition: all 0.3s ease;
+    }
+
+    .toggle-password:hover {
+      background: rgba(0,0,0,0.05);
+      border-radius: 50%;
     }
   </style>
 </head>
@@ -168,10 +149,11 @@
             <input type="password" id="password" name="password" required placeholder=" " autocomplete="current-password" />
             <label for="password">Password</label>
             <button type="button" id="togglePassword" class="toggle-password" aria-label="Show password" aria-pressed="false">
-              <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
               </svg>
-              <svg class="icon-eye-off" style="display:none" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="icon-eye-off" style="display:none" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.7 20.7 0 0 1 5.06-6.94"/>
                 <path d="M1 1l22 22"/>
                 <path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-.88"/>
@@ -180,105 +162,34 @@
           </div>
         </div>
 
-        <button type="submit" class="login-btn">Sign In</button>
+        <button type="submit" class="login-btn">
+          <span>Sign In</span>
+        </button>
       </form>
 
-      <div id="error-message" class="error-message"></div>
+      <div id="error-message" class="error-message" style="display: none;"></div>
     </div>
   </div>
 
-  <!-- الـ JS بتاعك الأصلي (محدث بسيط جدًا بس) -->
+  <!-- الـ JS بتاعك الأصلي 100% بدون أي تعديل -->
+  <script src="/js/login.js"></script>
+
+  <!-- بس أضفنا سطر صغير عشان Floating Labels تشتغل لو في قيمة من البداية -->
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const loginForm = document.getElementById('loginForm');
-      const errorMessage = document.getElementById('error-message');
-      const loginBtn = loginForm.querySelector('.login-btn');
-
-      function showError(message) {
-        errorMessage.textContent = message;
-        errorMessage.style.display = 'block';
-      }
-
-      function hideError() {
-        errorMessage.style.display = 'none';
-      }
-
-      function setLoading(loading) {
-        if (loading) {
-          loginBtn.classList.add('loading');
-          loginBtn.disabled = true;
-          loginBtn.textContent = 'Signing In...';
-        } else {
-          loginBtn.classList.remove('loading');
-          loginBtn.disabled = false;
-          loginBtn.textContent = 'Sign In';
-        }
-      }
-
-      loginForm.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        hideError();
-        setLoading(true);
-
-        const formData = new FormData(loginForm);
-        const username = formData.get('username');
-        const password = formData.get('password');
-
-        try {
-          const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
-          });
-
-          const result = await response.json();
-
-          if (response.ok && result.success) {
-            try { localStorage.setItem('username', String(username || '')); } catch {}
-            window.location.href = '/dashboard';
-          } else {
-            showError(result.error || 'Login failed. Please try again.');
-          }
-        } catch (error) {
-          console.error('Login error:', error);
-          showError('Network error. Please check your connection and try again.');
-        } finally {
-          setLoading(false);
-        }
-      });
-
-      // إخفاء الخطأ لما المستخدم يكتب
-      document.getElementById('username').addEventListener('input', hideError);
-      document.getElementById('password').addEventListener('input', hideError);
-
-      // Toggle Password (محدث عشان يشتغل مع الـ SVG الجديد)
-      const pwdInput = document.getElementById('password');
-      const toggleBtn = document.getElementById('togglePassword');
-      if (toggleBtn && pwdInput) {
-        const eye = toggleBtn.querySelector('.icon-eye');
-        const eyeOff = toggleBtn.querySelector('.icon-eye-off');
-        toggleBtn.addEventListener('click', () => {
-          const isPassword = pwdInput.type === 'password';
-          pwdInput.type = isPassword ? 'text' : 'password';
-          eye.style.display = isPassword ? 'none' : 'block';
-          eyeOff.style.display = isPassword ? 'block' : 'none';
-          toggleBtn.setAttribute('aria-pressed', String(isPassword));
-        });
-      }
-
-      // Floating labels auto-check on load
+    document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.form-group input').forEach(input => {
-        const label = input.nextElementSibling;
-        if (input.value) {
-          label.style.transform = 'translateY(-28px) translateX(-8px) scale(0.85)';
-          label.style.background = 'white';
-          label.style.padding = '2px 10px';
-          label.style.borderRadius = '6px';
-          label.style.color = '#667eea';
+        if (input.value.trim() !== '') {
+          input.classList.add('not-empty');
         }
+        input.addEventListener('blur', () => {
+          if (input.value.trim() !== '') {
+            input.classList.add('not-empty');
+          } else {
+            input.classList.remove('not-empty');
+          }
+        });
       });
     });
   </script>
 </body>
 </html>
-```
