@@ -1,27 +1,27 @@
-/* Logistics (Final Version by Request)
-   - No tabs
-   - Show ALL assigned items for the current user
-   - Each item has:
-        * Received → rec = requested, status = Received by operations
-        * Partial → small inline input → rec = user input, status = Partially received by operations
+/* Logistics with 2 Tabs (Missing / Received)
+   - Missing tab: items that have NOT been received yet  (rec == 0)
+   - Received tab: items that have been received (fully or partially) (rec > 0)
+   - Buttons per item:
+        * Received → rec = requested, status = "Received by operations"
+        * Partial  → user enters quantity, status = "Partially received by operations"
 */
 
 (function () {
-
   // ---------- Helpers ----------
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
   const N  = (v) => Number.isFinite(+v) ? +v : 0;
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => 
-      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
-  );
+  const esc = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
 
   async function postJSON(url, body) {
     const res = await fetch(url, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {})
+      body: JSON.stringify(body || {}),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json().catch(() => ({}));
@@ -30,14 +30,19 @@
   // ---------- DOM ----------
   const grid      = $("#logistics-grid") || $("#assigned-grid") || $("main");
   const searchBox = $("#logisticsSearch") || $("#search");
+  const tabMissing  = $("#tab-missing");
+  const tabReceived = $("#tab-received");
 
   // ---------- State ----------
-  let allItems = [];
+  let allItems   = [];
+  let activeTab  = "missing"; // "missing" | "received"
 
   // ---------- Normalize ----------
   function normalize(it) {
-    const req = N(it.requested ?? it.req);
+    const req   = N(it.requested ?? it.req);
     const avail = N(it.available ?? it.avail);
+    const rec   = N(it.quantityReceivedByOperations ?? it.rec ?? 0);
+
     return {
       id: it.id,
       pageId: it.pageId || it.page_id || it.notionPageId || it.id,
@@ -46,9 +51,9 @@
       productName: it.productName ?? it.product_name ?? "Unnamed",
       requested: req,
       available: avail,
-      remaining: Math.max(0, req - avail),
-      rec: N(it.quantityReceivedByOperations ?? it.rec ?? 0),
-      status: (it.operationsStatus || it.status || "").toLowerCase()
+      rec,
+      remaining: Math.max(0, req - rec),
+      status: (it.operationsStatus || it.status || "").toLowerCase(),
     };
   }
 
@@ -56,7 +61,7 @@
   async function fetchAssigned() {
     const res = await fetch("/api/orders/assigned", {
       credentials: "same-origin",
-      cache: "no-store"
+      cache: "no-store",
     });
     if (!res.ok) throw new Error("Failed to load assigned items");
     const data = await res.json();
@@ -72,11 +77,11 @@
     await postJSON("/api/logistics/mark-received", {
       itemIds: [itemId],
       statusById: { [itemId]: decision },
-      recMap: { [itemId]: value }
+      recMap: { [itemId]: value },
     });
 
     // update local state instantly
-    const it = allItems.find(x => x.id === itemId);
+    const it = allItems.find((x) => x.id === itemId);
     if (it) {
       it.rec = value;
       it.status = decision.toLowerCase();
@@ -93,13 +98,22 @@
 
     const q = (searchBox?.value || "").toLowerCase().trim();
 
-    const view = allItems.filter(it =>
-      it.productName.toLowerCase().includes(q) ||
-      it.reason.toLowerCase().includes(q)
+    // Filter by tab
+    let view = allItems.filter((it) =>
+      activeTab === "missing" ? it.rec <= 0 : it.rec > 0
     );
 
+    // Filter by search
+    if (q) {
+      view = view.filter(
+        (it) =>
+          it.productName.toLowerCase().includes(q) ||
+          it.reason.toLowerCase().includes(q)
+      );
+    }
+
     if (!view.length) {
-      grid.innerHTML = `<p class="empty">No assigned items.</p>`;
+      grid.innerHTML = `<p class="empty">No items.</p>`;
       return;
     }
 
@@ -108,9 +122,9 @@
       row.className = "order-card single-row";
 
       const statusColor =
-        it.status.includes("received")
+        it.rec > 0 && it.remaining === 0
           ? "pill--success"
-          : it.status.includes("partial")
+          : it.rec > 0 && it.remaining > 0
           ? "pill--warning"
           : it.remaining > 0
           ? "pill--danger"
@@ -154,47 +168,83 @@
       grid.appendChild(row);
     }
 
-    wire();
+    wireRowButtons();
   }
 
-  // ---------- Events ----------
-  function wire() {
-    $$(".btn[data-act='full']").forEach(btn => {
+  // ---------- Row buttons events ----------
+  function wireRowButtons() {
+    $$(".btn[data-act='full']").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.dataset.id;
-        const item = allItems.find(x => x.id == id);
+        const item = allItems.find((x) => x.id == id);
         if (item) markReceived(item.id, item.requested, true);
       };
     });
 
-    $$(".btn[data-act='partial']").forEach(btn => {
+    $$(".btn[data-act='partial']").forEach((btn) => {
       btn.onclick = () => {
         const box = $("#ibox-" + btn.dataset.id);
-        box.style.display = box.style.display === "none" ? "block" : "none";
+        if (box) {
+          box.style.display = box.style.display === "none" ? "block" : "none";
+        }
       };
     });
 
-    $$(".btn[data-act='save-partial']").forEach(btn => {
+    $$(".btn[data-act='save-partial']").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.dataset.id;
         const input = $("#input-" + id);
         const val = N(input.value);
         if (val <= 0) return alert("Enter valid quantity");
+        const item = allItems.find((x) => x.id == id);
+        if (!item) return;
+        if (val > item.requested) {
+          return alert("Quantity cannot be more than requested.");
+        }
         markReceived(id, val, false);
       };
     });
   }
 
+  // ---------- Tabs ----------
+  function setActiveTab(tab) {
+    activeTab = tab;
+
+    if (tabMissing) {
+      tabMissing.classList.toggle("active", tab === "missing");
+      tabMissing.setAttribute("aria-pressed", tab === "missing" ? "true" : "false");
+    }
+
+    if (tabReceived) {
+      tabReceived.classList.toggle("active", tab === "received");
+      tabReceived.setAttribute("aria-pressed", tab === "received" ? "true" : "false");
+    }
+
+    render();
+  }
+
   // ---------- Init ----------
   async function init() {
-    allItems = await fetchAssigned();
-    render();
+    try {
+      allItems = await fetchAssigned();
+    } catch (e) {
+      console.error(e);
+      if (grid) grid.innerHTML = '<p class="error">Failed to load items.</p>';
+      return;
+    }
+    setActiveTab("missing"); // default tab
   }
 
   if (searchBox) {
     searchBox.addEventListener("input", render);
   }
 
-  init();
+  if (tabMissing) {
+    tabMissing.addEventListener("click", () => setActiveTab("missing"));
+  }
+  if (tabReceived) {
+    tabReceived.addEventListener("click", () => setActiveTab("received"));
+  }
 
+  init();
 })();
