@@ -2722,9 +2722,9 @@ body.sidebar-mini .container-full-width { padding-left: 24px !important; }
   display: flex !important;
   align-items: center;
   justify-content: center;
-  width: 32px !important;
-  height: 32px !important;
-  margin-left: 40px !important;     /* تبعد عن الـ Reason */
+  width: 25px !important;
+  height: 25px !important;
+  margin-left: 30px !important;     /* تبعد عن الـ Reason */
   transform: translateY(1px);       /* تزبطها عموديًا */
   padding: 0 !important;
 }
