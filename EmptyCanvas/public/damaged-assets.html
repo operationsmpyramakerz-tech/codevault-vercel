@@ -8,6 +8,237 @@
   <!-- نفس ستايل باقي الصفحات -->
   <link rel="stylesheet" href="/css/style.css"/>
   <script src="https://unpkg.com/feather-icons"></script>
+
+  <!-- CSS حديث مشابه للصفحات السابقة -->
+  <style>
+    .create-order-layout { /* استخدم نفس الكلاس للتوافق */
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+    }
+
+    .modern-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 25px -6px rgba(0,0,0,0.08);
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+    }
+
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin: 0;
+      padding: 1.4rem 1.6rem 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert.info {
+      background: #eff6ff;
+      border-left: 4px solid #3b82f6;
+      color: #1e40af;
+      padding: 1rem 1.6rem;
+      margin: 1rem 1.6rem 0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .add-component-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.7rem 1.4rem;
+      border: 2px dashed #94a3b8;
+      background: transparent;
+      color: #475569;
+      border-radius: 12px;
+      font-weight: 600;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .add-component-btn:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+      background: #eff6ff;
+    }
+
+    .expenses-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 0 1.6rem 1rem;
+    }
+
+    .item-entry {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 0.5fr;
+      align-items: start;
+      padding: 1rem 0;
+      border-bottom: 1px solid #f1f5f9;
+      gap: 1rem;
+    }
+
+    .item-entry:last-child {
+      border-bottom: none;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field label {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin-bottom: 0.4rem;
+      font-weight: 500;
+    }
+
+    .field select,
+    .field input[type="text"],
+    .field input[type="file"] {
+      padding: 0.65rem 0.9rem;
+      border: 1.5px solid #d1d5db;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+
+    .field select:focus,
+    .field input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 4px rgba(59,130,246,0.15);
+    }
+
+    .file-input-wrapper {
+      position: relative;
+    }
+
+    .file-input-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.65rem 0.9rem;
+      border: 1.5px dashed #d1d5db;
+      border-radius: 12px;
+      cursor: pointer;
+      color: #64748b;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+
+    .file-input-label:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+
+    .file-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .remove-btn {
+      background: #fef2f2;
+      color: #ef4444;
+      border: none;
+      border-radius: 10px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 1.6rem; /* للتوافق مع الـ labels */
+    }
+
+    .remove-btn:hover {
+      background: #fecaca;
+      transform: scale(1.1);
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+      padding: 1.4rem 1.6rem;
+      background: #f8fafc;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .submit-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0.8rem 1.8rem;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      box-shadow: 0 6px 14px -4px rgba(59,130,246,0.35);
+      transition: all 0.3s;
+    }
+
+    .submit-btn:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      padding: 0.8rem 1.8rem;
+      background: white;
+      border: 1.5px solid #cbd5e1;
+      color: #374151;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .item-entry {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+      }
+
+      .remove-btn {
+        margin-top: 0;
+        align-self: flex-end;
+      }
+
+      .form-actions {
+        flex-direction: column-reverse;
+      }
+
+      .submit-btn,
+      .btn-secondary {
+        width: 100%;
+      }
+    }
+  </style>
 </head>
 <body>
 <script>
@@ -47,17 +278,17 @@
           </a>
         </li>
         <li>
-  <a class="nav-link" href="/sv-assets">
-    <i data-feather="layers"></i>
-    <span class="nav-label">S.V Schools Assets</span>
-  </a>
-</li>
+          <a class="nav-link" href="/sv-assets">
+            <i data-feather="layers"></i>
+            <span class="nav-label">S.V Schools Assets</span>
+          </a>
+        </li>
         <li>
-  <a class="nav-link" href="/damaged-assets-reviewed">
-    <i data-feather="check-circle"></i>
-    <span class="nav-label">Reviewed Damaged Assets</span>
-  </a>
-</li>
+          <a class="nav-link" href="/damaged-assets-reviewed">
+            <i data-feather="check-circle"></i>
+            <span class="nav-label">Reviewed Damaged Assets</span>
+          </a>
+        </li>
       </ul>
     </nav>
 
@@ -94,33 +325,28 @@
       </div>
     </header>
 
-    <main class="container-full-width">
-      <section class="card card--elevated">
-        <div class="card-header">
-          <h2><i data-feather="clipboard"></i> Damage Report</h2>
-          <p class="card-subtitle">Report damaged items and attach evidence</p>
+    <main class="container-full-width create-order-layout">
+      <section class="card modern-card">
+        <h2 class="section-title"><i data-feather="clipboard"></i> Damage Report</h2>
+        <p class="card-subtitle" style="padding: 0 1.6rem; color: #6b7280; font-size: 0.95rem;">Report damaged items and attach evidence</p>
 
-          <!-- تلميحات مهمة للرفع -->
-          <div class="alert info" style="margin-top:10px">
-            <p style="margin:6px 0;">
-              <strong>Note:</strong> Each file must be ≤ <strong>20MB</strong>.
-            </p>
-          </div>
+        <!-- تلميحات -->
+        <div class="alert info">
+          <strong>Note:</strong> Each file must be ≤ <strong>20MB</strong>.
         </div>
 
-        <!-- النموذج متعدد العناصر -->
+        <!-- النموذج -->
         <form id="damagedForm" class="form-container">
-          <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
-            <h3 style="margin:0;display:flex;gap:8px;align-items:center;"><i data-feather="package"></i> Components</h3>
-            <button id="addItemBtn" type="button" class="btn btn-outline-pill"><i data-feather="plus"></i> Add Component</button>
+          <div class="section-header">
+            <h3 style="margin:0; font-size:1.2rem; font-weight:600;">Components</h3>
+            <button id="addItemBtn" type="button" class="add-component-btn"><i data-feather="plus"></i> Add Component</button>
           </div>
 
-          <!-- العناصر بتتبني ديناميكياً من damaged-assets.js -->
           <div id="itemsList" class="expenses-list"></div>
 
           <div class="form-actions">
+            <button type="reset" class="btn-secondary"><i data-feather="x-circle"></i> Clear Form</button>
             <button id="submitBtn" type="submit" class="submit-btn"><i data-feather="save"></i> Submit Report</button>
-            <button type="reset" class="btn btn-secondary"><i data-feather="x-circle"></i> Clear Form</button>
           </div>
         </form>
       </section>
