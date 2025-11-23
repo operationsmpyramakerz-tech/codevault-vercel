@@ -124,18 +124,22 @@ document.addEventListener('DOMContentLoaded', function () {
       const item = document.createElement('div');
       item.className = 'order-item-card';
       item.innerHTML = `
-        <div class="order-item__left">
-          <span class="badge badge--name" title="${escapeHTML(product.productName)}">${escapeHTML(product.productName)}</span>
-        </div>
-        <div class="order-item__right">
-          <span class="badge badge--qty">Qty: ${Number(product.quantity) || 0}</span>
-          <button class="receive-btn ${product.status === 'Received' ? 'received' : ''}"
-                  data-order-id="${product.id}"
-                  ${product.status === 'Received' ? 'disabled' : ''}>
-            ${product.status === 'Received' ? 'Received' : 'Mark as Received'}
-          </button>
-        </div>
-      `;
+        html += `
+  <div class="order-item-card">
+      <div class="order-item__left">
+          <div class="order-item__name">${p.name}</div>
+          <div class="order-item__qty">Qty: ${p.quantity}</div>
+      </div>
+
+      <div class="order-item__right">
+          ${
+            p.received
+              ? `<span class="pill pill-green">Received</span>`
+              : `<span class="pill pill-muted">Not Received</span>`
+          }
+      </div>
+  </div>
+`;
       item.querySelector('.receive-btn').addEventListener('click', markAsReceived);
       list.appendChild(item);
     });
