@@ -37,21 +37,9 @@
   const grid          = $('#logistics-grid') || $('#assigned-grid') || $('main');
   const emptyMsg      = $('#logistics-empty') || $('#assigned-empty');
 
-  const btnPrepared   = $('#lg-btn-prepared');
-  const btnMissing    = $('#lg-btn-missing');
-  const btnPartial    = $('#lg-btn-partial');
-  const btnReceived   = $('#lg-btn-received');
-  const btnDelivered  = $('#lg-btn-delivered');
-
-  const cPrepared   = $('#lg-prepared')  || $('#lg-count-prepared');
-  const cMissing    = $('#lg-missing')   || $('#lg-count-missing');
-  const cPartial    = $('#lg-partial')   || $('#lg-count-partial');
-  const cReceived   = $('#lg-received')  || $('#lg-count-received');
-  const cDelivered  = $('#lg-delivered') || $('#lg-count-delivered');
-
   // ------------ state ------------
   let allItems  = [];
-  let activeTab = (new URLSearchParams(location.search).get('tab') || 'prepared').toLowerCase();
+  let activeTab = "missing";   // أو prepared لو أنت عايز
 
   // ------------ normalize & grouping ------------
   const statusOf   = (it) => S(it.operationsStatus || it.opsStatus || it.status || '').toLowerCase();
@@ -358,8 +346,6 @@ const isPrepared = (it) => {
     }
   }
 
-  [[btnPrepared,'prepared'],[btnMissing,'missing'],[btnPartial,'partial'],[btnReceived,'received'],[btnDelivered,'delivered']]
-    .forEach(([b,t]) => b && b.addEventListener('click', () => { setActiveTab(t); render(); }));
 
   setActiveTab(activeTab);
   searchInput && searchInput.addEventListener('input', render);
