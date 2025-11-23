@@ -2057,7 +2057,7 @@ body.sidebar-mini .sidebar-nav .nav-link .icon {
 #products-container .product-row .icon-btn--x {
   width: 15px;
   height: 15px;
-  border-radius: 999px;
+  border-radius: 300px;
   background: #ff0000;
   border: 1px solid #FEE2E2;
   color: #ffffff;
