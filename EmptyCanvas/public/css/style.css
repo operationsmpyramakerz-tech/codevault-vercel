@@ -411,7 +411,7 @@ body.sidebar-collapsed .sidebar-toggle svg{ transform:rotate(180deg); }
 }
 .create-order-layout .form-row-headers {
   display: grid;
-  grid-template-columns: 1.6fr 200px 1.9fr 48px; /* نفس الأعمدة بتاعة product-row */
+  grid-template-columns: 1.6fr 20px 1.0fr 48px; /* نفس الأعمدة بتاعة product-row */
   gap: 12px;
   align-items: center;
   font-size: 0.9rem;
