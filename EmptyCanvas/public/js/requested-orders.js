@@ -129,7 +129,17 @@ document.addEventListener('DOMContentLoaded', () => {
       allItems = Array.isArray(data) ? data : [];
       // ⬅️ عرض فقط الطلبات اللي الـ S.V Approval = Approved
 allItems = allItems.filter(item => item.svApproval === "Approved");
-      groups = groupOrders(allItems);
+      // كوّن الجروبات
+groups = groupOrders(allItems);
+
+// ➊ داخل كل جروب، احتفظ فقط بالمكوّنات Approved
+groups = groups.map(g => ({
+  ...g,
+  items: g.items.filter(it => it.svApproval === "Approved")
+}));
+
+// ➋ لو بعد الفلترة الجروب فاضي → احذفه
+groups = groups.filter(g => g.items.length > 0);
       render();
     } catch (e) {
       console.error(e);
