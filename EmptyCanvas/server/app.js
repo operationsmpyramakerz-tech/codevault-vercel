@@ -13,7 +13,7 @@ const ordersDatabaseId = process.env.Products_list;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
 const damagedAssetsDatabaseId = process.env.Damaged_Assets;
-const NOTION_VER = process.env.NOTION_VERSION || '2022-06-28'; // المطلوب في أمثلة Notion
+const NOTION_VER = process.env.NOTION_VERSION || '2022-06-28'; // المطلوب في أمثلة Notion 
 // Team Members DB (from ENV)
 const teamMembersDatabaseId =
   process.env.Team_Members ||
@@ -2393,87 +2393,7 @@ app.get("/orders/sv-orders", requireAuth, requirePage("S.V schools orders"), (re
   res.sendFile(path.join(__dirname, "..", "public", "sv-orders.html"));
 });
 
-// ====== API: list S.V orders for current user ======
-app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
-try {
-  // Identify the current Team Member page
-  const userQuery = await notion.databases.query({
-    database_id: teamMembersDatabaseId,
-    filter: { property: 'Name', title: { equals: req.session.username } },
-  });
-  if (!userQuery.results.length) return res.status(404).json({ error: 'User not found' });
-  const userId = userQuery.results[0].id;
 
-  // Resolve property names on Orders DB (Products_list)
-  const reqQtyProp    = await detectRequestedQtyPropName();
-  const approvalProp  = await detectSVApprovalPropName();
-  const teamsProp     = await detectOrderTeamsMembersPropName();
-  let   svRelProp     = await detectSVSchoolsPropName();
-
-  // Verify S.V relation actually exists & is a relation; otherwise null it
-  const ordersProps = await getOrdersDBProps();
-  if (!ordersProps[svRelProp] || ordersProps[svRelProp].type !== 'relation') {
-    svRelProp = null;
-  }
-
-  const items = [];
-  let hasMore = true, startCursor;
-
-  // Primary filter: Teams Members contains current user (this exists per your DB)
-  while (hasMore) {
-    const resp = await notion.databases.query({
-      database_id: ordersDatabaseId,
-      start_cursor: startCursor,
-      filter: {
-  property: svRelProp,   // ← ده العمود S.V Schools اللي جاي من Notion
-  relation: { contains: userId }
-},
-      sorts: [{ timestamp: 'created_time', direction: 'descending' }],
-    });
-
-    for (const page of resp.results) {
-      const props = page.properties || {};
-
-      // If S.V Schools relation exists, enforce it in code too
-      if (svRelProp) {
-        const svArr = props[svRelProp]?.relation;
-        const svHasUser = Array.isArray(svArr) && svArr.some(r => r && r.id === userId);
-        if (!svHasUser) continue;
-      }
-
-      // Product name (from Product relation if present)
-      let productName = 'Item';
-      const productRel = props.Product?.relation;
-      if (Array.isArray(productRel) && productRel.length) {
-        try {
-          const productPage = await notion.pages.retrieve({ page_id: productRel[0].id });
-          productName = productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-        } catch {}
-      } else {
-        productName = props.Name?.title?.[0]?.plain_text || productName;
-      }
-
-      items.push({
-        id: page.id,
-        reason: props.Reason?.title?.[0]?.plain_text || '',
-        productName,
-        quantity: Number(props[reqQtyProp]?.number || 0),
-        approval: props[approvalProp]?.select?.name || props[approvalProp]?.status?.name || '',
-        createdTime: page.created_time,
-      });
-    }
-
-    hasMore = resp.has_more;
-    startCursor = resp.next_cursor;
-  }
-
-  res.set('Cache-Control', 'no-store');
-  return res.json(items);
-} catch (e) {
-  console.error('GET /api/sv-orders error:', e?.body || e);
-  return res.status(500).json({ error: 'Failed to load S.V orders' });
-}
-});
     // ====== API: update quantity (number only) ======
 app.post("/api/sv-orders/:id/quantity", requireAuth, requirePage("S.V schools orders"), async (req, res) => {
   try {
