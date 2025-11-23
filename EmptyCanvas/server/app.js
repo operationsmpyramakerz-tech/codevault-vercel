@@ -2424,7 +2424,10 @@ try {
     const resp = await notion.databases.query({
       database_id: ordersDatabaseId,
       start_cursor: startCursor,
-      filter: { property: teamsProp, relation: { contains: userId } },
+      filter: {
+  property: svRelProp,   // ← ده العمود S.V Schools اللي جاي من Notion
+  relation: { contains: userId }
+},
       sorts: [{ timestamp: 'created_time', direction: 'descending' }],
     });
 
