@@ -411,7 +411,7 @@ body.sidebar-collapsed .sidebar-toggle svg{ transform:rotate(180deg); }
 }
 .create-order-layout .form-row-headers {
   display: grid;
-  grid-template-columns: 1.6fr 100px 1.2fr 48px; /* نفس الأعمدة بتاعة product-row */
+  grid-template-columns: 1.6fr 100px 1.6fr 48px; /* نفس الأعمدة بتاعة product-row */
   gap: 12px;
   align-items: center;
   font-size: 0.9rem;
@@ -774,7 +774,7 @@ body.sidebar-collapsed .main-content { padding-left: 0 !important; }
 @media (min-width: 768px) { .product-cards-grid { grid-template-columns: 1fr 1fr; } }
 
 .product-card {
-  background: var(--surface, #fff);
+  background: var(--surface, #fff);ب
   border: 1px solid #E5E7EB;
   border-radius: 14px;
   padding: .9rem 1rem;
