@@ -706,6 +706,15 @@ app.get(
             assignedToId = assignedRel[0].id;
             assignedToName = await memberName(assignedToId);
           }
+          // 🔥 Filter: show only items where S.V Approval = "Approved"
+const svApproval =
+  props["S.V Approval"]?.select?.name ||
+  props["S.V approval"]?.select?.name ||
+  props["SV Approval"]?.select?.name ||
+  props["S V Approval"]?.select?.name ||
+  "";
+
+if (svApproval !== "Approved") continue;
 
           all.push({
             id: page.id,
