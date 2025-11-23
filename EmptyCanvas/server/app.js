@@ -2442,8 +2442,15 @@ app.get("/api/sv-orders", requireAuth, requirePage("S.V schools orders"), async 
 
     // Build Notion filter
     const andFilter = [
-      { property: teamsProp, relation: { contains: userId } },
-    ];
+  { property: teamsProp, relation: { contains: userId } },
+];
+
+if (svRelProp) {
+  andFilter.push({
+    property: svRelProp,
+    relation: { contains: userId }
+  });
+}
     if (label) {
       if (approvalType === "status") {
         andFilter.push({ property: approvalProp, status: { equals: label } });
