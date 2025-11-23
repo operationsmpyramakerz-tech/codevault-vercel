@@ -127,8 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!r.ok) throw new Error('Failed to fetch requested orders');
       const data = await r.json();
       allItems = Array.isArray(data) ? data : [];
-      // ⬅️ عرض فقط الطلبات اللي الـ S.V Approval = Approved
-allItems = allItems.filter(item => item.svApproval === "Approved");
       // كوّن الجروبات
 groups = groupOrders(allItems);
 
