@@ -119,32 +119,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!r.ok) throw new Error('Failed to load team members');
     teamMembers = await r.json();
   }
-async function loadRequested() {
-  try {
-    const r = await fetch('/api/orders/requested', { credentials: 'same-origin', cache: 'no-store' });
-    if (r.status === 401) { location.href = '/login'; return; }
-    if (!r.ok) throw new Error('Failed to fetch requested orders');
-    const data = await r.json();
-    allItems = Array.isArray(data) ? data : [];
 
-    // كوّن الجروبات
-    groups = groupOrders(allItems);
-
-    // ➊ داخل كل جروب، احتفظ فقط بالمكوّنات Approved
-    groups = groups.map(g => ({
-      ...g,
-      items: g.items.filter(it => it.svApproval === "Approved")
-    }));
-
-    // ➋ لو بعد الفلترة الجروب فاضي → احذفه
-    groups = groups.filter(g => g.items.length > 0);
-
-    render();
-  } catch (e) {
-    console.error(e);
-    listDiv.innerHTML = `<p style="color:#B91C1C;">Error: ${e.message}</p>`;
+  async function loadRequested() {
+    try {
+      const r = await fetch('/api/orders/requested', { credentials: 'same-origin', cache: 'no-store' });
+      if (r.status === 401) { location.href = '/login'; return; }
+      if (!r.ok) throw new Error('Failed to fetch requested orders');
+      const data = await r.json();
+      allItems = Array.isArray(data) ? data : [];
+      groups = groupOrders(allItems);
+      render();
+    } catch (e) {
+      console.error(e);
+      listDiv.innerHTML = `<p style="color:#B91C1C;">Error: ${e.message}</p>`;
+    }
   }
-}
 
   function buildSelectOptions(group) {
     // بناخد أعضاء الفريق
