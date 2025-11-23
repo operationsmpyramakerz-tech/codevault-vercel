@@ -69,20 +69,23 @@
       } catch {}
 
       // prevent full reload — filter in place
-      a.addEventListener("click", (e) => {
-        const targetTab = (a.dataset.tab || "not-started").toLowerCase();
-        if (targetTab && targetTab !== TAB) {
-          e.preventDefault();
-          TAB = targetTab;
-          setActiveTab();
-          applyFilter();
-          render();
-          // update URL without reloading
-          const u = new URL(window.location.href);
-          u.searchParams.set("tab", TAB);
-          history.replaceState({}, "", u.pathname + "?" + u.searchParams.toString());
-        }
-      });
+      a.addEventListener("click", async (e) => {
+  const targetTab = (a.dataset.tab || "not-started").toLowerCase();
+  if (targetTab && targetTab !== TAB) {
+    e.preventDefault();
+    TAB = targetTab;
+    setActiveTab();
+
+    await loadList();   // ⬅⬅⬅ الحل هنا
+
+    applyFilter();
+    render();
+
+    const u = new URL(window.location.href);
+    u.searchParams.set("tab", TAB);
+    history.replaceState({}, "", u.pathname + "?" + u.searchParams.toString());
+  }
+});
     });
   }
 
