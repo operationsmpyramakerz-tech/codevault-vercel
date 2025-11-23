@@ -482,7 +482,7 @@ body.sidebar-collapsed .sidebar-toggle svg{ transform:rotate(180deg); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 500px;
   border: 1px solid #E5E7EB;
   background: #F3F4F6;
   color: #6B7280;
