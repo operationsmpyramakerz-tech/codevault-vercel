@@ -140,7 +140,7 @@ item.innerHTML = `
     }
   </div>
 `;
-      item.querySelector('.receive-btn').addEventListener('click', markAsReceived);
+
       list.appendChild(item);
     });
 
