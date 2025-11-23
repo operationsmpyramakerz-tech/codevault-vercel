@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Create Order — Products</title>
 
-  <!-- Fonts & Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- الأساسيات -->
   <link href="/css/style.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet"/>
-  <script src="https://unpkg.com/feather-icons"></script>
+  <script src="https://unpk.com/feather-icons"></script>
 
   <style>
     :root {
@@ -17,52 +16,72 @@
       --orange-hover: #ea580c;
       --white: #ffffff;
       --black: #0f172a;
-      --gray-100: #f8fafc;
-      --gray-200: #e2e8f0;
-      --gray-300: #cbd5e1;
-      --gray-500: #64748b;
-      --gray-700: #334155;
-      --gray-900: #1e293b;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
       --radius: 12px;
-      --shadow: 0 4px 20px rgba(0,0,0,0.08);
+      --shadow: 0 4px 15px rgba(0,0,0,0.07);
     }
 
     body {
       font-family: 'Inter', sans-serif;
-      background: var(--gray-100);
+      background: var(--gray-50);
       color: var(--gray-900);
+      margin: 0;
+      padding: 0;
     }
 
-    /* تصغير الـ Header كتير */
+    /* تصغير الـ Header تمامًا زي الصورة */
     .main-header {
       background: var(--white);
       padding: 0.75rem 1.5rem;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--gray-200);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1rem;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
-    .header-row1 { display: none; } /* نخفي الـ Greeting الكبير */
-    
     .page-title {
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: 700;
       color: var(--black);
       margin: 0;
     }
 
-    /* Stepper صغير وأنيق */
+    .account-mini {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--gray-700);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .ico-circle img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    /* إخفاء الـ Greeting الكبير تمامًا */
+    .header-row1, .greeting-pill { display: none !important; }
+
+    /* Stepper صغير وأنيق زي الصورة */
     .stepper {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 2rem;
-      margin: 1rem 0 2rem;
+      margin: 2rem 0;
       padding: 0;
       list-style: none;
     }
@@ -76,16 +95,16 @@
     }
 
     .circle {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       background: var(--gray-200);
       color: var(--gray-700);
+      font-weight: 700;
+      font-size: 1.1rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 1rem;
       transition: all 0.3s;
     }
 
@@ -101,7 +120,7 @@
 
     .bar {
       height: 3px;
-      flex: 1;
+      width: 80px;
       background: var(--gray-300);
       border-radius: 2px;
     }
@@ -110,66 +129,70 @@
     .form-card {
       background: var(--white);
       border-radius: var(--radius);
-      padding: 1.5rem;
+      padding: 1.75rem;
       box-shadow: var(--shadow);
       border: 1px solid var(--gray-200);
+      margin: 0 auto;
+      max-width: 1000px;
     }
 
     .form-row-headers {
       display: grid;
-      grid-template-columns: 2.5fr 1fr 1.5fr 100px;
+      grid-template-columns: 2.5fr 1fr 1.5fr 110px;
       gap: 1rem;
       padding: 0.75rem 0;
       font-weight: 600;
       color: var(--gray-700);
       font-size: 0.95rem;
-      border-bottom: 1px solid var(--gray-200);
+      border-bottom: 2px solid var(--gray-200);
       margin-bottom: 1rem;
     }
 
     #products-container {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
+      gap: 0.rem;
     }
 
     .product-row {
       display: grid;
-      grid-template-columns: 2.5fr 1fr 1.5fr 100px;
+      grid-template-columns: 2.5fr 1fr 1.5fr 110px;
       gap: 1rem;
       align-items: center;
-      padding: 0.75rem;
-      background: var(--gray-100);
+      padding: 1rem;
+      background: var(--gray-50);
       border-radius: 10px;
+      margin-bottom: 0.75rem;
       transition: all 0.2s ease;
+      border: 1px solid var(--gray-200);
     }
 
     .product-row:hover {
       background: #fff7ed;
       transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(249,115,22,0.1);
     }
 
+    /* الحقول */
     .field input,
     .choices__inner {
-      height: 48px;
+      height: 52px;
       border: 1.5px solid var(--gray-300);
       border-radius: 10px;
-      padding: 0 14px;
+      padding: 0 16px;
       font-size: 15px;
       transition: all 0.2s;
     }
 
     .field input:focus,
-    .choices__inner:focus {
+    .choices__inner:focus-within {
+      border-color: var(--orange) !important;
+      box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
       outline: none;
-      border-color: var(--orange);
-      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
     }
 
     .choices__inner {
       background: white !important;
-      padding: 0 !important;
     }
 
     /* الأزرار */
@@ -179,7 +202,8 @@
       align-items: center;
       flex-wrap: wrap;
       gap: 1rem;
-      padding-top: 1rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
       border-top: 1px dashed var(--gray-300);
     }
 
@@ -191,40 +215,44 @@
       border-radius: 10px;
       font-weight: 600;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       transition: all 0.3s;
     }
 
     #addProductBtn:hover {
       background: var(--orange);
       color: white;
-      transform: translateY(-2px);
     }
 
     #nextReviewBtn {
       background: var(--orange);
       color: white;
-      padding: 12px 28px;
+      padding: 12px 32px;
       border: none;
       border-radius: 10px;
       font-weight: 600;
       font-size: 15px;
-      box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+      box-shadow: 0 6px 20px rgba(249,115,22,0.3);
       transition: all 0.3s;
     }
 
     #nextReviewBtn:hover {
       background: var(--orange-hover);
       transform: translateY(-3px);
-      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.4);
+      box-shadow: 0 12px 30px rgba(249,115,22,0.4);
     }
 
     .icon-btn--danger {
       background: #fee2e2;
       color: #dc2626;
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
-      font-size: 18px;
+      font-size: 20px;
+      border: none;
+      cursor: pointer;
       transition: all 0.2s;
     }
 
@@ -236,12 +264,14 @@
     .product-url-link {
       background: #fff7ed;
       color: var(--orange);
-      width: 36px;
-      height: 36px;
+      width: 38px;
+      height: 38px;
       border-radius: 50%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      text-decoration: none;
+      transition: all 0.2s;
     }
 
     .product-url-link:hover {
@@ -253,12 +283,12 @@
       background: #fff7ed;
       border: 1px solid #fdba74;
       color: var(--gray-700);
-      padding: 1rem 1.25rem;
+      padding: 1rem 1.5rem;
       border-radius: 10px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-top: 1.5rem;
+      gap: 12px;
+      margin-top: 2rem;
       font-size: 14px;
     }
 
@@ -266,12 +296,11 @@
 
     /* Responsive */
     @media (max-width: 992px) {
-      .form-row-headers,
-      .product-row {
+      .form-row-headers, .product-row {
         grid-template-columns: 1fr;
         gap: 0.75rem;
       }
-      .actions-cell { display: flex; gap: 8px; justify-content: flex-end; }
+      .actions-cell { display: flex; gap: 10px; justify-content: flex-end; }
     }
   </style>
 </head>
@@ -284,7 +313,7 @@
 </script>
 
 <div class="app-container">
-  <!-- Sidebar نفس القديم -->
+  <!-- Sidebar الأصلي بدون تغيير -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
@@ -311,7 +340,7 @@
   </aside>
 
   <div class="main-content">
-    <!-- Header صغير ونظيف -->
+    <!-- Header صغير ونظيف زي الصورة بالضبط -->
     <header class="main-header">
       <h1 class="page-title">Create New Order</h1>
       <a href="/account" class="account-mini">
@@ -344,7 +373,7 @@
           <button id="addProductBtn" type="button">
             <i data-feather="plus"></i><span>Add Another Product</span>
           </button>
-          <div style="display:flex; gap:10px;">
+          <div style="display:flex; gap:12px;">
             <a href="/orders/new" style="padding:10px 20px; border:1.5px solid var(--gray-300); border-radius:10px; color:var(--gray-700); background:white; font-weight:600; text-decoration:none;">
               Back
             </a>
