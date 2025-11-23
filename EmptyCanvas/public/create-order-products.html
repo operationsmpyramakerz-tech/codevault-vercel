@@ -5,319 +5,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Create Order — Products</title>
 
-  <!-- الأساسيات -->
   <link href="/css/style.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" rel="stylesheet"/>
-  <script src="https://unpk.com/feather-icons"></script>
+  <script src="https://unpkg.com/feather-icons"></script>
 
   <style>
-    :root {
-      --orange: #f97316;
-      --orange-hover: #ea580c;
-      --white: #ffffff;
-      --black: #0f172a;
-      --gray-50: #f9fafb;
-      --gray-100: #f3f4f6;
-      --gray-200: #e5e7eb;
-      --gray-300: #d1d5db;
-      --gray-500: #6b7280;
-      --gray-700: #374151;
-      --gray-900: #111827;
-      --radius: 12px;
-      --shadow: 0 4px 15px rgba(0,0,0,0.07);
+    /* أنيميشنز ناعمة بدون تغيير أي لون أو شكل */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--gray-50);
-      color: var(--gray-900);
-      margin: 0;
-      padding: 0;
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
     }
 
-    /* تصغير الـ Header تمامًا زي الصورة */
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    @keyframes bounceIn {
+      0% { opacity: 0; transform: scale(0.3); }
+      50% { opacity: 1; transform: scale(1.05); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); }
+    }
+
+    /* تطبيق الأنيميشن */
     .main-header {
-      background: var(--white);
-      padding: 0.75rem 1.5rem;
-      border-bottom: 1px solid var(--gray-200);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: var(--shadow);
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      animation: slideInLeft 0.7s ease-out;
+    }
+
+    .greeting-pill {
+      animation: bounceIn 0.8s ease-out 0.3s both;
     }
 
     .page-title {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--black);
-      margin: 0;
+      animation: fadeInUp 0.8s ease-out 0.5s both;
     }
 
-    .account-mini {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--gray-700);
-      text-decoration: none;
-      font-weight: 500;
+    .page-stepper {
+      animation: fadeInUp 0.9s ease-out 0.7s both;
     }
 
-    .ico-circle img {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    /* إخفاء الـ Greeting الكبير تمامًا */
-    .header-row1, .greeting-pill { display: none !important; }
-
-    /* Stepper صغير وأنيق زي الصورة */
-    .stepper {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 2rem;
-      margin: 2rem 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .step {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-weight: 600;
-      color: var(--gray-500);
-    }
-
-    .circle {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--gray-200);
-      color: var(--gray-700);
-      font-weight: 700;
-      font-size: 1.1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s;
-    }
-
-    .step.active .circle {
-      background: var(--orange);
-      color: white;
-    }
-
-    .step.active .label {
-      color: var(--black);
-      font-weight: 700;
-    }
-
-    .bar {
-      height: 3px;
-      width: 80px;
-      background: var(--gray-300);
-      border-radius: 2px;
-    }
-
-    /* الكارت الرئيسي */
     .form-card {
-      background: var(--white);
-      border-radius: var(--radius);
-      padding: 1.75rem;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--gray-200);
-      margin: 0 auto;
-      max-width: 1000px;
+      animation: fadeInUp 1s ease-out 0.8s both;
+      opacity: 0;
+      animation-fill-mode: both;
     }
 
-    .form-row-headers {
-      display: grid;
-      grid-template-columns: 2.5fr 1fr 1.5fr 110px;
-      gap: 1rem;
-      padding: 0.75rem 0;
-      font-weight: 600;
-      color: var(--gray-700);
-      font-size: 0.95rem;
-      border-bottom: 2px solid var(--gray-200);
-      margin-bottom: 1rem;
-    }
-
-    #products-container {
-      display: flex;
-      flex-direction: column;
-      gap: 0.rem;
-    }
-
+    /* أنيميشن للصفوف اللي بتضاف */
     .product-row {
-      display: grid;
-      grid-template-columns: 2.5fr 1fr 1.5fr 110px;
-      gap: 1rem;
-      align-items: center;
-      padding: 1rem;
-      background: var(--gray-50);
-      border-radius: 10px;
-      margin-bottom: 0.75rem;
-      transition: all 0.2s ease;
-      border: 1px solid var(--gray-200);
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInUp 0.6s ease-out forwards;
     }
 
-    .product-row:hover {
-      background: #fff7ed;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(249,115,22,0.1);
+    /* أنيميشن عند الضغط على الأزرار */
+    #addProductBtn,
+    #nextReviewBtn,
+    .icon-btn--danger,
+    .product-url-link {
+      transition: all 0.3s ease;
     }
 
-    /* الحقول */
-    .field input,
-    .choices__inner {
-      height: 52px;
-      border: 1.5px solid var(--gray-300);
-      border-radius: 10px;
-      padding: 0 16px;
-      font-size: 15px;
-      transition: all 0.2s;
-    }
-
-    .field input:focus,
-    .choices__inner:focus-within {
-      border-color: var(--orange) !important;
-      box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
-      outline: none;
-    }
-
-    .choices__inner {
-      background: white !important;
-    }
-
-    /* الأزرار */
-    .form-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-top: 2rem;
-      padding-top: 1.5rem;
-      border-top: 1px dashed var(--gray-300);
-    }
-
-    #addProductBtn {
-      background: transparent;
-      border: 2px dashed var(--orange);
-      color: var(--orange);
-      padding: 10px 20px;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.3s;
-    }
-
-    #addProductBtn:hover {
-      background: var(--orange);
-      color: white;
-    }
-
-    #nextReviewBtn {
-      background: var(--orange);
-      color: white;
-      padding: 12px 32px;
-      border: none;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 15px;
-      box-shadow: 0 6px 20px rgba(249,115,22,0.3);
-      transition: all 0.3s;
-    }
-
+    #addProductBtn:hover,
     #nextReviewBtn:hover {
-      background: var(--orange-hover);
       transform: translateY(-3px);
-      box-shadow: 0 12px 30px rgba(249,115,22,0.4);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.15);
     }
 
-    .icon-btn--danger {
-      background: #fee2e2;
-      color: #dc2626;
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      font-size: 20px;
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
+    #addProductBtn:active,
+    #nextReviewBtn:active {
+      animation: pulse 0.3s ease;
     }
 
     .icon-btn--danger:hover {
-      background: #dc2626;
-      color: white;
-    }
-
-    .product-url-link {
-      background: #fff7ed;
-      color: var(--orange);
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      transition: all 0.2s;
+      transform: scale(1.1);
     }
 
     .product-url-link:hover {
-      background: var(--orange);
-      color: white;
+      transform: scale(1.15) rotate(15deg);
     }
 
+    /* أنيميشن للـ Tip */
     .tip-callout {
-      background: #fff7ed;
-      border: 1px solid #fdba74;
-      color: var(--gray-700);
-      padding: 1rem 1.5rem;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 2rem;
-      font-size: 14px;
+      animation: fadeInUp 1s ease-out 1.2s both;
+      opacity: 0;
+      animation-fill-mode: both;
     }
 
-    .tip-callout i { color: var(--orange); }
+    /* تحسين الـ Choices.js عند الفتح */
+    .choices__list--dropdown {
+      animation: fadeInUp 0.3s ease-out;
+    }
 
-    /* Responsive */
-    @media (max-width: 992px) {
-      .form-row-headers, .product-row {
-        grid-template-columns: 1fr;
-        gap: 0.75rem;
-      }
-      .actions-cell { display: flex; gap: 10px; justify-content: flex-end; }
+    /* لودينج ناعم للصفحة */
+    body {
+      opacity: 0;
+      animation: fadeInUp 0.6s ease-out 0.2s forwards;
     }
   </style>
 </head>
 <body>
 
 <script>
-  if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
-    document.body.classList.add('sidebar-mini');
-  }
+  (function() {
+    try {
+      if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
+        document.body.classList.add('sidebar-mini');
+      }
+    } catch(e) {}
+  })();
 </script>
 
 <div class="app-container">
-  <!-- Sidebar الأصلي بدون تغيير -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
-      <button class="sidebar-toggle" id="sidebar-toggle"><i data-feather="chevrons-left"></i></button>
+      <button aria-expanded="true" aria-label="Toggle sidebar" class="sidebar-toggle" id="sidebar-toggle">
+        <i data-feather="chevrons-left"></i>
+      </button>
     </div>
     <nav class="sidebar-nav">
       <ul class="nav-list">
@@ -340,25 +162,46 @@
   </aside>
 
   <div class="main-content">
-    <!-- Header صغير ونظيف زي الصورة بالضبط -->
     <header class="main-header">
-      <h1 class="page-title">Create New Order</h1>
-      <a href="/account" class="account-mini">
-        <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
-        <span class="label">My account</span>
-      </a>
+      <div class="header-row1">
+        <div class="left">
+          <div aria-live="polite" class="greeting-pill">
+            <span class="greeting-avatar">
+              <img alt="Hi icon" src="/images/greeting-icon.png"/>
+            </span>
+            <div class="greet-text">
+              <div class="greet-title">Hi, <span data-username="">...</span> [Wave]</div>
+              <div class="greet-sub">Start your day with operations</div>
+            </div>
+          </div>
+        </div>
+        <div class="right topbar-right">
+          <a aria-label="My account" class="account-mini" href="/account" title="My account">
+            <span class="ico-circle"><img alt="Logo" src="/images/logo.png"/></span>
+            <span class="label">My account</span>
+          </a>
+        </div>
+      </div>
+      <div class="header-row2">
+        <h1 class="page-title">Create New Order</h1>
+      </div>
     </header>
 
     <main class="container create-order-layout">
-      <!-- Stepper -->
       <section class="page-stepper">
-        <ol class="stepper">
-          <li class="step active"><span class="circle">1</span><span class="label">Products</span><span class="bar"></span></li>
-          <li class="step"><span class="circle">2</span><span class="label">Review</span></li>
+        <ol aria-label="Order steps" class="stepper" id="order-stepper">
+          <li class="step active" data-step="1">
+            <span class="circle">1</span>
+            <span class="label">Products</span>
+            <span class="bar"></span>
+          </li>
+          <li class="step" data-step="2">
+            <span class="circle">2</span>
+            <span class="label">Review</span>
+          </li>
         </ol>
       </section>
 
-      <!-- Form Card -->
       <section class="card form-card">
         <div class="form-row-headers">
           <span>Product</span>
@@ -366,24 +209,23 @@
           <span>Reason</span>
           <span></span>
         </div>
-
         <div id="products-container"></div>
 
         <div class="form-actions">
-          <button id="addProductBtn" type="button">
+          <button class="btn-outline-pill" id="addProductBtn" type="button">
             <i data-feather="plus"></i><span>Add Another Product</span>
           </button>
-          <div style="display:flex; gap:12px;">
-            <a href="/orders/new" style="padding:10px 20px; border:1.5px solid var(--gray-300); border-radius:10px; color:var(--gray-700); background:white; font-weight:600; text-decoration:none;">
+          <div style="display:flex; gap:10px;">
+            <a class="nav-link" href="/orders/new" style="padding:.75rem 1rem; border:1px solid #D1D5DB; border-radius:12px; text-decoration:none; color:#374151; background:#fff;">
               Back
             </a>
-            <button id="nextReviewBtn" type="button">Next: Review</button>
+            <button class="submit-btn elevated" id="nextReviewBtn" type="button">Next: Review</button>
           </div>
         </div>
 
-        <div class="tip-callout">
+        <div class="tip-callout" role="note">
           <i data-feather="info"></i>
-          <span><strong>Tip:</strong> Use search to filter products quickly.</span>
+          <span><strong>Tip:</strong>: Use search to filter products quickly.</span>
         </div>
       </section>
     </main>
@@ -394,5 +236,29 @@
 <script src="/js/common-ui.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <script src="/js/order-products.step.js"></script>
+
+<!-- أنيميشن للصفوف الجديدة -->
+<script>
+  // كل صف جديد يضاف → يظهر بأنيميشن ناعم
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.classList && node.classList.contains('product-row')) {
+          node.style.opacity = '0';
+          node.style.transform = 'translateY(20px)';
+          setTimeout(() => {
+            node.style.transition = 'all 0.6s ease-out';
+            node.style.opacity = '1';
+            node.style.transform = 'translateY(0)';
+          }, 50);
+        }
+      });
+    });
+  });
+
+  observer.observe(document.getElementById('products-container'), {
+    childList: true
+  });
+</script>
 </body>
 </html>
