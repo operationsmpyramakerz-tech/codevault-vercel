@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,7 +13,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Inter', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #f0f2f5; /* الخلفية القديمة البسيطة (افتراضي رمادي فاتح زي المواقع القديمة) */
       min-height: 100vh;
       display: flex;
       align-items: center;
@@ -20,40 +21,30 @@
       overflow: hidden;
       position: relative;
     }
-    body::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><defs><radialGradient id=%22g%22><stop offset=%220%%22 stop-color=%22%23fff%22 stop-opacity=%220.12%22/><stop offset=%22100%%22 stop-opacity=%220%22/></radialGradient></defs><circle cx=%2250%22 cy=%2250%22 r=%2440%22 fill=%22url(%23g)%22/></svg>') center/cover;
-      animation: float 22s infinite linear;
-      pointer-events: none;
-    }
-    @keyframes float { 0% { transform: translate(0,0) rotate(0deg); } 100% { transform: translate(30px,-30px) rotate(360deg); } }
+    /* مسحت الـ ::before والأنيميشن اللي كان بيضيف الخلفية المتحركة */
 
     .login-container { position: relative; z-index: 1; width: 100%; max-width: 420px; padding: 20px; }
     .login-card {
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 20px;
+      background: white; /* كارد أبيض بسيط زي القديم */
+      border-radius: 8px; /* رجعتها للشكل البسيط */
       padding: 45px 35px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* شادو بسيط */
+      border: 1px solid #ddd;
       animation: cardAppear 0.9s ease-out forwards;
       opacity: 0;
       transform: translateY(40px);
     }
     @keyframes cardAppear { to { opacity: 1; transform: translateY(0); } }
 
-    .login-header { text-align: center; margin-bottom: 35px; color: white; }
+    .login-header { text-align: center; margin-bottom: 35px; color: #333; /* لون نص أسود بسيط */ }
     .login-logo {
       width: 90px; height: 90px; margin-bottom: 15px;
       animation: logoBounce 2.5s infinite;
       filter: drop-shadow(0 5px 10px rgba(0,0,0,0.2));
     }
     @keyframes logoBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
-    .login-header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; background: linear-gradient(90deg,#fff,#f0f0f0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .login-header p { opacity: 0.9; font-size: 15px; }
+    .login-header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; color: #333; /* بدون gradient */ }
+    .login-header p { opacity: 0.9; font-size: 15px; color: #666; }
 
     .form-group {
       position: relative;
@@ -63,7 +54,7 @@
       position: absolute;
       left: 16px;
       top: 16px;
-      color: rgba(255,255,255,0.8);
+      color: #999;
       font-weight: 500;
       font-size: 14px;
       pointer-events: none;
@@ -73,22 +64,22 @@
     .form-group input {
       width: 100%;
       padding: 16px 16px;
-      border: none;
+      border: 1px solid #ddd;
       border-radius: 14px;
-      background: rgba(255,255,255,0.2);
-      color: white;
+      background: white;
+      color: #333;
       font-size: 16px;
-      backdrop-filter: blur(10px);
       transition: all 0.3s ease;
     }
     .form-group input::placeholder { color: transparent; }
-    .form-group input:focus { outline: none; background: rgba(255,255,255,0.3); box-shadow: 0 0 0 4px rgba(255,255,255,0.25); transform: scale(1.02); }
+    .form-group input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 4px rgba(102,126,234,0.1); transform: scale(1.02); }
     .form-group input:focus ~ label,
     .form-group input:not(:placeholder-shown) ~ label {
       transform: translateY(-28px) translateX(-8px) scale(0.85);
-      background: rgba(102,126,234,0.9);
+      background: white;
       padding: 2px 10px;
       border-radius: 6px;
+      color: #667eea;
     }
 
     .password-wrapper { position: relative; }
@@ -99,18 +90,18 @@
       transform: translateY(-50%);
       background: none;
       border: none;
-      color: white;
+      color: #666;
       cursor: pointer;
       padding: 8px;
       border-radius: 50%;
       transition: all 0.3s;
     }
-    .toggle-password:hover { background: rgba(255,255,255,0.2); }
+    .toggle-password:hover { background: #f0f0f0; }
 
     .login-btn {
       width: 100%;
       padding: 16px;
-      background: linear-gradient(90deg, #ff6b6b, #feca57);
+      background: #667eea;
       color: white;
       font-weight: 600;
       font-size: 17px;
@@ -121,9 +112,9 @@
       position: relative;
       overflow: hidden;
       margin-top: 10px;
-      box-shadow: 0 8px 25px rgba(255,107,107,0.4);
+      box-shadow: 0 8px 25px rgba(102,126,234,0.4);
     }
-    .login-btn:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(255,107,107,0.5); }
+    .login-btn:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(102,126,234,0.5); }
     .login-btn.loading { opacity: 0.85; cursor: not-allowed; }
     .login-btn::after {
       content: '';
@@ -138,14 +129,13 @@
     .login-btn:active::after { width: 300px; height: 300px; }
 
     .error-message {
-      background: rgba(255,77,77,0.25);
-      color: #ff6b6b;
+      background: #ffebee;
+      color: #e74c3c;
       padding: 14px;
       border-radius: 12px;
       text-align: center;
       margin-top: 20px;
-      border: 1px solid rgba(255,107,107,0.4);
-      backdrop-filter: blur(10px);
+      border: 1px solid #e74c3c;
       animation: shake 0.6s ease-in-out;
       display: none;
     }
@@ -281,12 +271,14 @@
         const label = input.nextElementSibling;
         if (input.value) {
           label.style.transform = 'translateY(-28px) translateX(-8px) scale(0.85)';
-          label.style.background = 'rgba(102,126,234,0.9)';
+          label.style.background = 'white';
           label.style.padding = '2px 10px';
           label.style.borderRadius = '6px';
+          label.style.color = '#667eea';
         }
       });
     });
   </script>
 </body>
 </html>
+```
