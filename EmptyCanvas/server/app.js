@@ -687,6 +687,15 @@ app.get(
           const qty = props["Quantity Requested"]?.number || 0;
           const status = props["Status"]?.select?.name || "Pending";
           const createdTime = page.created_time;
+          // 🔥 Extract S.V Approval (select/status)
+const svApproval =
+  props["S.V Approval"]?.select?.name ||
+  props["S.V Approval"]?.status?.name ||
+  props["SV Approval"]?.select?.name ||
+  props["SV Approval"]?.status?.name ||
+  "";
+          // ❗ Show only items where S.V Approval = Approved
+if (svApproval !== "Approved") continue;
 
           // Created by (Teams Members relation)
           let createdById = "";
@@ -715,19 +724,20 @@ const svApproval =
   "";
 
 if (svApproval !== "Approved") continue;
-
-          all.push({
-            id: page.id,
-            reason,
-            productName,
-            quantity: qty,
-            status,
-            createdTime,
-            createdById,
-            createdByName,
-            assignedToId,
-            assignedToName,
-          });
+          
+all.push({
+    id: page.id,
+    reason,
+    productName,
+    quantity: qty,
+    status,
+    createdTime,
+    createdById,
+    createdByName,
+    assignedToId,
+    assignedToName,
+    svApproval, // ⬅⬅⬅ مهم جداً
+});
         }
 
         hasMore = resp.has_more;
