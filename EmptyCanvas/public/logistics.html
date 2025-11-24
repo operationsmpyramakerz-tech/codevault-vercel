@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body>
+
 <script>
   (function() {
     try {
@@ -28,6 +29,7 @@
         <i data-feather="chevrons-left"></i>
       </button>
     </div>
+
     <nav class="sidebar-nav">
       <ul class="nav-list">
         <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
@@ -43,6 +45,7 @@
         <li><a class="nav-link" href="/damaged-assets-reviewed"><i data-feather="check-circle"></i><span class="nav-label">Reviewed Damaged Assets</span></a></li>
       </ul>
     </nav>
+
     <div class="sidebar-footer">
       <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
     </div>
@@ -50,22 +53,21 @@
 
   <!-- Main -->
   <div class="main-content">
+
     <header class="main-header">
       <div class="header-row1">
         <div class="left">
-          <div class="greeting-pill" aria-live="polite">
+          <div class="greeting-pill">
             <span class="greeting-avatar">
               <img src="/images/greeting-icon.png" alt="Hi icon"/>
             </span>
             <div class="greet-text">
-              <div class="greet-title">
-                Hi, <span data-username="">...</span> 👋
-              </div>
+              <div class="greet-title">Hi, <span data-username="">...</span> 👋</div>
               <div class="greet-sub">Your logistics overview</div>
             </div>
           </div>
 
-          <div id="logistics-searchbar" class="searchbar" role="search">
+          <div id="logistics-searchbar" class="searchbar">
             <i data-feather="search"></i>
             <input id="logisticsSearch" type="search"
                    placeholder="Search items for logistics..."
@@ -74,10 +76,8 @@
         </div>
 
         <div class="right topbar-right">
-          <a class="account-mini" href="/account" aria-label="My account" title="My account">
-            <span class="ico-circle">
-              <img src="/images/logo.png" alt="Logo"/>
-            </span>
+          <a class="account-mini" href="/account">
+            <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
             <span class="label">My account</span>
           </a>
         </div>
@@ -87,21 +87,9 @@
         <h1 class="page-title">Logistics</h1>
 
         <!-- Tabs -->
-        <div class="page-tabs" role="tablist" style="margin-top: 12px;">
-          <button id="tab-missing"
-                  class="page-tab active"
-                  type="button"
-                  role="tab"
-                  aria-pressed="true">
-            Missing
-          </button>
-          <button id="tab-received"
-                  class="page-tab"
-                  type="button"
-                  role="tab"
-                  aria-pressed="false">
-            Received
-          </button>
+        <div class="page-tabs" role="tablist" style="margin-top:12px;">
+          <button id="tab-missing"  class="page-tab active" type="button" role="tab">Missing</button>
+          <button id="tab-received" class="page-tab"          type="button" role="tab">Received</button>
         </div>
       </div>
     </header>
@@ -109,51 +97,24 @@
     <main class="container-full-width">
       <div id="assigned-empty" class="muted" style="display:none;">No items.</div>
       <div id="assigned-grid" class="assigned-grid"></div>
-      <!-- ===== ORDER MODAL (Full / Partial per item) ===== -->
-<div id="order-modal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <h2 id="order-modal-title">Order Items</h2>
-
-    <div id="order-modal-items"></div>
-
-    <div class="modal-actions">
-      <button id="order-modal-close" class="btn btn-danger">Close</button>
-    </div>
-  </div>
-</div>
     </main>
   </div>
 </div>
 
-  <!-- ===================== ORDER MODAL ===================== -->
-<div id="orderModal" class="modal" style="
-  display:none;
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.4);
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-">
-  <div class="modal-box" style="
-    background: white;
-    padding: 20px;
-    width: 90%;
-    max-width: 450px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  ">
-    <h3 style="margin-bottom:10px;">Order Items</h3>
+
+<!-- ===================== ORDER ITEMS MODAL ===================== -->
+<div id="orderModal" class="modal" style="display:none;">
+  <div class="modal-box">
+    <h3 id="orderModalTitle">Order Items</h3>
 
     <div id="modalItems"></div>
 
-    <button id="closeModalBtn"
-            class="btn btn-danger"
-            style="margin-top:15px; width:100%;">
+    <button id="closeModalBtn" class="btn btn-danger" style="margin-top:15px;width:100%;">
       Close
     </button>
   </div>
 </div>
+
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/logistics.js"></script>
