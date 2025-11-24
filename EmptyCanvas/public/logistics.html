@@ -9,6 +9,24 @@
 
   <!-- CSS حديث مع أنيميشن -->
   <style>
+    /* تحسين الـ Modal على الموبايل */
+@media (max-width: 768px) {
+  #orderModal .modal-box {
+    width: 98vw !important;
+    height: 98vh !important;
+    max-width: 98vw !important;
+    max-height: 98vh !important;
+    border-radius: 16px;
+    padding: 1.2rem;
+  }
+  #orderModal .receiver-block {
+    padding: 1.5rem 1.2rem;
+    margin: 0 -1.2rem -1.2rem;
+  }
+  #orderModal .modal-title {
+    font-size: 1.3rem !important;
+  }
+}
     .create-order-layout { /* للتوافق مع الصفحات السابقة */
       max-width: 1200px;
       margin: 0 auto;
@@ -377,28 +395,62 @@
     </main>
   </div>
 </div>
-
-<!-- ===================== ORDER ITEMS MODAL ===================== -->
+<!-- ===================== ORDER ITEMS MODAL (محدث: Fullscreen Centered) ===================== -->
 <div id="orderModal" class="modal" style="display:none;">
-  <div class="modal-box">
-    <h3 id="orderModalTitle" class="modal-title">Order Items</h3>
+  <div class="modal-box" style="
+    max-width: 95vw;
+    width: 95vw;
+    max-height: 95vh;
+    height: 95vh;
+    padding: 1.8rem;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+  ">
+    <!-- Header مع عنوان + زر إغلاق في الزاوية -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 id="orderModalTitle" class="modal-title" style="margin:0; font-size:1.5rem;">
+        Receive Items for: <span style="color:#f59e0b; font-weight:700;">FOR DIY</span>
+      </h3>
+      <button id="closeModalBtn" style="
+        background:none; border:none; font-size:2rem; cursor:pointer; color:#94a3b8;
+        padding:0.5rem; border-radius:50%; width:48px; height:48px;
+      " onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
+        ×
+      </button>
+    </div>
 
-    <!-- Items (Full / Partial) -->
-    <div id="modalItems"></div>
+    <!-- Items List (ياخد باقي المساحة) -->
+    <div id="modalItems" style="
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+      margin-bottom: 1.5rem;
+    "></div>
 
-    <!-- Receiver + Password + Submit -->
-    <div class="receiver-block">
-      <label class="lbl">Received from</label>
-      <select id="receiverUser" class="input full">
-        <!-- filled from /api/logistics/receivers -->
-      </select>
+    <!-- Receiver + Password + Submit (ثابت في الأسفل) -->
+    <div class="receiver-block" style="
+      padding-top: 1.5rem;
+      border-top: 2px solid #e5e7eb;
+      background: #fafbfc;
+      border-radius: 0 0 20px 20px;
+      margin: 0 -1.8rem -1.8rem;
+      padding: 1.8rem;
+    ">
+      <div style="max-width: 500px; margin: 0 auto;">
+        <label class="lbl">Received from</label>
+        <select id="receiverUser" class="input full" style="margin-bottom:1rem;"></select>
 
-      <label class="lbl">Password</label>
-      <input id="receiverPass" type="password" class="input full"
-             placeholder="Enter password"/>
+        <label class="lbl">Password</label>
+        <input id="receiverPass" type="password" class="input full"
+               placeholder="Enter password to confirm receipt" style="margin-bottom:1.2rem;"/>
 
-      <button id="submitOrderBtn" class="btn btn-primary">Submit</button>
-      <button id="closeModalBtn" class="btn btn-danger">Close</button>
+        <div style="display:flex; gap:1rem; justify-content:center;">
+          <button id="submitOrderBtn" class="btn btn-primary" style="flex:1; padding:0.9rem; font-size:1.1rem;">
+            Confirm & Submit
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
