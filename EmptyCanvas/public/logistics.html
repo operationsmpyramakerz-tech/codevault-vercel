@@ -107,11 +107,28 @@
   <div class="modal-box">
     <h3 id="orderModalTitle">Order Items</h3>
 
+    <!-- Items (Full / Partial) -->
     <div id="modalItems"></div>
 
-    <button id="closeModalBtn" class="btn btn-danger" style="margin-top:15px;width:100%;">
-      Close
-    </button>
+    <!-- Receiver + Password + Submit inside the same window -->
+    <div class="receiver-block" style="margin-top:16px; border-top:1px solid #eee; padding-top:12px;">
+      <label class="lbl" style="display:block; margin-bottom:4px;">Received from</label>
+      <select id="receiverUser" class="input full" style="width:100%; margin-bottom:8px;">
+        <!-- filled from /api/logistics/receivers -->
+      </select>
+
+      <label class="lbl" style="display:block; margin-bottom:4px;">Password</label>
+      <input id="receiverPass" type="password" class="input full"
+             placeholder="Enter password" style="width:100%; margin-bottom:10px;"/>
+
+      <button id="submitOrderBtn" class="btn btn-primary" style="width:100%; margin-bottom:8px;">
+        Submit
+      </button>
+
+      <button id="closeModalBtn" class="btn btn-danger" style="width:100%;">
+        Close
+      </button>
+    </div>
   </div>
 </div>
 
