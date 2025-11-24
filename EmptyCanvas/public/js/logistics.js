@@ -111,13 +111,32 @@
   }
 
   function wireButtons(){
-    $$("button[data-act='order-received']").forEach(btn=>{
-      btn.onclick = ()=> {
-        const reason = btn.dataset.reason;
-        alert(`Order received clicked (Reason: ${reason})\n— Logic will be added next step.`);
-      };
-    });
-  }
+  $$("button[data-act='order-received']").forEach(btn=>{
+    btn.onclick = ()=> {
+      const reason = btn.dataset.reason;
+
+      // جميع العناصر التابعة لهذا الـ Order
+      const orderItems = allItems.filter(it => it.reason === reason);
+
+      // بناء HTML وإظهاره في الـ Modal
+      const box = document.getElementById("modalItems");
+      box.innerHTML = orderItems.map(it => `
+        <div style="padding:10px; border-bottom:1px solid #ddd;">
+          <strong>${esc(it.productName)}</strong><br>
+          Req: ${it.requested} <br>
+          Rec: ${it.rec} <br>
+          Rem: ${it.remaining}
+        </div>
+      `).join("");
+
+      document.getElementById("orderModal").style.display = "flex";
+    };
+  });
+
+  document.getElementById("closeModalBtn").onclick = () => {
+    document.getElementById("orderModal").style.display = "none";
+  };
+}
 
   function setActiveTab(tab){
     activeTab = tab;
