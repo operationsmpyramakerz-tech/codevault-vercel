@@ -97,6 +97,24 @@
     <main class="container-full-width">
       <div id="assigned-empty" class="muted" style="display:none;">No items.</div>
       <div id="assigned-grid" class="assigned-grid"></div>
+
+      <!-- ===== SUBMIT MODAL ===== -->
+<div id="submit-modal" class="modal" style="display:none;">
+  <div class="modal-content" style="max-width:420px;">
+    <h2>Select Receiver</h2>
+
+    <label class="lbl">User</label>
+    <select id="submit-user" class="input full"></select>
+
+    <label class="lbl">Password</label>
+    <input id="submit-pass" type="password" class="input full" placeholder="Enter password">
+
+    <div class="modal-actions" style="margin-top:15px;">
+      <button id="submit-modal-confirm" class="btn btn-primary" style="width:100%;">Submit</button>
+      <button id="submit-modal-close" class="btn btn-danger" style="width:100%; margin-top:6px;">Cancel</button>
+    </div>
+  </div>
+</div>
     </main>
   </div>
 </div>
