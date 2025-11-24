@@ -23,13 +23,13 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body || {}),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await res.text().catch(()=>''));
     return res.json().catch(() => ({}));
   }
 
   // ---------- DOM ----------
-  const grid      = $("#logistics-grid") || $("#assigned-grid") || $("main");
-  const searchBox = $("#logisticsSearch") || $("#search");
+  const grid        = $("#logistics-grid") || $("#assigned-grid") || $("main");
+  const searchBox   = $("#logisticsSearch") || $("#search");
   const tabMissing  = $("#tab-missing");
   const tabReceived = $("#tab-received");
 
@@ -45,7 +45,7 @@
 
     return {
       id: it.id,
-      pageId: it.pageId || it.page_id || it.notionPageId || it.id,
+      pageId: it.pageId || it.page_id || it.notionPageId || it.id, // مهم للـ backend
       reason: it.reason || "",
       created: it.createdTime || it.created || "",
       productName: it.productName ?? it.product_name ?? "Unnamed",
@@ -70,23 +70,30 @@
 
   // ---------- Actions ----------
   async function markReceived(itemId, value, isFull) {
+    const item = allItems.find((x) => x.id == itemId);
+    if (!item) return;
+
+    const backendId = item.pageId || item.id;   // نستخدم pageId لو موجود
     const decision = isFull
       ? "Received by operations"
       : "Partially received by operations";
 
-    await postJSON("/api/logistics/mark-received", {
-      itemIds: [itemId],
-      statusById: { [itemId]: decision },
-      recMap: { [itemId]: value },
-    });
+    try {
+      await postJSON("/api/logistics/mark-received", {
+        itemIds: [backendId],
+        statusById: { [backendId]: decision },
+        recMap: { [backendId]: value },
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save. Please try again.");
+      return;
+    }
 
     // update local state instantly
-    const it = allItems.find((x) => x.id === itemId);
-    if (it) {
-      it.rec = value;
-      it.status = decision.toLowerCase();
-      it.remaining = Math.max(0, it.requested - value);
-    }
+    item.rec = value;
+    item.status = decision.toLowerCase();
+    item.remaining = Math.max(0, item.requested - value);
 
     render();
   }
