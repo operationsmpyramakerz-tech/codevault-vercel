@@ -774,7 +774,7 @@ body.sidebar-collapsed .main-content { padding-left: 0 !important; }
 @media (min-width: 768px) { .product-cards-grid { grid-template-columns: 1fr 1fr; } }
 
 .product-card {
-  background: var(--surface, #fff);ب
+  background: var(--surface, #fff);
   border: 1px solid #E5E7EB;
   border-radius: 14px;
   padding: .9rem 1rem;
