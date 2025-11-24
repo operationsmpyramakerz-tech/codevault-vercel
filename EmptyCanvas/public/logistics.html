@@ -113,6 +113,35 @@
   </div>
 </div>
 
+  <!-- ===================== ORDER MODAL ===================== -->
+<div id="orderModal" class="modal" style="
+  display:none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+">
+  <div class="modal-box" style="
+    background: white;
+    padding: 20px;
+    width: 90%;
+    max-width: 450px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  ">
+    <h3 style="margin-bottom:10px;">Order Items</h3>
+
+    <div id="modalItems"></div>
+
+    <button id="closeModalBtn"
+            class="btn btn-danger"
+            style="margin-top:15px; width:100%;">
+      Close
+    </button>
+  </div>
+</div>
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/logistics.js"></script>
