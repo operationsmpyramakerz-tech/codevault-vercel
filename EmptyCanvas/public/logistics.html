@@ -15,8 +15,14 @@
       padding: 1.5rem 1rem;
     }
     .main-content {
-  margin-left: auto;
-  margin-right: auto;
+  display: flex;
+  justify-content: center;   /* تخلّي المحتوى الداخلي في النص */
+}
+
+/* الـ wrapper الداخلي */
+.main-inner {
+  width: 100%;
+  max-width: 1200px;
 }
 
     /* Tabs مودرن */
@@ -334,7 +340,7 @@
 
   <!-- Main -->
   <div class="main-content">
-
+<div class="main-inner">
     <header class="main-header">
       <div class="header-row1">
         <div class="left">
