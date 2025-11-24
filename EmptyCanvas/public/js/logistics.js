@@ -1,65 +1,89 @@
-/* Logistics with Orders Grouping + One "Received" Button per Order + Submit With User Selection */
+/* Logistics – Orders Grouped + Modal Full/Partial Receiving */
 
 (function () {
+
+  // ---------- Helpers ----------
   const $  = (s,r=document)=>r.querySelector(s);
   const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
   const N  = (v)=>Number.isFinite(+v)?+v:0;
   const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 
-  const grid = $("#assigned-grid");
-  const searchBox = $("#logisticsSearch");
-  const tabMissing = $("#tab-missing");
+  const grid        = $("#assigned-grid");
+  const searchBox   = $("#logisticsSearch");
+  const tabMissing  = $("#tab-missing");
   const tabReceived = $("#tab-received");
 
-  /* ========= State ========= */
+  const modal       = $("#orderModal");
+  const modalTitle  = $("#orderModalTitle");
+  const modalBody   = $("#modalItems");
+  const modalClose  = $("#closeModalBtn");
+
   let allItems = [];
   let activeTab = "missing";
-  let currentGrouped = [];   // لحفظ الـ orders grouped
-  let currentOrderItems = []; // items الخاصة بالأوردر المفتوح
 
-  /* ========= Normalize ========= */
+  // ---------- Normalize ----------
   function normalize(it){
     const req = N(it.requested ?? it.req);
     const rec = N(it.quantityReceivedByOperations ?? it.rec ?? 0);
     return {
       id: it.id,
-      pageId: it.pageId || it.page_id || it.id,
+      pageId: it.pageId || it.page_id || it.notionPageId || it.id,
       reason: it.reason || "No Reason",
       productName: it.productName ?? "Unnamed",
       requested: req,
-      rec,
+      rec: rec,
       remaining: Math.max(0, req - rec),
       created: it.createdTime || it.created || ""
     };
   }
 
+  // ---------- Fetch ----------
   async function fetchAssigned(){
     const res = await fetch("/api/orders/assigned",{credentials:"same-origin"});
-    return (await res.json()).map(normalize);
+    if(!res.ok) throw new Error("Failed");
+    const data = await res.json();
+    return Array.isArray(data)?data.map(normalize):[];
   }
 
-  async function postJSON(url, body) {
-    const res = await fetch(url, {
-      method:"POST",
-      credentials:"same-origin",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify(body||{})
-    });
-    if(!res.ok) throw new Error(await res.text());
-    return res.json().catch(()=>({}));
+  // ---------- Save (Full / Partial) ----------
+  async function saveReceive(itemId, quantity, fullFlag){
+    const item = allItems.find(x=>x.id == itemId);
+    if(!item) return;
+
+    const backendId = item.pageId;
+    const decision = fullFlag ? "Received by operations" : "Partially received by operations";
+
+    await fetch("/api/logistics/mark-received", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemIds: [backendId],
+        statusById: { [backendId]: decision },
+        recMap: { [backendId]: quantity }
+      })
+    }).catch(()=> alert("Saving failed"));
+
+    // update local
+    item.rec = quantity;
+    item.remaining = Math.max(0, item.requested - quantity);
+
+    // re-render modal + list
+    render();
+    openOrderModal(item.reason);
   }
 
-  /* ========= Group by Reason ========= */
+  // ---------- Group by Order ----------
   function groupOrders(list){
     const map = new Map();
     for(const it of list){
-      if(!map.has(it.reason)) map.set(it.reason, []);
+      if(!map.has(it.reason)) map.set(it.reason,[]);
       map.get(it.reason).push(it);
     }
-    return [...map.entries()].map(([reason, items]) => ({ reason, items }));
+    return [...map.entries()].map(([reason, items])=>({reason, items}));
   }
 
-  /* ========= Render ========= */
+  // ---------- Render ----------
   function render(){
     if(!grid) return;
     grid.innerHTML = "";
@@ -67,17 +91,17 @@
     const q = (searchBox?.value || "").toLowerCase();
 
     let items = allItems.filter(it =>
-      activeTab==="missing" ? it.rec===0 : it.rec>0
+      activeTab === "missing" ? it.rec === 0 : it.rec > 0
     );
 
     if(q){
       items = items.filter(it =>
-        it.productName.toLowerCase().includes(q)
+        it.productName.toLowerCase().includes(q) ||
+        it.reason.toLowerCase().includes(q)
       );
     }
 
     const groups = groupOrders(items);
-    currentGrouped = groups;
 
     if(!groups.length){
       grid.innerHTML = `<p class="empty">No items.</p>`;
@@ -86,33 +110,22 @@
 
     for(const g of groups){
       const card = document.createElement("div");
-      card.className = "order-card grouped";
+      card.className = "order-card";
 
       card.innerHTML = `
-        <div class="order-head">
+        <div class="order-card__head">
           <h3>${esc(g.reason)}</h3>
-          <small>${g.items.length} items</small>
-        </div>
-
-        <div class="order-items">
-          ${g.items.map(it => `
-            <div class="order-item">
-              <div>${esc(it.productName)} — Req: ${it.requested} — Rec: ${it.rec}</div>
-            </div>
-          `).join("")}
-        </div>
-
-        <div class="order-actions" style="margin-top:10px;">
-          <button class="btn btn-primary order-open-btn"
-                  data-reason="${esc(g.reason)}">
+          <button class="btn btn-primary btn-sm order-btn" data-reason="${esc(g.reason)}">
             Received
           </button>
+        </div>
 
-          <button class="btn btn-success order-submit-btn"
-                  data-reason="${esc(g.reason)}"
-                  style="margin-left:8px;">
-            Submit
-          </button>
+        <div class="order-card__items">
+          ${g.items.map(it=>`
+            <div class="order-item-mini">
+              ${esc(it.productName)} — Req: ${it.requested}
+            </div>
+          `).join("")}
         </div>
       `;
 
@@ -122,174 +135,102 @@
     wireOrderButtons();
   }
 
-  /* ========= FULL/PARTIAL Saving ========= */
-  async function markReceived(itemId, value) {
-    const item = allItems.find(x => x.id == itemId);
-    if (!item) return;
+  // ---------- Open Modal ----------
+  function openOrderModal(reason){
+    const items = allItems.filter(it=>it.reason === reason);
 
-    const decision = (value >= item.requested) 
-        ? "Received by operations" 
-        : "Partially received by operations";
+    modalTitle.textContent = reason;
 
-    await postJSON("/api/logistics/mark-received", {
-      itemIds:[item.pageId],
-      statusById:{ [item.pageId]: decision },
-      recMap:{ [item.pageId]: value }
-    });
+    modalBody.innerHTML = items.map(it => `
+      <div class="modal-item-row">
+        <div class="modal-item-left">
+          <strong>${esc(it.productName)}</strong><br>
+          Req: ${it.requested} — Rec: ${it.rec}
+        </div>
 
-    item.rec = value;
-    item.remaining = Math.max(0, item.requested - value);
+        <div class="modal-item-right">
+          <button class="btn btn-success btn-xs" data-act="full" data-id="${it.id}">
+            Full
+          </button>
 
-    render();
-  }
+          <button class="btn btn-warning btn-xs" data-act="partial" data-id="${it.id}">
+            Partial
+          </button>
 
-  /* ========= Wire Order Buttons ========= */
-  function wireOrderButtons(){
-
-    /* ---- 1) زرار Received (فتح القائمة) ---- */
-    $$(".order-open-btn").forEach(btn=>{
-      btn.onclick = ()=>{
-        const reason = btn.dataset.reason;
-        currentOrderItems = allItems.filter(x => x.reason === reason);
-
-        const box = $("#order-modal-items");
-        const title = $("#order-modal-title");
-
-        title.textContent = `Order: ${reason}`;
-
-        box.innerHTML = currentOrderItems.map(it => `
-          <div class="modal-item-row">
-            <div class="modal-item-name">${esc(it.productName)}</div>
-
-            <button class="btn btn-success btn-xs"
-                    data-act="full-item"
-                    data-id="${it.id}">
-              Full
+          <div class="partial-box" id="pbox-${it.id}" style="display:none;">
+            <input type="number" class="pinput" min="0" id="pinput-${it.id}" placeholder="Qty">
+            <button class="btn btn-primary btn-xxs" data-act="save" data-id="${it.id}">
+              Save
             </button>
-
-            <button class="btn btn-warning btn-xs"
-                    data-act="partial-item"
-                    data-id="${it.id}">
-              Partial
-            </button>
-
-            <div id="pbox-${it.id}" class="partial-box" style="display:none;">
-              <input type="number" min="0" id="pinput-${it.id}" class="pinput" placeholder="Qty">
-              <button class="btn btn-primary btn-xxs"
-                      data-act="save-partial-item"
-                      data-id="${it.id}">
-                Save
-              </button>
-            </div>
           </div>
-        `).join("");
+        </div>
+      </div>
+    `).join("");
 
-        $("#order-modal").style.display = "block";
-
-        wireItemButtons();
-      };
-    });
-
-    /* ---- 2) زرار Submit ---- */
-    $$(".order-submit-btn").forEach(btn=>{
-      btn.onclick = async ()=>{
-        const reason = btn.dataset.reason;
-        currentOrderItems = allItems.filter(x => x.reason === reason);
-
-        // افتح مودال السابميت
-        $("#submit-modal").style.display = "block";
-
-        // تحميل أسماء المستخدمين للـ dropdown
-        const list = await fetch("/api/logistics/receivers").then(r=>r.json());
-        const sel = $("#submit-user");
-        sel.innerHTML = list.map(u=>`
-          <option value="${u.id}">${esc(u.name)}</option>
-        `).join("");
-      };
-    });
-
-    $("#order-modal-close").onclick = ()=>{
-      $("#order-modal").style.display = "none";
-    };
+    modal.style.display = "flex";
+    wireModalButtons();
   }
 
-  /* ========= Wire Full/Partial Buttons Inside Modal ========= */
-  function wireItemButtons(){
-    // FULL
-    $$(".btn[data-act='full-item']").forEach(btn=>{
+  // ---------- Button Wiring ----------
+  function wireOrderButtons(){
+    $$(".order-btn").forEach(btn=>{
+      btn.onclick = ()=> openOrderModal(btn.dataset.reason);
+    });
+  }
+
+  function wireModalButtons(){
+
+    // Full
+    $$(".btn[data-act='full']").forEach(btn=>{
       btn.onclick = ()=>{
         const id = btn.dataset.id;
-        const it = allItems.find(x=>x.id==id);
-        if(it) markReceived(id, it.requested);
+        const item = allItems.find(x=>x.id == id);
+        if(item) saveReceive(id, item.requested, true);
       };
     });
 
-    // Toggle partial input
-    $$(".btn[data-act='partial-item']").forEach(btn=>{
+    // Partial toggle
+    $$(".btn[data-act='partial']").forEach(btn=>{
       btn.onclick = ()=>{
         const box = $("#pbox-"+btn.dataset.id);
-        box.style.display = box.style.display === "none" ? "block" : "none";
+        box.style.display = box.style.display==="none"?"block":"none";
       };
     });
 
-    // Save partial
-    $$(".btn[data-act='save-partial-item']").forEach(btn=>{
+    // Partial Save
+    $$(".btn[data-act='save']").forEach(btn=>{
       btn.onclick = ()=>{
         const id = btn.dataset.id;
         const val = N($("#pinput-"+id).value);
-        const it = allItems.find(x=>x.id==id);
+        const item = allItems.find(x=>x.id == id);
+        if(!item) return;
         if(val<=0) return alert("Enter valid quantity");
-        if(val > it.requested) return alert("Cannot exceed requested");
-        markReceived(id, val);
+        if(val > item.requested) return alert("Cannot exceed requested");
+        saveReceive(id, val, false);
       };
     });
+
+    modalClose.onclick = ()=> modal.style.display="none";
   }
 
-  /* ========= Submit Logic ========= */
-  $("#submit-modal-confirm").onclick = async ()=>{
-    const userId = $("#submit-user").value;
-    const pass = $("#submit-pass").value;
-
-    if(!userId) return alert("Select a user");
-    if(!pass) return alert("Enter password");
-
-    // تحقق من الباسورد
-    const ok = await postJSON("/api/logistics/verify-user",{
-      userId, password: pass
-    });
-
-    if(!ok.ok) return alert("Incorrect password");
-
-    // لو صح → نسجّل rec لكل item
-    for(const it of currentOrderItems){
-      await markReceived(it.id, it.rec);
-    }
-
-    alert("Order Submitted Successfully.");
-    $("#submit-modal").style.display="none";
-  };
-
-  $("#submit-modal-close").onclick = ()=>{
-    $("#submit-modal").style.display="none";
-  };
-
-  /* ========= Tabs ========= */
+  // ---------- Tabs ----------
   function setActiveTab(tab){
     activeTab = tab;
-    tabMissing.classList.toggle("active",tab==="missing");
-    tabReceived.classList.toggle("active",tab==="received");
+    tabMissing.classList.toggle("active", tab==="missing");
+    tabReceived.classList.toggle("active", tab==="received");
     render();
   }
 
-  /* ========= Init ========= */
+  // ---------- Init ----------
   async function init(){
     allItems = await fetchAssigned();
     setActiveTab("missing");
   }
 
-  if(searchBox) searchBox.addEventListener("input",render);
-  tabMissing.addEventListener("click",()=>setActiveTab("missing"));
-  tabReceived.addEventListener("click",()=>setActiveTab("received"));
+  if(searchBox) searchBox.addEventListener("input", render);
+  tabMissing.addEventListener("click", ()=>setActiveTab("missing"));
+  tabReceived.addEventListener("click", ()=>setActiveTab("received"));
 
   init();
+
 })();
