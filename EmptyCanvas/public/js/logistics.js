@@ -1,4 +1,4 @@
-/* Logistics – Orders Grouped + Modal Full/Partial Receiving */
+/* Logistics – Orders Grouped + Modal Full/Partial Receiving + Submit inside modal */
 
 (function () {
 
@@ -18,8 +18,46 @@
   const modalBody   = $("#modalItems");
   const modalClose  = $("#closeModalBtn");
 
+  const receiverSelect = $("#receiverUser");
+  const receiverPass   = $("#receiverPass");
+  const submitBtn      = $("#submitOrderBtn");
+
   let allItems = [];
   let activeTab = "missing";
+  let currentOrderReason = null;
+  let receiversCache = null;
+
+  // ---------- Small helper: POST JSON ----------
+  async function postJSON(url, body) {
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    });
+    let data = {};
+    try { data = await res.json(); } catch { data = {}; }
+    if (!res.ok) {
+      const msg = data.error || data.message || res.statusText || "Request failed";
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  // ---------- Load Receivers (once) ----------
+  async function ensureReceiversLoaded() {
+    if (receiversCache !== null) return receiversCache;
+    try {
+      const res = await fetch("/api/logistics/receivers", { credentials: "same-origin" });
+      const data = await res.json();
+      const users = Array.isArray(data.users) ? data.users : [];
+      receiversCache = users;
+    } catch (e) {
+      console.error("Failed to load receivers:", e);
+      receiversCache = [];
+    }
+    return receiversCache;
+  }
 
   // ---------- Normalize ----------
   function normalize(it){
@@ -45,32 +83,16 @@
     return Array.isArray(data)?data.map(normalize):[];
   }
 
-  // ---------- Save (Full / Partial) ----------
-  async function saveReceive(itemId, quantity, fullFlag){
+  // ---------- Local Save (Full / Partial) ----------
+  // مابقاش يكلّم الباك إند مباشرة، بيعدّل الـ state بس
+  function setLocalReceive(itemId, quantity){
     const item = allItems.find(x=>x.id == itemId);
     if(!item) return;
-
-    const backendId = item.pageId;
-    const decision = fullFlag ? "Received by operations" : "Partially received by operations";
-
-    await fetch("/api/logistics/mark-received", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        itemIds: [backendId],
-        statusById: { [backendId]: decision },
-        recMap: { [backendId]: quantity }
-      })
-    }).catch(()=> alert("Saving failed"));
-
-    // update local
     item.rec = quantity;
     item.remaining = Math.max(0, item.requested - quantity);
 
-    // re-render modal + list
-    render();
-    openOrderModal(item.reason);
+    // نعيد فتح نفس المودال علشان تحديث عرض Req / Rec
+    if (currentOrderReason) openOrderModal(currentOrderReason);
   }
 
   // ---------- Group by Order ----------
@@ -137,6 +159,7 @@
 
   // ---------- Open Modal ----------
   function openOrderModal(reason){
+    currentOrderReason = reason;
     const items = allItems.filter(it=>it.reason === reason);
 
     modalTitle.textContent = reason;
@@ -169,6 +192,78 @@
 
     modal.style.display = "flex";
     wireModalButtons();
+
+    // حمّل قائمة الـ receivers جوه نفس المودال
+    ensureReceiversLoaded().then(users=>{
+      if (!receiverSelect) return;
+      receiverSelect.innerHTML = users.map(u =>
+        `<option value="${u.id}">${esc(u.name)}</option>`
+      ).join("");
+    });
+  }
+
+  // ---------- Submit Current Order (inside modal) ----------
+  async function submitCurrentOrder(){
+    if (!currentOrderReason) return;
+
+    const userId   = receiverSelect?.value || "";
+    const password = (receiverPass?.value || "").trim();
+
+    if (!userId) {
+      alert("اختر اسم المستلم من القائمة.");
+      return;
+    }
+    if (!password) {
+      alert("من فضلك أدخل كلمة السر.");
+      return;
+    }
+
+    try {
+      // 1) Verify user password
+      const verify = await postJSON("/api/logistics/verify-user", { userId, password });
+      if (!verify.ok) {
+        alert(verify.error || "Incorrect password");
+        return;
+      }
+
+      // 2) جهّز الـ itemIds و الـ recMap و statusById للطلب الحالي
+      const items = allItems.filter(it => it.reason === currentOrderReason);
+
+      const itemIds    = [];
+      const statusById = {};
+      const recMap     = {};
+
+      for (const it of items) {
+        const rec = N(it.rec);
+        if (rec > 0) {
+          const id = it.pageId;
+          itemIds.push(id);
+          recMap[id] = rec;
+          statusById[id] = (rec >= it.requested)
+            ? "Received by operations"
+            : "Partially received by operations";
+        }
+      }
+
+      if (!itemIds.length) {
+        alert("لا يوجد أي عنصر تم إدخال كمية استلام له في هذا الطلب.");
+        return;
+      }
+
+      // 3) إرسال مرة واحدة للباك إند
+      await postJSON("/api/logistics/mark-received", {
+        itemIds,
+        statusById,
+        recMap
+      });
+
+      alert("تم حفظ استلام الطلب بنجاح.");
+      modal.style.display = "none";
+      render();
+    } catch (e) {
+      console.error("Submit order error:", e);
+      alert(e.message || "فشل حفظ البيانات، حاول مرة أخرى.");
+    }
   }
 
   // ---------- Button Wiring ----------
@@ -185,7 +280,7 @@
       btn.onclick = ()=>{
         const id = btn.dataset.id;
         const item = allItems.find(x=>x.id == id);
-        if(item) saveReceive(id, item.requested, true);
+        if(item) setLocalReceive(id, item.requested);
       };
     });
 
@@ -193,6 +288,7 @@
     $$(".btn[data-act='partial']").forEach(btn=>{
       btn.onclick = ()=>{
         const box = $("#pbox-"+btn.dataset.id);
+        if (!box) return;
         box.style.display = box.style.display==="none"?"block":"none";
       };
     });
@@ -201,16 +297,24 @@
     $$(".btn[data-act='save']").forEach(btn=>{
       btn.onclick = ()=>{
         const id = btn.dataset.id;
-        const val = N($("#pinput-"+id).value);
+        const val = N($("#pinput-"+id)?.value);
         const item = allItems.find(x=>x.id == id);
         if(!item) return;
-        if(val<=0) return alert("Enter valid quantity");
+        if(val<=0)        return alert("Enter valid quantity");
         if(val > item.requested) return alert("Cannot exceed requested");
-        saveReceive(id, val, false);
+        setLocalReceive(id, val);
       };
     });
 
-    modalClose.onclick = ()=> modal.style.display="none";
+    // Submit inside modal
+    if (submitBtn) {
+      submitBtn.onclick = submitCurrentOrder;
+    }
+
+    // Close
+    if (modalClose) {
+      modalClose.onclick = ()=> modal.style.display="none";
+    }
   }
 
   // ---------- Tabs ----------
@@ -223,8 +327,13 @@
 
   // ---------- Init ----------
   async function init(){
-    allItems = await fetchAssigned();
-    setActiveTab("missing");
+    try {
+      allItems = await fetchAssigned();
+      setActiveTab("missing");
+    } catch (e) {
+      console.error("init logistics error:", e);
+      if (grid) grid.innerHTML = `<p class="empty">Failed to load items.</p>`;
+    }
   }
 
   if(searchBox) searchBox.addEventListener("input", render);
