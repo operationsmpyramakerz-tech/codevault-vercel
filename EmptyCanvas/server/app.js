@@ -2999,4 +2999,78 @@ app.get('/api/damaged-assets/report/:reportId/pdf', requireAuth, requirePage('Da
     res.status(500).json({ error: 'Failed to generate report PDF' });
   }
 });
+// ================== Logistics: Verify User Password ==================
+app.post("/api/logistics/verify-user", requireAuth, async (req, res) => {
+  try {
+    const { userId, password } = req.body || {};
+    if (!userId || !password) {
+      return res.status(400).json({ ok: false, error: "Missing userId or password" });
+    }
+
+    // Fetch page from Team Members DB
+    const userPage = await notion.pages.retrieve({ page_id: userId });
+    if (!userPage) return res.status(404).json({ ok: false, error: "User not found" });
+
+    const props = userPage.properties || {};
+    const name =
+      props.Name?.title?.[0]?.plain_text ||
+      props.Username?.title?.[0]?.plain_text ||
+      "User";
+
+    const storedPassword = props.Password?.number;
+
+    if (!storedPassword) {
+      return res.status(400).json({ ok: false, error: "Password not set for this user" });
+    }
+
+    if (storedPassword.toString() !== password.toString()) {
+      return res.json({ ok: false, error: "Incorrect password" });
+    }
+
+    return res.json({ ok: true, name });
+  } catch (e) {
+    console.error("verify-user error:", e.body || e);
+    return res.status(500).json({ ok: false, error: "Server error verifying user" });
+  }
+});
+// ========= Get Relation users for "Received from" column =========
+app.get("/api/logistics/receivers", requireAuth, async (req, res) => {
+  try {
+    if (!ordersDatabaseId) {
+      return res.status(500).json({ ok:false, error:"Orders DB missing" });
+    }
+
+    // Get DB schema
+    const db = await notion.databases.retrieve({ database_id: ordersDatabaseId });
+    const props = db.properties || {};
+
+    // Detect the Relation column "Received from"
+    let receivedFromKey = Object.keys(props).find(k =>
+      k.toLowerCase().includes("received from") ||
+      k.toLowerCase().includes("received_from")
+    );
+
+    if (!receivedFromKey) return res.json({ ok:true, users:[] });
+
+    // Get database ID of relation target
+    const relDbId = props[receivedFromKey]?.relation?.database_id;
+    if (!relDbId) return res.json({ ok:true, users:[] });
+
+    // Fetch all users from relation target database
+    const result = await notion.databases.query({
+      database_id: relDbId,
+      sorts: [{ property: "Name", direction: "ascending" }],
+    });
+
+    const users = result.results.map(p => ({
+      id: p.id,
+      name: p.properties?.Name?.title?.[0]?.plain_text || "Unnamed"
+    }));
+
+    return res.json({ ok:true, users });
+  } catch (e) {
+    console.error("GET /api/logistics/receivers error:", e.body || e);
+    return res.status(500).json({ ok:false, error:"Failed to load receiver users" });
+  }
+});
 module.exports = app;
