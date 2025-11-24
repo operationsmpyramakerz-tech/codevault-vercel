@@ -84,14 +84,13 @@
   }
 
   // ---------- Local Save (Full / Partial) ----------
-  // مابقاش يكلّم الباك إند مباشرة، بيعدّل الـ state بس
   function setLocalReceive(itemId, quantity){
     const item = allItems.find(x=>x.id == itemId);
     if(!item) return;
     item.rec = quantity;
     item.remaining = Math.max(0, item.requested - quantity);
 
-    // نعيد فتح نفس المودال علشان تحديث عرض Req / Rec
+    // نعيد فتح نفس المودال
     if (currentOrderReason) openOrderModal(currentOrderReason);
   }
 
@@ -110,103 +109,104 @@
     if(!grid) return;
     grid.innerHTML = "";
 
-    const q = (searchBox?.value || "").toLowerCase();
+    const search = (searchBox?.value || "").trim().toLowerCase();
 
-    let items = allItems.filter(it =>
-      activeTab === "missing" ? it.rec === 0 : it.rec > 0
-    );
+    const filtered = allItems.filter(it => {
+      if (activeTab === "missing" && it.remaining <= 0) return false;
+      if (activeTab === "received" && it.remaining > 0) return false;
+      if (search && !it.productName.toLowerCase().includes(search) && !it.reason.toLowerCase().includes(search)) return false;
+      return true;
+    });
 
-    if(q){
-      items = items.filter(it =>
-        it.productName.toLowerCase().includes(q) ||
-        it.reason.toLowerCase().includes(q)
-      );
-    }
+    const groups = groupOrders(filtered);
 
-    const groups = groupOrders(items);
-
-    if(!groups.length){
-      grid.innerHTML = `<p class="empty">No items.</p>`;
+    if (!groups.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty muted";
+      empty.textContent = "No items found.";
+      grid.appendChild(empty);
       return;
     }
 
-    for(const g of groups){
+    groups.forEach(({reason, items}, index) => {
       const card = document.createElement("div");
       card.className = "order-card";
+      card.style.animationDelay = `${index * 0.1}s`; // أنيميشن متتالي
 
-      card.innerHTML = `
-        <div class="order-card__head">
-          <h3>${esc(g.reason)}</h3>
-          <button class="btn btn-primary btn-sm order-btn" data-reason="${esc(g.reason)}">
-            Received
-          </button>
-        </div>
+      const header = document.createElement("div");
+      header.className = "order-header";
+      header.innerHTML = `<span class="order-reason">${esc(reason)}</span> <span class="muted" style="font-size:0.85rem;">(${items.length} items)</span>`;
+      card.appendChild(header);
 
-        <div class="order-card__items">
-          ${g.items.map(it=>`
-            <div class="order-item-mini">
-              ${esc(it.productName)} — Req: ${it.requested}
-            </div>
-          `).join("")}
-        </div>
-      `;
+      items.forEach(it => {
+        const itemEl = document.createElement("div");
+        itemEl.className = "order-item";
+        itemEl.innerHTML = `
+          <span class="item-name">${esc(it.productName)}</span>
+          <span class="item-qty">Req: ${it.requested} | Rec: ${it.rec}</span>
+        `;
+        card.appendChild(itemEl);
+      });
+
+      const btn = document.createElement("button");
+      btn.className = "order-btn";
+      btn.dataset.reason = reason;
+      btn.innerHTML = `<i data-feather="truck"></i> Receive Items`;
+      card.appendChild(btn);
 
       grid.appendChild(card);
-    }
+    });
 
+    feather.replace();
     wireOrderButtons();
   }
 
   // ---------- Open Modal ----------
-  function openOrderModal(reason){
+  async function openOrderModal(reason){
     currentOrderReason = reason;
-    const items = allItems.filter(it=>it.reason === reason);
 
-    modalTitle.textContent = reason;
+    if (modalTitle) modalTitle.textContent = `Receive Items for: ${esc(reason)}`;
+    if (modalBody) modalBody.innerHTML = "";
 
-    modalBody.innerHTML = items.map(it => `
-      <div class="modal-item-row">
-        <div class="modal-item-left">
-          <strong>${esc(it.productName)}</strong><br>
-          Req: ${it.requested} — Rec: ${it.rec}
+    const items = allItems.filter(it => it.reason === reason);
+
+    if (receiverSelect && !receiverSelect.options.length) {
+      const users = await ensureReceiversLoaded();
+      users.forEach(u => {
+        const opt = document.createElement("option");
+        opt.value = u.id;
+        opt.textContent = u.name;
+        receiverSelect.appendChild(opt);
+      });
+    }
+
+    items.forEach(it => {
+      const div = document.createElement("div");
+      div.className = "modal-item";
+      div.innerHTML = `
+        <div class="item-details">
+          <span>${esc(it.productName)}</span>
+          <span>Req: ${it.requested} | Rec: ${it.rec} | Remaining: ${it.remaining}</span>
         </div>
-
-        <div class="modal-item-right">
-          <button class="btn btn-success btn-xs" data-act="full" data-id="${it.id}">
-            Full
-          </button>
-
-          <button class="btn btn-warning btn-xs" data-act="partial" data-id="${it.id}">
-            Partial
-          </button>
-
-          <div class="partial-box" id="pbox-${it.id}" style="display:none;">
-            <input type="number" class="pinput" min="0" id="pinput-${it.id}" placeholder="Qty">
-            <button class="btn btn-primary btn-xxs" data-act="save" data-id="${it.id}">
-              Save
-            </button>
-          </div>
+        <div class="item-actions" style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn btn-full" data-act="full" data-id="${it.id}">Full Receive</button>
+          <button class="btn btn-partial" data-act="partial" data-id="${it.id}">Partial</button>
         </div>
-      </div>
-    `).join("");
+        <div id="pbox-${it.id}" class="partial-box" style="display:none;">
+          <input id="pinput-${it.id}" type="number" min="1" max="${it.requested}" placeholder="Quantity" style="width:100%; margin-bottom:6px;"/>
+          <button class="btn btn-save" data-act="save" data-id="${it.id}">Save Partial</button>
+        </div>
+      `;
+      modalBody.appendChild(div);
+    });
 
     modal.style.display = "flex";
     wireModalButtons();
-
-    // حمّل قائمة الـ receivers جوه نفس المودال
-    ensureReceiversLoaded().then(users=>{
-      if (!receiverSelect) return;
-      receiverSelect.innerHTML = users.map(u =>
-        `<option value="${u.id}">${esc(u.name)}</option>`
-      ).join("");
-    });
   }
 
-  // ---------- Submit Current Order (inside modal) ----------
+  // ---------- Submit ----------
   async function submitCurrentOrder(){
-    if (!currentOrderReason) return;
-
-    const userId   = receiverSelect?.value || "";
+    const userId = receiverSelect?.value || "";
     const password = (receiverPass?.value || "").trim();
 
     if (!userId) {
@@ -226,7 +226,7 @@
         return;
       }
 
-      // 2) جهّز الـ itemIds و الـ recMap و statusById للطلب الحالي
+      // 2) جهّز الـ itemIds و الـ recMap و statusById
       const items = allItems.filter(it => it.reason === currentOrderReason);
 
       const itemIds    = [];
@@ -250,7 +250,7 @@
         return;
       }
 
-      // 3) إرسال مرة واحدة للباك إند
+      // 3) إرسال
       await postJSON("/api/logistics/mark-received", {
         itemIds,
         statusById,
@@ -276,7 +276,7 @@
   function wireModalButtons(){
 
     // Full
-    $$(".btn[data-act='full']").forEach(btn=>{
+    $$(".btn-full").forEach(btn=>{
       btn.onclick = ()=>{
         const id = btn.dataset.id;
         const item = allItems.find(x=>x.id == id);
@@ -285,7 +285,7 @@
     });
 
     // Partial toggle
-    $$(".btn[data-act='partial']").forEach(btn=>{
+    $$(".btn-partial").forEach(btn=>{
       btn.onclick = ()=>{
         const box = $("#pbox-"+btn.dataset.id);
         if (!box) return;
@@ -294,7 +294,7 @@
     });
 
     // Partial Save
-    $$(".btn[data-act='save']").forEach(btn=>{
+    $$(".btn-save").forEach(btn=>{
       btn.onclick = ()=>{
         const id = btn.dataset.id;
         const val = N($("#pinput-"+id)?.value);
