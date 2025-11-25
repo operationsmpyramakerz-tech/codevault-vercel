@@ -2735,3 +2735,31 @@ body.sidebar-mini .container-full-width { padding-left: 24px !important; }
   stroke-width: 2;
 }
 
+/* ... existing code ... */
+
+/* ===== Orders Modal (polished + centered close icon) ===== */
+/* تعديل جديد: إجبار النافذة على التوسط في الشاشة */
+#orderModal {
+  display: none; /* الـ JS بيحولها لـ flex لما تفتح */
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  inset: 0;
+  z-index: 2000; /* رقم عالي عشان تظهر فوق كل حاجة */
+  background: rgba(0, 0, 0, 0.55);
+}
+
+#orderModal .modal-content {
+  position: relative;
+  width: min(680px, 94vw);
+  border-radius: 16px;
+  padding: 14px 14px 16px;
+  background: #fff;
+  box-shadow: 0 24px 48px rgba(0,0,0,.18), 0 4px 16px rgba(0,0,0,.08);
+  /* نلغي أي هوامش خارجية قديمة */
+  margin: 0 !important; 
+}
+
+/* Header uses Flex so the close button is vertically centered */
+.order-modal__head {
+/* ... existing code ... */
