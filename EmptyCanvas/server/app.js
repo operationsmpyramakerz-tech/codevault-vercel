@@ -13,6 +13,7 @@ const ordersDatabaseId = process.env.Products_list;
 const stocktakingDatabaseId = process.env.School_Stocktaking_DB_ID;
 const fundsDatabaseId = process.env.Funds;
 const damagedAssetsDatabaseId = process.env.Damaged_Assets;
+const expensesDatabaseId = process.env.Expenses_Database;
 const NOTION_VER = process.env.NOTION_VERSION || '2022-06-28'; // المطلوب في أمثلة Notion 
 // Team Members DB (from ENV)
 const teamMembersDatabaseId =
@@ -61,6 +62,7 @@ const ALL_PAGES = [
   "Create New Order",
   "Stocktaking",
   "Funds",
+  "Expenses",
   "Logistics",
   "S.V schools orders",
   "Damaged Assets",
@@ -90,6 +92,7 @@ function normalizePages(names = []) {
   if (set.has("create new order")) out.push("Create New Order");
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
+  if (set.has("expenses")) out.push("Expenses");
   if (set.has("logistics")) out.push("Logistics");  if (set.has("s.v schools orders") || set.has("sv schools orders")) out.push("S.V schools orders");
   if (set.has("damaged assets")) out.push("Damaged Assets");
   if (set.has("s.v schools assets") || set.has("sv schools assets")) 
@@ -111,6 +114,9 @@ function expandAllowedForUI(list = []) {
   }
   if (set.has("Funds")) {
     set.add("Funds");
+  }
+  if (set.has("Expenses")) {
+    set.add("Expenses");
   }
   if (set.has("Logistics")) {
     set.add("Logistics");
@@ -153,6 +159,7 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Create New Order")) return "/orders/new";
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
+  if (allowed.includes("Expenses")) return "/expenses";
   return "/login";
 }
 
