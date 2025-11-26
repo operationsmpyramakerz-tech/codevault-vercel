@@ -84,58 +84,6 @@
 
     .cash-btn:hover { transform: scale(1.05); }
 
-    /************** MODALS ******************/
-    .ex-modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-    }
-
-    .ex-modal-box {
-      background: white;
-      padding: 1.8rem;
-      width: 90%;
-      max-width: 420px;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
-
-    .ex-modal-title {
-      font-size: 1.4rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-    }
-
-    .ex-input {
-      width: 100%;
-      padding: 0.8rem;
-      border-radius: 12px;
-      border: 1.5px solid #d1d5db;
-      margin-bottom: 1rem;
-      font-size: 1rem;
-    }
-
-    .ex-modal-actions {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 1rem;
-    }
-
-    .ex-btn {
-      padding: 0.7rem 1.4rem;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .ex-primary { background: #3b82f6; color: white; }
-    .ex-danger { background: #ef4444; color: white; }
-
     .section-date {
       font-size: 0.95rem;
       color: #64748b;
@@ -146,26 +94,57 @@
       padding-left: 0.5rem;
     }
 
+    /* Expense Item Cards - محدث ليشبه الصورة بالضبط */
     .expense-item {
       background: white;
       border-radius: 20px;
-      padding: 1.3rem;
+      padding: 1.2rem 1.4rem;
       margin-bottom: 1rem;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.07);
-      border: 1px solid #f1f5f9;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.05);
       display: flex;
       align-items: center;
-      gap: 1rem;
-      transition: all 0.3s;
+      gap: 1.2rem;
+      transition: all 0.3s ease;
     }
     .expense-item:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    .expense-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .expense-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 0.3rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .expense-description {
+      font-size: 0.9rem;
+      color: #6b7280;
+      margin: 0;
+    }
+    .expense-amount {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ef4444;
+      text-align: right;
     }
 
+    /* Responsive */
+    @media (max-width: 480px) {
+      .expenses-layout { padding: 1rem 0.8rem; }
+      .total-amount { font-size: 2.6rem; }
+      .expense-item { padding: 1rem; gap: 1rem; }
+      .expense-title { font-size: 1rem; }
+      .expense-amount { font-size: 1.1rem; }
+    }
   </style>
 </head>
-
 <body>
 
 <script>
@@ -177,14 +156,12 @@
 </script>
 
 <div class="app-container">
-
-  <!-- Sidebar -->
+  <!-- Sidebar (نفس اللي عندك) -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
       <button id="sidebar-toggle" class="sidebar-toggle"><i data-feather="chevrons-left"></i></button>
     </div>
-
     <nav class="sidebar-nav">
       <ul class="nav-list">
         <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
@@ -201,7 +178,6 @@
         <li><a class="nav-link active" href="/expenses"><i data-feather="dollar-sign"></i><span class="nav-label">Expenses</span></a></li>
       </ul>
     </nav>
-
     <div class="sidebar-footer">
       <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
     </div>
@@ -209,7 +185,6 @@
 
   <!-- Main Content -->
   <div class="main-content">
-
     <header class="main-header">
       <div class="header-row1">
         <div class="left">
@@ -221,15 +196,13 @@
             </div>
           </div>
         </div>
-
         <div class="right topbar-right">
           <a class="account-mini" href="/account">
-            <span class="ico-circle"><img src="/images/logo.png"/></span>
+            <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
             <span class="label">My account</span>
           </a>
         </div>
       </div>
-
       <div class="header-row2">
         <h1 class="page-title">Expenses</h1>
       </div>
@@ -240,7 +213,7 @@
       <!-- Total Card -->
       <div class="total-card">
         <div class="total-label">All Expenses</div>
-        <div class="total-amount" id="totalAmount">£0</div>
+        <div class="total-amount" id="totalAmount">$ -35</div>
         <div>EGP</div>
         <button class="view-all-btn">View All</button>
       </div>
@@ -251,8 +224,25 @@
         <button id="cashOutBtn" class="cash-btn cash-out">− CASH OUT</button>
       </div>
 
-      <!-- Render expenses here -->
-      <div id="expensesContent"></div>
+      <!-- Expenses Content -->
+      <div id="expensesContent">
+        <div class="section-date">2025-11-26</div>
+        <div class="expense-item">
+          <div class="expense-details">
+            <div class="expense-title">Own car</div>
+            <div class="expense-description">t → t</div>
+          </div>
+          <div class="expense-amount">$ -45</div>
+        </div>
+
+        <div class="expense-item">
+          <div class="expense-details">
+            <div class="expense-title">Public transportation</div>
+            <div class="expense-description"></div>
+          </div>
+          <div class="expense-amount">$ -40</div>
+        </div>
+      </div>
 
     </main>
   </div>
