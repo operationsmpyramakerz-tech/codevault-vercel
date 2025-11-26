@@ -191,6 +191,24 @@ async function getCurrentUserNotionId(req) {
     return null;
   }
 }
+async function getCurrentUserRelationPage(req) {
+  const username = req.session?.username;
+  if (!username) return null;
+
+  try {
+    const q = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: username } }
+    });
+
+    if (q.results.length === 0) return null;
+
+    return q.results[0].id;   // page_id — اللى هيستخدم في relation
+  } catch (err) {
+    console.error("Relation user fetch error:", err.body || err);
+    return null;
+  }
+}
 async function getOrdersDBProps() {
   const db = await notion.databases.retrieve({ database_id: ordersDatabaseId });
   return db.properties || {};
@@ -2327,30 +2345,27 @@ app.get("/api/expenses/types", async (req, res) => {
   }
 });
 
-// Cash Out
 app.post("/api/expenses/cash-out", async (req, res) => {
-  const {
-    fundsType,
-    reason,
-    date,
-    from,
-    to,
-    kilometer,
-    amount
-  } = req.body;
+  const { fundsType, reason, date, from, to, amount, kilometer } = req.body;
 
   try {
-    const notionUserId = await getCurrentUserNotionId(req);
+    // get team member relation ID
+    const teamMemberPageId = await getCurrentUserRelationPage(req);
 
+    if (!fundsType || !reason || !date) {
+      return res.status(400).json({ success: false, error: "Missing required fields" });
+    }
+
+    // Build properties
     const props = {
       "Team Member": {
-        people: notionUserId ? [{ id: notionUserId }] : []
-      },
-      "Reason": {
-        rich_text: [{ type: "text", text: { content: reason || "" }}]
+        relation: teamMemberPageId ? [{ id: teamMemberPageId }] : []
       },
       "Funds Type": {
         select: { name: fundsType }
+      },
+      "Reason": {
+        rich_text: [{ type: "text", text: { content: reason }}]
       },
       "Date": {
         date: { start: date }
@@ -2360,28 +2375,32 @@ app.post("/api/expenses/cash-out", async (req, res) => {
       },
       "To": {
         rich_text: [{ type: "text", text: { content: to || "" }}]
-      },
-      "Cash out": {
-        number: parseFloat(amount)
       }
     };
 
-    // Add Kilometer only if "Own car"
+    // Own car case → save kilometer only
     if (fundsType === "Own car") {
       props["Kilometer"] = {
-        number: parseFloat(kilometer) || 0
+        number: Number(kilometer) || 0
+      };
+    } 
+    else {
+      // Normal case → save cash out only
+      props["Cash out"] = {
+        number: Number(amount) || 0
       };
     }
 
+    // Create row inside notion
     await notion.pages.create({
       parent: { database_id: process.env.Expenses_Database },
       properties: props
     });
 
-    res.json({ success: true, message: "Cash out recorded" });
+    res.json({ success: true, message: "Cash out saved successfully" });
 
   } catch (err) {
-    console.error("Cash out error:", err);
+    console.error("Cash out error:", err.body || err);
     res.status(500).json({ success: false, error: "Failed to save cash out" });
   }
 });
