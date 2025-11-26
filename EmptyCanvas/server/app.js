@@ -2429,6 +2429,112 @@ app.post("/api/expenses/cash-in", async (req, res) => {
         }
       }
     });
+// ================== EXPENSES API ==================
+
+// Get Funds Type Options
+app.get("/api/expenses/types", async (req, res) => {
+  try {
+    const response = await notion.databases.retrieve({
+      database_id: process.env.Expenses_Database,
+    });
+
+    const options = response.properties["Funds Type"].select.options
+      .map(opt => opt.name);
+
+    res.json({ success: true, options });
+  } catch (err) {
+    console.error("Error loading Funds Type:", err);
+    res.json({
+      success: false,
+      options: [],
+      error: "Cannot load Funds Type"
+    });
+  }
+});
+
+// Cash Out
+app.post("/api/expenses/cash-out", async (req, res) => {
+  const {
+    fundsType,
+    reason,
+    date,
+    from,
+    to,
+    kilometer,
+    amount
+  } = req.body;
+
+  try {
+    const notionUserId = await getCurrentUserNotionId(req);
+
+    const props = {
+      "Team Member": {
+        people: notionUserId ? [{ id: notionUserId }] : []
+      },
+      "Reason": {
+        rich_text: [{ type: "text", text: { content: reason || "" }}]
+      },
+      "Funds Type": {
+        select: { name: fundsType }
+      },
+      "Date": {
+        date: { start: date }
+      },
+      "From": {
+        rich_text: [{ type: "text", text: { content: from || "" }}]
+      },
+      "To": {
+        rich_text: [{ type: "text", text: { content: to || "" }}]
+      },
+      "Cash out": {
+        number: parseFloat(amount)
+      }
+    };
+
+    // Add Kilometer only if "Own car"
+    if (fundsType === "Own car") {
+      props["Kilometer"] = {
+        number: parseFloat(kilometer) || 0
+      };
+    }
+
+    await notion.pages.create({
+      parent: { database_id: process.env.Expenses_Database },
+      properties: props
+    });
+
+    res.json({ success: true, message: "Cash out recorded" });
+
+  } catch (err) {
+    console.error("Cash out error:", err);
+    res.status(500).json({ success: false, error: "Failed to save cash out" });
+  }
+});
+
+// Cash In
+app.post("/api/expenses/cash-in", async (req, res) => {
+  const { date, amount, cashInFrom } = req.body;
+
+  try {
+    const notionUserId = await getCurrentUserNotionId(req);
+
+    await notion.pages.create({
+      parent: { database_id: process.env.Expenses_Database },
+      properties: {
+        "Team Member": {
+          people: notionUserId ? [{ id: notionUserId }] : []
+        },
+        "Date": {
+          date: { start: date }
+        },
+        "Cash in": {
+          number: parseFloat(amount)
+        },
+        "Cash in from": {
+          rich_text: [{ type: "text", text: { content: cashInFrom || "" }}]
+        }
+      }
+    });
 
     res.json({ success: true, message: "Cash in recorded" });
 
@@ -2438,6 +2544,7 @@ app.post("/api/expenses/cash-in", async (req, res) => {
   }
 });
 
+// Fetch All Expenses
 app.get("/api/expenses", async (req, res) => {
   try {
     const list = await notion.databases.query({
@@ -2452,10 +2559,10 @@ app.get("/api/expenses", async (req, res) => {
       fundsType: page.properties["Funds Type"].select?.name || "",
       from: page.properties["From"].rich_text?.[0]?.plain_text || "",
       to: page.properties["To"].rich_text?.[0]?.plain_text || "",
-      kilometer: page.properties["Kilometer"].number || 0,
-      cashIn: page.properties["Cash in"].number || 0,
-      cashOut: page.properties["Cash out"].number || 0,
-      cashInFrom: page.properties["Cash in from"].rich_text?.[0]?.plain_text || ""
+      kilometer: page.properties["Kilometer"]?.number || 0,
+      cashIn: page.properties["Cash in"]?.number || 0,
+      cashOut: page.properties["Cash out"]?.number || 0,
+      cashInFrom: page.properties["Cash in from"]?.rich_text?.[0]?.plain_text || ""
     }));
 
     res.json({ success: true, items: formatted });
