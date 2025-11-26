@@ -2362,28 +2362,33 @@ app.post("/api/expenses/cash-out", async (req, res) => {
       "Team Member": {
         relation: teamMemberPageId ? [{ id: teamMemberPageId }] : []
       },
+
       "Funds Type": {
         select: { name: fundsType }
       },
+
+      // 🔥 FIXED HERE — Reason must be title
       "Reason": {
-        rich_text: [{ type: "text", text: { content: reason } }]
+        title: [{ text: { content: reason }}]
       },
+
       "Date": {
         date: { start: date }
       },
+
       "From": {
-        rich_text: [{ type: "text", text: { content: from || "" } }]
+        rich_text: [{ type: "text", text: { content: from || "" }}]
       },
+
       "To": {
-        rich_text: [{ type: "text", text: { content: to || "" } }]
+        rich_text: [{ type: "text", text: { content: to || "" }}]
       },
-      // دايمًا نسجل الـ Cash out (العمود ده موجود و Required في الـ DB)
+
       "Cash out": {
         number: Number(amount) || 0
       }
     };
 
-    // لو Own car نزود كمان Kilometer
     if (fundsType === "Own car") {
       props["Kilometer"] = {
         number: Number(kilometer) || 0
@@ -2406,7 +2411,7 @@ app.post("/api/expenses/cash-out", async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      error: errorMessage   // الـ frontend هيعرض ده في الـ alert
+      error: errorMessage
     });
   }
 });
