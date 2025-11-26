@@ -8,6 +8,58 @@
   <script src="https://unpkg.com/feather-icons"></script>
 
   <style>
+    /* ============================
+   iOS Style Bottom Sheet Modal
+   ============================ */
+
+.ios-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(4px);
+  display: none;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 99999;
+}
+
+/* Sheet box */
+.ios-sheet {
+  width: 100%;
+  max-width: 540px;
+  background: white;
+  border-radius: 22px 22px 0 0;
+  padding: 1.4rem;
+  box-shadow: 0 -6px 30px rgba(0,0,0,0.15);
+
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(.25,.1,.25,1);
+}
+
+/* drag handle */
+.ios-drag {
+  width: 45px;
+  height: 5px;
+  background: #ddd;
+  border-radius: 4px;
+  margin: 0 auto 14px;
+}
+
+/* scroll area */
+#allExpensesList {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Smooth scroll */
+#allExpensesList::-webkit-scrollbar {
+  width: 5px;
+}
+#allExpensesList::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
     .expenses-layout {
       max-width: 560px;
       margin: 0 auto;
@@ -489,9 +541,30 @@
 
   </div>
 </div>
+
+  <!-- iOS STYLE ALL EXPENSES MODAL -->
+<div id="allExpensesModal" class="ios-modal">
+  <div class="ios-sheet" id="iosSheet">
+
+    <div class="ios-drag"></div>
+
+    <h3 class="ex-modal-title" style="text-align:center;">All Expenses</h3>
+
+    <div id="allExpensesList"></div>
+
+    <button onclick="closeAllExpensesModal()" 
+            style="margin-top:1rem; width:100%; padding:0.9rem;
+                   border:none; background:#ef4444; color:white;
+                   border-radius:14px; font-weight:700;">
+      Close
+    </button>
+
+  </div>
+</div>
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/expenses.js"></script>
 
+  
 </body>
 </html>
