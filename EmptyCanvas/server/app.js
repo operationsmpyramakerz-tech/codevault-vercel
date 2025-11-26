@@ -2440,11 +2440,15 @@ app.post("/api/expenses/cash-in", async (req, res) => {
     });
 
     res.json({ success: true, message: "Cash in recorded" });
+} catch (err) {
+  console.error("❌ Cash in error (RAW):", err);
+  console.error("❌ Cash in error BODY:", err.body);
 
-  } catch (err) {
-    console.error("Cash in error:", err);
-    res.status(500).json({ success: false, error: "Failed to save cash in" });
-  }
+  res.status(500).json({
+    success: false,
+    error: err.body || err.message || "Failed to save cash in"
+  });
+}
 });
 
 // Fetch All Expenses
