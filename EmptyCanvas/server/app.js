@@ -2462,21 +2462,36 @@ app.post("/api/expenses/cash-in", async (req, res) => {
 }
 });
 
-// Fetch All Expenses
+// Fetch All Expenses — FILTER BY CURRENT USER ONLY
 app.get("/api/expenses", async (req, res) => {
   try {
+    // Get current user's Team Member relation PAGE ID
+    const teamMemberPageId = await getCurrentUserRelationPage(req);
+
+    if (!teamMemberPageId) {
+      return res.json({ success: true, items: [] });
+    }
+
+    // Query only expenses that belong to THIS user
     const list = await notion.databases.query({
       database_id: process.env.Expenses_Database,
+      filter: {
+        property: "Team Member",
+        relation: {
+          contains: teamMemberPageId
+        }
+      },
       sorts: [{ property: "Date", direction: "descending" }]
     });
 
+    // Format results
     const formatted = list.results.map(page => ({
       id: page.id,
-      date: page.properties["Date"].date?.start || null,
-      reason: page.properties["Reason"].rich_text?.[0]?.plain_text || "",
-      fundsType: page.properties["Funds Type"].select?.name || "",
-      from: page.properties["From"].rich_text?.[0]?.plain_text || "",
-      to: page.properties["To"].rich_text?.[0]?.plain_text || "",
+      date: page.properties["Date"]?.date?.start || null,
+      reason: page.properties["Reason"]?.rich_text?.[0]?.plain_text || "",
+      fundsType: page.properties["Funds Type"]?.select?.name || "",
+      from: page.properties["From"]?.rich_text?.[0]?.plain_text || "",
+      to: page.properties["To"]?.rich_text?.[0]?.plain_text || "",
       kilometer: page.properties["Kilometer"]?.number || 0,
       cashIn: page.properties["Cash in"]?.number || 0,
       cashOut: page.properties["Cash out"]?.number || 0,
@@ -2486,7 +2501,7 @@ app.get("/api/expenses", async (req, res) => {
     res.json({ success: true, items: formatted });
 
   } catch (err) {
-    console.error(err);
+    console.error("Expenses load error:", err.body || err);
     res.json({ success: false, error: "Cannot load expenses" });
   }
 });
