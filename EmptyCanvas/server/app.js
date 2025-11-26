@@ -2295,6 +2295,141 @@ app.get("/api/logistics", requireAuth, requirePage("Logistics"), async (req, res
   }
 });
 
+app.get("/api/expenses/types", async (req, res) => {
+  try {
+    const response = await notion.databases.retrieve({
+      database_id: process.env.Expenses_Database,
+    });
+
+    const options = response.properties["Funds Type"].select.options
+      .map(opt => opt.name);
+
+    res.json({ success: true, options });
+  } catch (err) {
+    console.error("Error loading Funds Type:", err);
+    res.json({
+      success: false,
+      options: [],
+      error: "Cannot load Funds Type"
+    });
+  }
+});
+
+app.post("/api/expenses/cash-out", async (req, res) => {
+  const {
+    fundsType,
+    reason,
+    date,
+    from,
+    to,
+    kilometer,
+    amount
+  } = req.body;
+
+  try {
+    const page = await notion.pages.create({
+      parent: { database_id: process.env.Expenses_Database },
+      properties: {
+        "Team Member": {
+          people: [{ id: req.session.user.notionId }]
+        },
+        "Reason": {
+          rich_text: [{ type: "text", text: { content: reason || "" }}]
+        },
+        "Funds Type": {
+          select: { name: fundsType }
+        },
+        "Date": {
+          date: { start: date }
+        },
+        "From": {
+          rich_text: [{ type: "text", text: { content: from || "" }}]
+        },
+        "To": {
+          rich_text: [{ type: "text", text: { content: to || "" }}]
+        },
+        "Cash out": {
+          number: parseFloat(amount)
+        }
+      }
+    });
+
+    // Kilometer only if Own Car
+    if (fundsType === "Own car") {
+      page.properties["Kilometer"] = {
+        number: parseFloat(kilometer) || 0
+      };
+    }
+
+    res.json({ success: true, message: "Cash out recorded" });
+
+  } catch (err) {
+    console.error("Cash out error:", err);
+    res.status(500).json({ success: false, error: "Failed to save cash out" });
+  }
+});
+
+app.post("/api/expenses/cash-in", async (req, res) => {
+  const {
+    date,
+    amount,
+    cashInFrom
+  } = req.body;
+
+  try {
+    await notion.pages.create({
+      parent: { database_id: process.env.Expenses_Database },
+      properties: {
+        "Team Member": {
+          people: [{ id: req.session.user.notionId }]
+        },
+        "Date": {
+          date: { start: date }
+        },
+        "Cash in": {
+          number: parseFloat(amount)
+        },
+        "Cash in from": {
+          rich_text: [{ type: "text", text: { content: cashInFrom || "" }}]
+        }
+      }
+    });
+
+    res.json({ success: true, message: "Cash in recorded" });
+
+  } catch (err) {
+    console.error("Cash in error:", err);
+    res.status(500).json({ success: false, error: "Failed to save cash in" });
+  }
+});
+
+app.get("/api/expenses", async (req, res) => {
+  try {
+    const list = await notion.databases.query({
+      database_id: process.env.Expenses_Database,
+      sorts: [{ property: "Date", direction: "descending" }]
+    });
+
+    const formatted = list.results.map(page => ({
+      id: page.id,
+      date: page.properties["Date"].date?.start || null,
+      reason: page.properties["Reason"].rich_text?.[0]?.plain_text || "",
+      fundsType: page.properties["Funds Type"].select?.name || "",
+      from: page.properties["From"].rich_text?.[0]?.plain_text || "",
+      to: page.properties["To"].rich_text?.[0]?.plain_text || "",
+      kilometer: page.properties["Kilometer"].number || 0,
+      cashIn: page.properties["Cash in"].number || 0,
+      cashOut: page.properties["Cash out"].number || 0,
+      cashInFrom: page.properties["Cash in from"].rich_text?.[0]?.plain_text || ""
+    }));
+
+    res.json({ success: true, items: formatted });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, error: "Cannot load expenses" });
+  }
+});
 
 // === Helper: upload base64 image to Vercel Blob (SDK v2) and return a public URL ===
 async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
