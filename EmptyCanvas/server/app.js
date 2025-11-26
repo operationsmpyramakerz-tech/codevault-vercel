@@ -1038,6 +1038,7 @@ app.post(
     }
   },
 );
+
 // --- Logistics: mark-received (Status + Quantity received by operations) ---
 app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
   try {
@@ -1051,7 +1052,6 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     const REC_PROP_ENV    = (process.env.NOTION_REC_PROP    || '').trim(); // "Quantity received by operations"
     const AVAIL_PROP_ENV  = (process.env.NOTION_AVAIL_PROP  || '').trim(); // e.g. "Available"
 
-    // Prefer your exact column name if present in the file's scope
     const REC_HARDBIND = (typeof REC_PROP_HARDBIND !== 'undefined' && REC_PROP_HARDBIND)
       ? REC_PROP_HARDBIND
       : (REC_PROP_ENV || 'Quantity received by operations');
@@ -1079,7 +1079,6 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     const results = [];
 
     for (const pageId of itemIds) {
-      // Get fresh properties
       const page  = await notion.pages.retrieve({ page_id: pageId });
       const props = page?.properties || {};
 
@@ -1108,13 +1107,12 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
         REC_HARDBIND,
         'number',
         ['Quantity received by operations', 'Received Qty', 'Received Quantity', 'Quantity Received', 'Rec', 'REC'],
-        '(received|rec\b)'
+        '(received|rec\\b)'
       );
 
       const reqNow   = Number(props?.[requestedPropName]?.number ?? NaN);
       const availNow = Number(props?.[availablePropName]?.number ?? NaN);
 
-      // Rec mirrors the latest Available. If no available column, fall back to recMap
       let recValue = Number(recMap[pageId]);
       if (Number.isFinite(availNow)) recValue = availNow;
 
@@ -1122,14 +1120,12 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
         ? Math.max(0, reqNow - availNow)
         : NaN;
 
-      // Rule: req = avail AND rec < req AND missing = 0 => move to Prepared
       const forceFullyPrepared =
         Number.isFinite(reqNow) && Number.isFinite(availNow) &&
         reqNow === availNow && Number.isFinite(recValue) && recValue < reqNow && missing === 0;
 
       const updateProps = {};
 
-      // Write Rec
       if (Number.isFinite(recValue)) {
         if (recPropName && props[recPropName]?.type === 'number') {
           updateProps[recPropName] = { number: recValue };
@@ -1138,10 +1134,9 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
         }
       }
 
-      // Write Status
       const nextStatusName = forceFullyPrepared ? 'Prepared' : String(statusById[pageId] || '').trim();
       if (nextStatusName && statusPropName && props[statusPropName]) {
-        const t = props[statusPropName].type; // "select" or "status"
+        const t = props[statusPropName].type;
         if (t === 'select') {
           updateProps[statusPropName] = { select: { name: nextStatusName } };
         } else if (t === 'status') {
@@ -1164,129 +1159,8 @@ app.post('/api/logistics/mark-received', requireAuth, async (req, res) => {
     return res.status(500).json({ ok: false, error: 'Failed to mark received' });
   }
 });
-app.get(
-  "/api/orders/assigned/pdf",
-  requireAuth,
-  requirePage("Assigned Schools Requested Orders"),
-  async (req, res) => {
-    // 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
-// يستخدم ids=pageId1,pageId2,...
-app.get(
-  "/api/orders/assigned/receipt",
-  requireAuth,
-  requirePage("Assigned Schools Requested Orders"),
-  async (req, res) => {
-    try {
-      const userId = await getCurrentUserPageId(req.session.username);
-      if (!userId) return res.status(404).json({ error: "User not found." });
 
-      const assignedProp  = await detectAssignedPropName();
-      const availableProp = await detectAvailableQtyPropName();
-      const statusProp    = await detectStatusPropName();
-
-      const ids = String(req.query.ids || "")
-        .split(",")
-        .map(s => s.trim())
-        .filter(Boolean);
-
-      if (!ids.length) {
-        return res.status(400).json({ error: "ids query is required" });
-      }
-
-      // اجمع العناصر المطلوبة فقط (ولازم تكون مُسندة للمستخدم)
-      const items = [];
-      let reasonTitle = "";
-      let createdAt = null;
-
-      for (const id of ids) {
-        try {
-          const page = await notion.pages.retrieve({ page_id: id });
-          const props = page.properties || {};
-
-          // تأكد أنها مُسندة للمستخدم الحالي
-          const rel = props[assignedProp]?.relation || [];
-          const isMine = Array.isArray(rel) && rel.some(r => r.id === userId);
-          if (!isMine) continue;
-
-          // الاسم + الأرقام
-          let productName = "Unknown Product";
-          const relP = props.Product?.relation;
-          if (Array.isArray(relP) && relP.length) {
-            try {
-              const productPage = await notion.pages.retrieve({ page_id: relP[0].id });
-              productName =
-                productPage.properties?.Name?.title?.[0]?.plain_text || productName;
-            } catch {}
-          }
-
-          const requested = Number(props["Quantity Requested"]?.number || 0);
-          const available = availableProp ? Number(props[availableProp]?.number || 0) : 0;
-          const status    = statusProp ? (props[statusProp]?.select?.name || "") : "";
-
-          items.push({
-            productName,
-            requested,
-            available,
-            status
-          });
-
-          // استخدم أول عنصر لمعلومات عامة للغلاف (السبب + التاريخ)
-          if (!reasonTitle) {
-            reasonTitle = props.Reason?.title?.[0]?.plain_text || "";
-            createdAt = page.created_time || null;
-          }
-        } catch {}
-      }
-
-      if (!items.length) {
-        return res.status(404).json({ error: "No items found for this receipt." });
-      }
-
-      // === PDF ===
-      const fname = `Receipt-${new Date().toISOString().slice(0, 10)}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
-
-      const doc = new PDFDocument({ size: "A4", margin: 36 });
-      doc.pipe(res);
-
-      // Header
-      doc.font("Helvetica-Bold").fontSize(18).text("Components Receipt", { align: "left" });
-      doc.moveDown(0.3);
-      doc.font("Helvetica").fontSize(10).fillColor("#555")
-        .text(`Generated: ${new Date().toLocaleString()}`, { continued: true })
-        .text(`   •   User: ${req.session.username || "-"}`);
-
-      if (reasonTitle) {
-        doc.moveDown(0.3);
-        doc.font("Helvetica").fontSize(11).fillColor("#111")
-          .text(`Reason: ${reasonTitle}`);
-      }
-      if (createdAt) {
-        doc.font("Helvetica").fontSize(10).fillColor("#777")
-          .text(`Order created: ${new Date(createdAt).toLocaleString()}`);
-      }
-
-      doc.moveDown(0.8);
-      const pageInnerWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-
-      // Table columns
-      const colNameW = Math.floor(pageInnerWidth * 0.60);
-      const colReqW  = Math.floor(pageInnerWidth * 0.18);
-      const colAvailW= pageInnerWidth - colNameW - colReqW;
-
-      const drawHead = () => {
-        const y = doc.y, h = 22;
-        doc.save();
-        doc.roundedRect(doc.page.margins.left, y, pageInnerWidth, h, 6)
-          .fillColor("#F3F4F6").strokeColor("#E5E7EB").lineWidth(1).fillAndStroke();
-        doc.fillColor("#111").font("Helvetica-Bold").fontSize(10);
-        doc.text("Component", doc.page.margins.left + 10, y + 6, { width: colNameW });
-        doc.text("Quantity",  doc.page.margins.left + 10 + colNameW, y + 6, {
-          width: colReqW - 10, align: "right",
-        });
-
-        // 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
+// 4-b) PDF استلام المكونات (Receipt) لمجموعة عناصر طلب (ids)
 // يستخدم ids=pageId1,pageId2,...
 app.get(
   "/api/orders/assigned/receipt",
@@ -1438,7 +1312,9 @@ app.get(
     }
   },
 );
-    app.get(
+
+// 4-c) PDF النواقص للطلبات المسندة (Shortage List)
+app.get(
   "/api/orders/assigned/pdf",
   requireAuth,
   requirePage("Assigned Schools Requested Orders"),
@@ -1510,7 +1386,6 @@ app.get(
         }
       }
 
-      // PDF
       const fname = `Assigned-Shortage-${new Date().toISOString().slice(0, 10)}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
@@ -1568,7 +1443,7 @@ app.get(
     }
   },
 );
-
+      
 // Components list — requires Create New Order
 app.get(
   "/api/components",
