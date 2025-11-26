@@ -2398,10 +2398,14 @@ app.post("/api/expenses/cash-out", async (req, res) => {
 
     res.json({ success: true, message: "Cash out saved successfully" });
   } catch (err) {
-    console.error("Cash out error:", err.body || err);
-    res.status(500).json({ success: false, error: "Failed to save cash out" });
-  }
-});
+  console.error("Cash out error:", err.body || err);
+
+  return res.status(500).json({
+    success: false,
+    error: "Cash out error",
+    details: err.body || err
+  });
+}
 
 // Cash In
 app.post("/api/expenses/cash-in", async (req, res) => {
