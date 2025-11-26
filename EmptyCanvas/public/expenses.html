@@ -61,6 +61,82 @@
       backdrop-filter: blur(10px);
     }
 
+    .expense-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.cash-btn {
+  flex: 1;
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  color: white;
+  transition: 0.2s;
+}
+
+.cash-in { background: linear-gradient(135deg, #22c55e, #16a34a); margin-right: 0.7rem; }
+.cash-out { background: linear-gradient(135deg, #ef4444, #dc2626); margin-left: 0.7rem; }
+
+.cash-btn:hover { transform: scale(1.05); }
+
+
+/************** MODALS ******************/
+.ex-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.ex-modal-box {
+  background: white;
+  padding: 1.8rem;
+  width: 90%;
+  max-width: 420px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.ex-modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.ex-input {
+  width: 100%;
+  padding: 0.8rem;
+  border-radius: 12px;
+  border: 1.5px solid #d1d5db;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.ex-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+.ex-btn {
+  padding: 0.7rem 1.4rem;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ex-primary { background: #3b82f6; color: white; }
+.ex-danger { background: #ef4444; color: white; }
+
     /* Section Title */
     .section-date {
       font-size: 0.95rem;
@@ -229,6 +305,95 @@
         <div>USD</div>
         <button class="view-all-btn">View All</button>
       </div>
+
+      <main class="expenses-layout">
+
+  <!-- Total Card -->
+  <div class="total-card">
+    <div class="total-label">All Expenses</div>
+    <div class="total-amount" id="totalAmount">$0</div>
+    <div>USD</div>
+    <button class="view-all-btn">View All</button>
+  </div>
+
+  <!-- ACTION BUTTONS -->
+  <div class="expense-buttons">
+    <button id="cashInBtn" class="cash-btn cash-in">+ CASH IN</button>
+    <button id="cashOutBtn" class="cash-btn cash-out">− CASH OUT</button>
+  </div>
+
+  <!-- Dynamic grouped expenses will be inserted here -->
+  <div id="expensesContent"></div>
+
+</main>
+
+
+<!-- ================= CASH IN MODAL ================= -->
+<div id="cashInModal" class="ex-modal">
+  <div class="ex-modal-box">
+
+    <h3 class="ex-modal-title">Add Cash In</h3>
+
+    <label>Date</label>
+    <input id="ci_date" type="date" class="ex-input"/>
+
+    <label>Cash in</label>
+    <input id="ci_cash" type="number" class="ex-input"/>
+
+    <label>Cash in from</label>
+    <input id="ci_from" type="text" class="ex-input"/>
+
+    <div class="ex-modal-actions">
+      <button id="ci_submit" class="ex-btn ex-primary">Submit</button>
+      <button class="ex-btn ex-danger" onclick="closeCashInModal()">Close</button>
+    </div>
+
+  </div>
+</div>
+
+
+
+
+<!-- ================= CASH OUT MODAL ================= -->
+<div id="cashOutModal" class="ex-modal">
+  <div class="ex-modal-box">
+
+    <h3 class="ex-modal-title">Add Cash Out</h3>
+
+    <label>Funds Type</label>
+    <select id="co_type" class="ex-input"></select>
+
+    <label>Reason</label>
+    <input id="co_reason" type="text" class="ex-input"/>
+
+    <label>Date</label>
+    <input id="co_date" type="date" class="ex-input"/>
+
+    <label>From</label>
+    <input id="co_from" type="text" class="ex-input"/>
+
+    <label>To</label>
+    <input id="co_to" type="text" class="ex-input"/>
+
+    <!-- This field appears ONLY when funds type = Own car -->
+    <div id="co_km_block" style="display:none;">
+      <label>Kilometer</label>
+      <input id="co_km" type="number" class="ex-input"/>
+    </div>
+
+    <!-- This field appears ONLY when funds type != Own car -->
+    <div id="co_cash_block">
+      <label>Cash out</label>
+      <input id="co_cash" type="number" class="ex-input"/>
+    </div>
+
+    <div class="ex-modal-actions">
+      <button id="co_submit" class="ex-btn ex-primary">Submit</button>
+      <button class="ex-btn ex-danger" onclick="closeCashOutModal()">Close</button>
+    </div>
+
+  </div>
+</div>
 
       <!-- Today -->
       <div class="section-date">Today</div>
