@@ -258,7 +258,7 @@ async function loadExpenses() {
     }
 
     container.innerHTML = html || "<p>No expenses yet.</p>";
-}
+    
     } catch (err) {
         console.error("Load expenses error:", err);
         if (container) container.innerHTML = "<p>Error loading data</p>";
