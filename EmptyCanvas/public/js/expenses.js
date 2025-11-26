@@ -30,8 +30,12 @@ async function loadFundsTypes() {
         // KM logic
         sel.addEventListener("change", () => {
             const v = sel.value;
-            document.getElementById("co_km_block").style.display = v === "Own car" ? "block" : "none";
-            document.getElementById("co_cash_block").style.display = v !== "Own car" ? "block" : "none";
+            const kmBlock   = document.getElementById("co_km_block");
+            const cashBlock = document.getElementById("co_cash_block");
+            if (kmBlock && cashBlock) {
+                kmBlock.style.display  = v === "Own car" ? "block" : "none";
+                cashBlock.style.display = v === "Own car" ? "none"  : "block";
+            }
         });
     }
 }
@@ -40,60 +44,86 @@ async function loadFundsTypes() {
    OPEN / CLOSE MODALS
    ============================= */
 function openCashInModal() {
-    document.getElementById("ci_date").value = "";
-    document.getElementById("ci_cash").value = "";
-    document.getElementById("ci_from").value = "";
-    document.getElementById("cashInModal").style.display = "flex";
+    const d = document.getElementById("ci_date");
+    const c = document.getElementById("ci_cash");
+    const f = document.getElementById("ci_from");
+    if (d) d.value = "";
+    if (c) c.value = "";
+    if (f) f.value = "";
+    const modal = document.getElementById("cashInModal");
+    if (modal) modal.style.display = "flex";
 }
 
 function closeCashInModal() {
-    document.getElementById("cashInModal").style.display = "none";
+    const modal = document.getElementById("cashInModal");
+    if (modal) modal.style.display = "none";
 }
 
 function openCashOutModal() {
-    document.getElementById("co_date").value = "";
-    document.getElementById("co_reason").value = "";
-    document.getElementById("co_from").value = "";
-    document.getElementById("co_to").value = "";
-    document.getElementById("co_km").value = "";
-    document.getElementById("co_cash").value = "";
-    document.getElementById("co_type").value = "";
+    const d   = document.getElementById("co_date");
+    const r   = document.getElementById("co_reason");
+    const f   = document.getElementById("co_from");
+    const t   = document.getElementById("co_to");
+    const km  = document.getElementById("co_km");
+    const ca  = document.getElementById("co_cash");
+    const typ = document.getElementById("co_type");
 
-    // reset visibility
-    document.getElementById("co_km_block").style.display = "none";
-    document.getElementById("co_cash_block").style.display = "block";
+    if (d)  d.value  = "";
+    if (r)  r.value  = "";
+    if (f)  f.value  = "";
+    if (t)  t.value  = "";
+    if (km) km.value = "";
+    if (ca) ca.value = "";
+    if (typ) typ.value = "";
 
-    document.getElementById("cashOutModal").style.display = "flex";
+    const kmBlock   = document.getElementById("co_km_block");
+    const cashBlock = document.getElementById("co_cash_block");
+    if (kmBlock)   kmBlock.style.display   = "none";
+    if (cashBlock) cashBlock.style.display = "block";
+
+    const modal = document.getElementById("cashOutModal");
+    if (modal) modal.style.display = "flex";
 }
 
 function closeCashOutModal() {
-    document.getElementById("cashOutModal").style.display = "none";
+    const modal = document.getElementById("cashOutModal");
+    if (modal) modal.style.display = "none";
 }
 
 /* =============================
    SUBMIT CASH IN
    ============================= */
 async function submitCashIn() {
-    const date = document.getElementById("ci_date").value;
-    const amount = document.getElementById("ci_cash").value;
-    const cashInFrom = document.getElementById("ci_from").value;
+    const dateInput = document.getElementById("ci_date");
+    const amountInput = document.getElementById("ci_cash");
+    const fromInput = document.getElementById("ci_from");
+
+    const date = dateInput ? dateInput.value : "";
+    const amount = amountInput ? amountInput.value : "";
+    const cashInFrom = fromInput ? fromInput.value : "";
 
     if (!date || !amount) {
-        return alert("Please fill required fields.");
+        alert("Please fill required fields.");
+        return;
     }
 
-    const res = await fetch("/api/expenses/cash-in", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ date, amount, cashInFrom })
-    });
+    try {
+        const res = await fetch("/api/expenses/cash-in", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date, amount, cashInFrom }),
+        });
 
-    const data = await res.json();
-    if (data.success) {
-        closeCashInModal();
-        loadExpenses();
-    } else {
-        alert("Error: " + data.error);
+        const data = await res.json();
+        if (data.success) {
+            closeCashInModal();
+            await loadExpenses();
+        } else {
+            alert("Error: " + (data.error || "Unknown error"));
+        }
+    } catch (err) {
+        console.error("Cash-in submit error:", err);
+        alert("Failed to submit cash in.");
     }
 }
 
@@ -101,14 +131,21 @@ async function submitCashIn() {
    SUBMIT CASH OUT
    ============================= */
 async function submitCashOut() {
-    const type = document.getElementById("co_type").value;
-    const reason = document.getElementById("co_reason").value;
-    const date = document.getElementById("co_date").value;
-    const from = document.getElementById("co_from").value;
-    const to = document.getElementById("co_to").value;
+    const typeEl   = document.getElementById("co_type");
+    const reasonEl = document.getElementById("co_reason");
+    const dateEl   = document.getElementById("co_date");
+    const fromEl   = document.getElementById("co_from");
+    const toEl     = document.getElementById("co_to");
+
+    const type   = typeEl   ? typeEl.value   : "";
+    const reason = reasonEl ? reasonEl.value : "";
+    const date   = dateEl   ? dateEl.value   : "";
+    const from   = fromEl   ? fromEl.value   : "";
+    const to     = toEl     ? toEl.value     : "";
 
     if (!type || !reason || !date) {
-        return alert("Please fill required fields.");
+        alert("Please fill required fields.");
+        return;
     }
 
     const body = {
@@ -116,28 +153,35 @@ async function submitCashOut() {
         reason,
         date,
         from,
-        to
+        to,
     };
 
     // Own car logic
     if (type === "Own car") {
-        body.kilometer = document.getElementById("co_km").value || 0;
+        const kmEl = document.getElementById("co_km");
+        body.kilometer = kmEl ? (kmEl.value || 0) : 0;
     } else {
-        body.amount = document.getElementById("co_cash").value || 0;
+        const cashEl = document.getElementById("co_cash");
+        body.amount = cashEl ? (cashEl.value || 0) : 0;
     }
 
-    const res = await fetch("/api/expenses/cash-out", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(body)
-    });
+    try {
+        const res = await fetch("/api/expenses/cash-out", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
 
-    const data = await res.json();
-    if (data.success) {
-        closeCashOutModal();
-        loadExpenses();
-    } else {
-        alert("Error: " + data.error);
+        const data = await res.json();
+        if (data.success) {
+            closeCashOutModal();
+            await loadExpenses();
+        } else {
+            alert("Error: " + (data.error || "Unknown error"));
+        }
+    } catch (err) {
+        console.error("Cash-out submit error:", err);
+        alert("Failed to submit cash out.");
     }
 }
 
@@ -148,60 +192,68 @@ async function loadExpenses() {
     const container = document.getElementById("expensesContent");
     const totalBox = document.getElementById("totalAmount");
 
-    container.innerHTML = `<p style="color:#999;">Loading...</p>`;
-
-    const res = await fetch("/api/expenses");
-    const data = await res.json();
-
-    if (!data.success) {
-        container.innerHTML = "<p>Error loading data</p>";
-        return;
+    if (container) {
+        container.innerHTML = `<p style="color:#999;">Loading...</p>`;
     }
 
-    const items = data.items;
+    try {
+        const res = await fetch("/api/expenses");
+        const data = await res.json();
 
-    // Calculate total
-    let total = 0;
-    items.forEach(it => {
-        if (it.cashIn) total += it.cashIn;
-        if (it.cashOut) total -= it.cashOut;
-    });
-    totalBox.innerHTML = `$${total.toLocaleString()}`;
+        if (!data.success) {
+            if (container) container.innerHTML = "<p>Error loading data</p>";
+            return;
+        }
 
-    // Group by date
-    const groups = {};
-    items.forEach(item => {
-        const d = item.date || "Unknown";
-        if (!groups[d]) groups[d] = [];
-        groups[d].push(item);
-    });
+        const items = data.items || [];
 
-    // Render
-    let html = "";
-    for (const date of Object.keys(groups)) {
-        html += `<div class="section-date">${date}</div>`;
-
-        groups[date].forEach(it => {
-            html += `
-            <div class="expense-item">
-                <div class="expense-icon icon-gift"></div>
-
-                <div class="expense-details">
-                    <div class="expense-title">${it.fundsType || ""}</div>
-                    <div class="expense-person">${it.reason || ""}</div>
-                    <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
-                </div>
-
-                <div class="expense-amount">
-                    ${it.cashIn ? `+$${it.cashIn}` : ""}
-                    ${it.cashOut ? `-$${it.cashOut}` : ""}
-                </div>
-            </div>
-            `;
+        // Calculate total
+        let total = 0;
+        items.forEach(it => {
+            if (it.cashIn) total += it.cashIn;
+            if (it.cashOut) total -= it.cashOut;
         });
-    }
+        if (totalBox) totalBox.innerHTML = `$${total.toLocaleString()}`;
 
-    container.innerHTML = html || "<p>No expenses yet.</p>";
+        // Group by date
+        const groups = {};
+        items.forEach(item => {
+            const d = item.date || "Unknown";
+            if (!groups[d]) groups[d] = [];
+            groups[d].push(item);
+        });
+
+        // Render
+        let html = "";
+        Object.keys(groups).forEach(date => {
+            html += `<div class="section-date">${date}</div>`;
+            groups[date].forEach(it => {
+                html += `
+                <div class="expense-item">
+                    <div class="expense-icon icon-gift"></div>
+
+                    <div class="expense-details">
+                        <div class="expense-title">${it.fundsType || ""}</div>
+                        <div class="expense-person">${it.reason || ""}</div>
+                        <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
+                    </div>
+
+                    <div class="expense-amount">
+                        ${it.cashIn ? `+$${it.cashIn}` : ""}
+                        ${it.cashOut ? `-$${it.cashOut}` : ""}
+                    </div>
+                </div>
+                `;
+            });
+        });
+
+        if (container) {
+            container.innerHTML = html || "<p>No expenses yet.</p>";
+        }
+    } catch (err) {
+        console.error("Load expenses error:", err);
+        if (container) container.innerHTML = "<p>Error loading data</p>";
+    }
 }
 
 /* =============================
@@ -211,6 +263,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadFundsTypes();
     await loadExpenses();
 
-    document.getElementById("cashInBtn").addEventListener("click", openCashInModal);
-    document.getElementById("cashOutBtn").addEventListener("click", openCashOutModal);
+    const cashInBtn  = document.getElementById("cashInBtn");
+    const cashOutBtn = document.getElementById("cashOutBtn");
+    if (cashInBtn)  cashInBtn.addEventListener("click", openCashInModal);
+    if (cashOutBtn) cashOutBtn.addEventListener("click", openCashOutModal);
+
+    // زرار الـ Submit جوه مودال الكاش إن
+    const ciSubmit = document.getElementById("ci_submit");
+    if (ciSubmit) {
+        ciSubmit.addEventListener("click", (e) => {
+            e.preventDefault();
+            submitCashIn();
+        });
+    }
+
+    // زرار الـ Submit جوه مودال الكاش آوت
+    const coSubmit = document.getElementById("co_submit");
+    if (coSubmit) {
+        coSubmit.addEventListener("click", (e) => {
+            e.preventDefault();
+            submitCashOut();
+        });
+    }
 });
