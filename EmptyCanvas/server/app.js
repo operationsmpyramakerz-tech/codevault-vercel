@@ -329,6 +329,12 @@ app.get("/account", requireAuth, (req, res) => {
 app.get("/funds", requireAuth, requirePage("Funds"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "funds.html"));
 });
+
+// Expenses page 
+app.get("/expenses", requireAuth, requirePage("Expenses"), (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "expenses.html"));
+});
+
 // Logistics page
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "logistics.html"));
