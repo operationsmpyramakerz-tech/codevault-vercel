@@ -1,210 +1,153 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Expenses</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/css/style.css"/>
+  <script src="https://unpkg.com/feather-icons"></script>
 </head>
-<body class="">
-  <div class="app-container">
-    <!-- Sidebar موجودة عندك بالفعل في باقي الصفحات (انسخها زي ما هي) -->
-    <!--  مثال بسيط، استبدل الجزء ده بالـ sidebar الحقيقي بتاعك -->
-    <!--#include virtual="/partials/sidebar.html" -->
 
-    <main class="main-content">
+<body>
+<script>
+  (function() {
+    try {
+      if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
+        document.body.classList.add('sidebar-mini');
+      }
+    } catch(e) {}
+  })();
+</script>
 
-      <!-- نفس الـ header اللي عندك في باقي الصفحات (انسخه كما هو) -->
-      <!--#include virtual="/partials/header.html" -->
+<div class="app-container">
 
-      <section class="container-full-width expenses-page">
-        <div class="expenses-layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>Dashboard</h2>
+      <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+        <i data-feather="chevrons-left"></i>
+      </button>
+    </div>
 
-          <!-- ===== LEFT: Dashboard / List ===== -->
-          <div class="expenses-col expenses-col--left">
+    <nav class="sidebar-nav">
+      <ul class="nav-list">
+        <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/requested"><i data-feather="users"></i><span class="nav-label">Schools Requested Orders</span></a></li>
+        <li><a class="nav-link" href="/orders/assigned"><i data-feather="user-check"></i><span class="nav-label">Storage</span></a></li>
+        <li><a class="nav-link" href="/orders/new"><i data-feather="plus-circle"></i><span class="nav-label">Create New Order</span></a></li>
+        <li><a class="nav-link" href="/stocktaking"><i data-feather="archive"></i><span class="nav-label">Stocktaking</span></a></li>
+        <li><a class="nav-link" href="/logistics"><i data-feather="truck"></i><span class="nav-label">Logistics</span></a></li>
+        <li><a class="nav-link" href="/funds"><i data-feather="dollar-sign"></i><span class="nav-label">Funds</span></a></li>
+        <li><a class="nav-link" href="/orders/sv-orders"><i data-feather="award"></i><span class="nav-label">S.V schools orders</span></a></li>
+        <li><a class="nav-link" href="/damaged-assets"><i data-feather="alert-triangle"></i><span class="nav-label">Damaged Assets</span></a></li>
+        <li><a class="nav-link" href="/sv-assets"><i data-feather="layers"></i><span class="nav-label">S.V Schools Assets</span></a></li>
+        <li><a class="nav-link" href="/damaged-assets-reviewed"><i data-feather="check-circle"></i><span class="nav-label">Reviewed Damaged Assets</span></a></li>
 
-            <div class="exp-topbar">
-              <div class="exp-dots">
-                <span></span><span></span><span></span>
-              </div>
-              <h1 class="exp-title">Dashboard</h1>
-              <div class="exp-avatar">
-                <img src="/images/avatar-placeholder.png" alt="User" />
-              </div>
+        <!-- NEW EXPENSES PAGE BUTTON -->
+        <li>
+          <a class="nav-link active" href="/expenses">
+            <i data-feather="dollar-sign"></i>
+            <span class="nav-label">Expenses</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- HEADER -->
+    <header class="main-header">
+      <div class="header-row1">
+        <div class="left">
+
+          <div class="greeting-pill">
+            <span class="greeting-avatar">
+              <img src="/images/greeting-icon.png" alt="Hi icon"/>
+            </span>
+            <div class="greet-text">
+              <div class="greet-title">Hi, <span data-username="">...</span> 👋</div>
+              <div class="greet-sub">Manage your expenses</div>
+            </div>
+          </div>
+
+          <!-- Dummy searchbar (hidden to avoid JS errors) -->
+          <div id="orders-searchbar" class="searchbar" style="display:none;">
+            <i data-feather="search"></i>
+            <input type="search" placeholder="Search..." id="orderSearch"/>
+          </div>
+        </div>
+
+        <div class="right topbar-right">
+          <a class="account-mini" href="/account" aria-label="My account">
+            <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
+            <span class="label">My account</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="header-row2">
+        <h1 class="page-title">Expenses</h1>
+      </div>
+    </header>
+
+    <!-- PAGE BODY -->
+    <main class="container-full-width">
+
+      <section class="card card--elevated">
+        <div class="card-header">
+          <h2><i data-feather="clipboard"></i> Expenses Form</h2>
+          <p class="card-subtitle">Add expenses related to missions</p>
+        </div>
+
+        <form id="expensesForm" class="form-container">
+
+          <div class="form-group">
+            <label class="form-label">
+              <i data-feather="target"></i> Mission Name *
+            </label>
+            <input type="text" id="missionName" class="form-input" placeholder="Enter mission name" required/>
+          </div>
+
+          <div class="expenses-section">
+            <div class="section-header">
+              <h3><i data-feather="receipt"></i> Expenses</h3>
+              <button type="button" id="addExpenseBtn" class="btn btn-outline-pill">
+                <i data-feather="plus"></i> Add Expense
+              </button>
             </div>
 
-            <!-- Balance Card -->
-            <div class="exp-balance-card">
-              <div class="exp-balance-main">
-                <span class="exp-balance-currency">$</span>
-                <span class="exp-balance-amount">17,800</span>
-                <span class="exp-balance-currency-small">USD</span>
-              </div>
-              <p class="exp-balance-label">Available Balance</p>
+            <div id="expensesList" class="expenses-list">
+              <!-- Dynamic Expenses Here -->
             </div>
+          </div>
 
-            <!-- List Header -->
-            <div class="exp-section-head">
-              <span class="exp-section-title">All Expenses</span>
-              <button class="exp-view-all">View All</button>
-            </div>
+          <div class="form-actions">
+            <button type="submit" class="submit-btn">
+              <i data-feather="save"></i> Submit Expenses
+            </button>
 
-            <!-- TODAY -->
-            <div class="exp-day-block">
-              <p class="exp-day-label">Today</p>
-
-              <div class="exp-list">
-                <article class="exp-item">
-                  <div class="exp-item-left">
-                    <div class="exp-icon">
-                      <span class="exp-icon-emoji">☕</span>
-                    </div>
-                    <div class="exp-item-text">
-                      <h3 class="exp-item-title">Coffee</h3>
-                      <p class="exp-item-sub">with Peter Bower</p>
-                    </div>
-                  </div>
-                  <div class="exp-item-right">
-                    <span class="exp-item-amount">$50</span>
-                  </div>
-                </article>
-
-                <article class="exp-item">
-                  <div class="exp-item-left">
-                    <div class="exp-icon">
-                      <span class="exp-icon-emoji">🎁</span>
-                    </div>
-                    <div class="exp-item-text">
-                      <h3 class="exp-item-title">Gift</h3>
-                      <p class="exp-item-sub">for Audrey Campbell</p>
-                    </div>
-                  </div>
-                  <div class="exp-item-right">
-                    <span class="exp-item-amount">$1,500</span>
-                  </div>
-                </article>
-
-                <article class="exp-item">
-                  <div class="exp-item-left">
-                    <div class="exp-icon">
-                      <span class="exp-icon-emoji">🔔</span>
-                    </div>
-                    <div class="exp-item-text">
-                      <h3 class="exp-item-title">Subscription</h3>
-                      <p class="exp-item-sub">made with Chapman</p>
-                    </div>
-                  </div>
-                  <div class="exp-item-right">
-                    <span class="exp-item-amount">$500</span>
-                  </div>
-                </article>
-              </div>
-            </div>
-
-            <!-- YESTERDAY -->
-            <div class="exp-day-block">
-              <p class="exp-day-label">Yesterday</p>
-
-              <div class="exp-list">
-                <article class="exp-item">
-                  <div class="exp-item-left">
-                    <div class="exp-icon">
-                      <span class="exp-icon-emoji">🍽️</span>
-                    </div>
-                    <div class="exp-item-text">
-                      <h3 class="exp-item-title">Tea &amp; Snacks</h3>
-                      <p class="exp-item-sub">with Peter Bower</p>
-                    </div>
-                  </div>
-                  <div class="exp-item-right">
-                    <span class="exp-item-amount">$50</span>
-                  </div>
-                </article>
-
-                <article class="exp-item">
-                  <div class="exp-item-left">
-                    <div class="exp-icon">
-                      <span class="exp-icon-emoji">🔔</span>
-                    </div>
-                    <div class="exp-item-text">
-                      <h3 class="exp-item-title">Subscription</h3>
-                      <p class="exp-item-sub">made with Chapman</p>
-                    </div>
-                  </div>
-                  <div class="exp-item-right">
-                    <span class="exp-item-amount">$500</span>
-                  </div>
-                </article>
-              </div>
-            </div>
-
-            <!-- Floating Add button -->
-            <button class="exp-floating-add" type="button">
-              <span>+</span>
+            <button type="reset" class="btn btn-secondary">
+              <i data-feather="x-circle"></i> Clear
             </button>
           </div>
 
-          <!-- ===== RIGHT: Add Amount ===== -->
-          <div class="expenses-col expenses-col--right">
-            <div class="exp-add-card">
-              <h2 class="exp-add-title">Add Amount</h2>
-
-              <!-- Amount row -->
-              <div class="exp-field-row exp-field-row--amount">
-                <div class="exp-field-label">Amount</div>
-                <div class="exp-amount-display">
-                  <span class="exp-amount-currency">$</span>
-                  <span class="exp-amount-value" id="expAmountValue">50</span>
-                  <span class="exp-amount-currency-small">USD</span>
-                </div>
-              </div>
-
-              <!-- Category -->
-              <div class="exp-field-group">
-                <label class="exp-field-label">Expenses made for</label>
-                <button class="exp-select">
-                  <span>Tea &amp; Snacks</span>
-                  <span class="exp-select-caret">▾</span>
-                </button>
-              </div>
-
-              <!-- Description -->
-              <div class="exp-field-group">
-                <label class="exp-field-label">Description</label>
-                <p class="exp-description">
-                  Meeting and Snacks with Victor
-                </p>
-              </div>
-
-              <!-- Keypad -->
-              <div class="exp-keypad">
-                <button type="button">1</button>
-                <button type="button">2</button>
-                <button type="button">3</button>
-                <button type="button">4</button>
-                <button type="button">5</button>
-                <button type="button">6</button>
-                <button type="button">7</button>
-                <button type="button">8</button>
-                <button type="button">9</button>
-                <button type="button" class="exp-keypad-icon">
-                  <!-- small card icon placeholder -->
-                  ⌫
-                </button>
-                <button type="button">0</button>
-                <button type="button" class="exp-keypad-icon exp-keypad-confirm">
-                  ✓
-                </button>
-              </div>
-            </div>
-          </div>
-
-        </div>
+        </form>
       </section>
+
     </main>
   </div>
+</div>
 
-  <!-- اختيارى: بعدين نربطه بـ Notion -->
-  <!-- <script src="/js/expenses.js"></script> -->
+<script>feather.replace();</script>
+<script src="/js/common-ui.js"></script>
+<script src="/js/expenses.js"></script>
+
 </body>
 </html>
