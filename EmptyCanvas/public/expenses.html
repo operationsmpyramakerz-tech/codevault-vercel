@@ -62,82 +62,80 @@
     }
 
     .expense-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 2rem;
-}
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+    }
 
-.cash-btn {
-  flex: 1;
-  padding: 1rem;
-  font-size: 1.1rem;
-  font-weight: 700;
-  border-radius: 16px;
-  border: none;
-  cursor: pointer;
-  color: white;
-  transition: 0.2s;
-}
+    .cash-btn {
+      flex: 1;
+      padding: 1rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      border-radius: 16px;
+      border: none;
+      cursor: pointer;
+      color: white;
+      transition: 0.2s;
+    }
 
-.cash-in { background: linear-gradient(135deg, #22c55e, #16a34a); margin-right: 0.7rem; }
-.cash-out { background: linear-gradient(135deg, #ef4444, #dc2626); margin-left: 0.7rem; }
+    .cash-in { background: linear-gradient(135deg, #22c55e, #16a34a); margin-right: 0.7rem; }
+    .cash-out { background: linear-gradient(135deg, #ef4444, #dc2626); margin-left: 0.7rem; }
 
-.cash-btn:hover { transform: scale(1.05); }
+    .cash-btn:hover { transform: scale(1.05); }
 
+    /************** MODALS ******************/
+    .ex-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
 
-/************** MODALS ******************/
-.ex-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
+    .ex-modal-box {
+      background: white;
+      padding: 1.8rem;
+      width: 90%;
+      max-width: 420px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
 
-.ex-modal-box {
-  background: white;
-  padding: 1.8rem;
-  width: 90%;
-  max-width: 420px;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-}
+    .ex-modal-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
 
-.ex-modal-title {
-  font-size: 1.4rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-}
+    .ex-input {
+      width: 100%;
+      padding: 0.8rem;
+      border-radius: 12px;
+      border: 1.5px solid #d1d5db;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
 
-.ex-input {
-  width: 100%;
-  padding: 0.8rem;
-  border-radius: 12px;
-  border: 1.5px solid #d1d5db;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-}
+    .ex-modal-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+    }
 
-.ex-modal-actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 1rem;
-}
+    .ex-btn {
+      padding: 0.7rem 1.4rem;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
 
-.ex-btn {
-  padding: 0.7rem 1.4rem;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-}
+    .ex-primary { background: #3b82f6; color: white; }
+    .ex-danger { background: #ef4444; color: white; }
 
-.ex-primary { background: #3b82f6; color: white; }
-.ex-danger { background: #ef4444; color: white; }
-
-    /* Section Title */
     .section-date {
       font-size: 0.95rem;
       color: #64748b;
@@ -148,7 +146,6 @@
       padding-left: 0.5rem;
     }
 
-    /* Expense Item */
     .expense-item {
       background: white;
       border-radius: 20px;
@@ -165,74 +162,10 @@
       transform: translateY(-4px);
       box-shadow: 0 15px 35px rgba(0,0,0,0.12);
     }
-    .expense-icon {
-      width: 56px;
-      height: 56px;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.6rem;
-      flex-shrink: 0;
-    }
-    .icon-coffee { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
-    .icon-gift { background: linear-gradient(135deg, #c084fc, #a855f7); }
-    .icon-mail { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
-    .icon-tea { background: linear-gradient(135deg, #34d399, #10b981); }
-    .icon-sub { background: linear-gradient(135deg, #f87171, #ef4444); }
 
-    .expense-details {
-      flex: 1;
-    }
-    .expense-title {
-      font-weight: 600;
-      color: #1e293b;
-      margin: 0 0 0.3rem;
-    }
-    .expense-person {
-      font-size: 0.9rem;
-      color: [\"#6b7280"];
-      margin: 0;
-    }
-    .expense-amount {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #1e293b;
-    }
-
-    /* Floating Action Button */
-    .fab {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      width: 64px;
-      height: 64px;
-      background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-      color: white;
-      border: none;
-      border-radius: 50%;
-      font-size: 2rem;
-      box-shadow: 0 10px 30px rgba(139,92,246,0.4);
-      cursor: pointer;
-      z-index: 100;
-      transition: all 0.3s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .fab:hover {
-      transform: scale(1.1);
-      box-shadow: 0 15px 40px rgba(139,92,246,0.5);
-    }
-
-    /* Responsive */
-    @media (max-width: 480px) {
-      .expenses-layout { padding: 1rem 0.8rem; }
-      .total-amount { font-size: 2.6rem; }
-      .fab { bottom: 1.5rem; right: 1.5rem; width: 58px; height: 58px; }
-    }
   </style>
 </head>
+
 <body>
 
 <script>
@@ -244,12 +177,14 @@
 </script>
 
 <div class="app-container">
-  <!-- Sidebar (نفس اللي عندك) -->
+
+  <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
       <button id="sidebar-toggle" class="sidebar-toggle"><i data-feather="chevrons-left"></i></button>
     </div>
+
     <nav class="sidebar-nav">
       <ul class="nav-list">
         <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
@@ -266,6 +201,7 @@
         <li><a class="nav-link active" href="/expenses"><i data-feather="dollar-sign"></i><span class="nav-label">Expenses</span></a></li>
       </ul>
     </nav>
+
     <div class="sidebar-footer">
       <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
     </div>
@@ -273,6 +209,7 @@
 
   <!-- Main Content -->
   <div class="main-content">
+
     <header class="main-header">
       <div class="header-row1">
         <div class="left">
@@ -284,13 +221,15 @@
             </div>
           </div>
         </div>
+
         <div class="right topbar-right">
           <a class="account-mini" href="/account">
-            <span class="ico-circle"><img src="/images/logo.png" alt="Logo"/></span>
+            <span class="ico-circle"><img src="/images/logo.png"/></span>
             <span class="label">My account</span>
           </a>
         </div>
       </div>
+
       <div class="header-row2">
         <h1 class="page-title">Expenses</h1>
       </div>
@@ -301,34 +240,25 @@
       <!-- Total Card -->
       <div class="total-card">
         <div class="total-label">All Expenses</div>
-        <div class="total-amount">$17,800</div>
+        <div class="total-amount" id="totalAmount">$0</div>
         <div>USD</div>
         <button class="view-all-btn">View All</button>
       </div>
 
-      <main class="expenses-layout">
+      <!-- Buttons -->
+      <div class="expense-buttons">
+        <button id="cashInBtn" class="cash-btn cash-in">+ CASH IN</button>
+        <button id="cashOutBtn" class="cash-btn cash-out">− CASH OUT</button>
+      </div>
 
-  <!-- Total Card -->
-  <div class="total-card">
-    <div class="total-label">All Expenses</div>
-    <div class="total-amount" id="totalAmount">$0</div>
-    <div>USD</div>
-    <button class="view-all-btn">View All</button>
+      <!-- Render expenses here -->
+      <div id="expensesContent"></div>
+
+    </main>
   </div>
+</div>
 
-  <!-- ACTION BUTTONS -->
-  <div class="expense-buttons">
-    <button id="cashInBtn" class="cash-btn cash-in">+ CASH IN</button>
-    <button id="cashOutBtn" class="cash-btn cash-out">− CASH OUT</button>
-  </div>
-
-  <!-- Dynamic grouped expenses will be inserted here -->
-  <div id="expensesContent"></div>
-
-</main>
-
-
-<!-- ================= CASH IN MODAL ================= -->
+<!-- CASH IN MODAL -->
 <div id="cashInModal" class="ex-modal">
   <div class="ex-modal-box">
 
@@ -351,10 +281,7 @@
   </div>
 </div>
 
-
-
-
-<!-- ================= CASH OUT MODAL ================= -->
+<!-- CASH OUT MODAL -->
 <div id="cashOutModal" class="ex-modal">
   <div class="ex-modal-box">
 
@@ -375,13 +302,11 @@
     <label>To</label>
     <input id="co_to" type="text" class="ex-input"/>
 
-    <!-- This field appears ONLY when funds type = Own car -->
     <div id="co_km_block" style="display:none;">
       <label>Kilometer</label>
       <input id="co_km" type="number" class="ex-input"/>
     </div>
 
-    <!-- This field appears ONLY when funds type != Own car -->
     <div id="co_cash_block">
       <label>Cash out</label>
       <input id="co_cash" type="number" class="ex-input"/>
@@ -395,73 +320,9 @@
   </div>
 </div>
 
-      <!-- Today -->
-      <div class="section-date">Today</div>
-      <div class="expense-item">
-        <div class="expense-icon icon-coffee"><span aria-hidden="true">Coffee</span></div>
-        <div class="expense-details">
-          <div class="expense-title">Coffee</div>
-          <div class="expense-person">with Peter Bower</div>
-        </div>
-        <div class="expense-amount">$50</div>
-      </div>
-
-      <div class="expense-item">
-        <div class="expense-icon icon-gift"><span aria-hidden="true">Gift</span></div>
-        <div class="expense-details">
-          <div class="expense-title">Gift</div>
-          <div class="expense-person">for Audrey Campbell</div>
-        </div>
-        <div class="expense-amount">$1,500</div>
-      </div>
-
-      <div class="expense-item">
-        <div class="expense-icon icon-mail"><span aria-hidden="true">Mail</span></div>
-        <div class="expense-details">
-          <div class="expense-title">Subscription</div>
-          <div class="expense-person">made with Chapman</div>
-        </div>
-        <div class="expense-amount">$500</div>
-      </div>
-
-      <!-- Yesterday -->
-      <div class="section-date">Yesterday</div>
-      <div class="expense-item">
-        <div class="expense-icon icon-tea"><span aria-hidden="true">Tea</span></div>
-        <div class="expense-details">
-          <div class="expense-title">Tea & Snacks</div>
-          <div class="expense-person">with Peter Bower</div>
-        </div>
-        <div class="expense-amount">$50</div>
-      </div>
-
-      <div class="expense-item">
-        <div class="expense-icon icon-sub"><span aria-hidden="true">Sub</span></div>
-        <div class="expense-details">
-          <div class="expense-title">Subscription</div>
-          <div class="expense-person">made with Chapman</div>
-        </div>
-        <div class="expense-amount">$500</div>
-      </div>
-
-      <!-- Floating Add Button -->
-      <button class="fab" onclick="openAddExpenseModal()">
-        +
-      </button>
-    </main>
-  </div>
-</div>
-
-<script>
-  feather.replace();
-
-  // فتح نافذة إضافة مصروف (مثال بسيط)
-  function openAddExpenseModal() {
-    alert("Add new expense form will open here!");
-    // هنا هتضيف الـ modal بتاع Add Amount زي الصورة
-  }
-</script>
-
+<script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
+<script src="/js/expenses.js"></script>
+
 </body>
 </html>
