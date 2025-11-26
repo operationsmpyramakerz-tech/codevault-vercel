@@ -192,64 +192,73 @@ async function loadExpenses() {
     const container = document.getElementById("expensesContent");
     const totalBox = document.getElementById("totalAmount");
 
-    if (container) {
-        container.innerHTML = `<p style="color:#999;">Loading...</p>`;
+    container.innerHTML = `<p style="color:#999;">Loading...</p>`;
+
+    const res = await fetch("/api/expenses");
+    const data = await res.json();
+
+    if (!data.success) {
+        container.innerHTML = "<p>Error loading data</p>";
+        return;
     }
 
-    try {
-        const res = await fetch("/api/expenses");
-        const data = await res.json();
+    const items = data.items;
 
-        if (!data.success) {
-            if (container) container.innerHTML = "<p>Error loading data</p>";
-            return;
-        }
+    // Calculate total
+    let total = 0;
+    items.forEach(it => {
+        if (it.cashIn) total += it.cashIn;
+        if (it.cashOut) total -= it.cashOut;
+    });
+    totalBox.innerHTML = `£${total.toLocaleString()}`;
 
-        const items = data.items || [];
+    // Group by date
+    const groups = {};
+    items.forEach(item => {
+        const d = item.date || "Unknown";
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(item);
+    });
 
-        // Calculate total
-        let total = 0;
-        items.forEach(it => {
-            if (it.cashIn) total += it.cashIn;
-            if (it.cashOut) total -= it.cashOut;
-        });
-        if (totalBox) totalBox.innerHTML = `$${total.toLocaleString()}`;
+    // Render
+    let html = "";
+    for (const date of Object.keys(groups)) {
+        html += `<div class="section-date">${date}</div>`;
 
-        // Group by date
-        const groups = {};
-        items.forEach(item => {
-            const d = item.date || "Unknown";
-            if (!groups[d]) groups[d] = [];
-            groups[d].push(item);
-        });
+        groups[date].forEach(it => {
 
-        // Render
-        let html = "";
-        Object.keys(groups).forEach(date => {
-            html += `<div class="section-date">${date}</div>`;
-            groups[date].forEach(it => {
-                html += `
-                <div class="expense-item">
-                    <div class="expense-icon icon-gift"></div>
+            const isIn = it.cashIn && it.cashIn > 0;
+            const isOut = it.cashOut && it.cashOut > 0;
 
-                    <div class="expense-details">
-                        <div class="expense-title">${it.fundsType || ""}</div>
-                        <div class="expense-person">${it.reason || ""}</div>
-                        <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
-                    </div>
+            const arrow = isIn 
+                ? `<span class="arrow-icon arrow-in">↑</span>`
+                : `<span class="arrow-icon arrow-out">↓</span>`;
 
-                    <div class="expense-amount">
-                        ${it.cashIn ? `+$${it.cashIn}` : ""}
-                        ${it.cashOut ? `-$${it.cashOut}` : ""}
-                    </div>
+            html += `
+            <div class="expense-item">
+
+                <div class="expense-icon">
+                    ${arrow}
                 </div>
-                `;
-            });
-        });
 
-        if (container) {
-            container.innerHTML = html || "<p>No expenses yet.</p>";
-        }
+                <div class="expense-details">
+                    <div class="expense-title">${it.fundsType || ""}</div>
+                    <div class="expense-person">${it.reason || ""}</div>
+                    <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
+                </div>
+
+                <div class="expense-amount">
+                    ${it.cashIn ? `+£${it.cashIn}` : ""}
+                    ${it.cashOut ? `-£${it.cashOut}` : ""}
+                </div>
+
+            </div>
+            `;
+        });
+    }
+
+    container.innerHTML = html || "<p>No expenses yet.</p>";
+}
     } catch (err) {
         console.error("Load expenses error:", err);
         if (container) container.innerHTML = "<p>Error loading data</p>";
