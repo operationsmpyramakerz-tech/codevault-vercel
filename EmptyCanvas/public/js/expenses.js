@@ -313,11 +313,18 @@ if (viewAllBtn) {
         });
     }
 });
+// OPEN iOS Bottom Sheet
 function openAllExpensesModal() {
     const modal = document.getElementById("allExpensesModal");
+    const sheet = document.getElementById("iosSheet");
     const list = document.getElementById("allExpensesList");
 
-    list.innerHTML = "";
+    modal.style.display = "flex";
+    setTimeout(() => {
+        sheet.style.transform = "translateY(0)";
+    }, 10);
+
+    list.innerHTML = "Loading...";
 
     fetch("/api/expenses")
       .then(res => res.json())
@@ -328,6 +335,7 @@ function openAllExpensesModal() {
         }
 
         const items = data.items;
+        list.innerHTML = "";
 
         items.forEach(it => {
             const isIn = it.cashIn > 0;
@@ -336,7 +344,7 @@ function openAllExpensesModal() {
                 : `<span class="arrow-icon arrow-out">↗</span>`;
 
             list.innerHTML += `
-                <div class="expense-item" style="margin: 0 0 1rem 0;">
+                <div class="expense-item" style="margin:0 0 1rem 0;">
                     <div class="expense-icon">${arrow}</div>
                     <div class="expense-details">
                         <div class="expense-title">${it.fundsType}</div>
@@ -344,16 +352,32 @@ function openAllExpensesModal() {
                         <div class="expense-person">${it.from} → ${it.to}</div>
                     </div>
                     <div class="expense-amount">
-                        ${it.cashIn ? `+£${it.cashIn}` : ""}
-                        ${it.cashOut ? `-£${it.cashOut}` : ""}
+                        ${it.cashIn ? `+£${it.cashIn}` : `-£${it.cashOut}`}
                     </div>
                 </div>`;
         });
       });
-
-    modal.style.display = "flex";
 }
 
+// CLOSE
 function closeAllExpensesModal() {
-    document.getElementById("allExpensesModal").style.display = "none";
+    const modal = document.getElementById("allExpensesModal");
+    const sheet = document.getElementById("iosSheet");
+
+    sheet.style.transform = "translateY(100%)";
+
+    setTimeout(() => {
+        modal.style.display = "none";
+    }, 300);
 }
+
+// Close when clicking outside
+document.addEventListener("click", (e) => {
+    const modal = document.getElementById("allExpensesModal");
+    const sheet = document.getElementById("iosSheet");
+
+    if (modal.style.display === "flex" &&
+        !sheet.contains(e.target)) {
+        closeAllExpensesModal();
+    }
+});
