@@ -397,7 +397,7 @@
 <!-- Title + View All button -->
 <div class="expenses-header">
     <span class="expenses-title">All Expenses</span>
-    <button class="view-all-chip">View All</button>
+    <button id="viewAllBtn" class="view-all-chip">View All</button>
 </div>
 
       <!-- Buttons -->
@@ -474,7 +474,21 @@
 
   </div>
 </div>
+  
+<!-- VIEW ALL EXPENSES MODAL -->
+<div id="allExpensesModal" class="ex-modal">
+  <div class="ex-modal-box" style="max-height: 80vh; overflow-y: auto;">
 
+    <h3 class="ex-modal-title">All Expenses</h3>
+
+    <div id="allExpensesList"></div>
+
+    <div class="ex-modal-actions">
+      <button class="ex-btn ex-danger" onclick="closeAllExpensesModal()">Close</button>
+    </div>
+
+  </div>
+</div>
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/expenses.js"></script>
