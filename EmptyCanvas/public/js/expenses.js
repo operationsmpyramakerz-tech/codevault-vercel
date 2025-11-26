@@ -188,6 +188,7 @@ async function submitCashOut() {
 /* =============================
    LOAD EXPENSES FROM SERVER
    ============================= */
+
 async function loadExpenses() {
     const container = document.getElementById("expensesContent");
     const totalBox = document.getElementById("totalAmount");
@@ -195,7 +196,6 @@ async function loadExpenses() {
     container.innerHTML = `<p style="color:#999;">Loading...</p>`;
 
     try {
-
         const res = await fetch("/api/expenses");
         const data = await res.json();
 
@@ -206,7 +206,9 @@ async function loadExpenses() {
 
         const items = data.items;
 
-        // Calculate total
+        // ============================
+        // TOTAL
+        // ============================
         let total = 0;
         items.forEach(it => {
             if (it.cashIn) total += it.cashIn;
@@ -214,34 +216,46 @@ async function loadExpenses() {
         });
         totalBox.innerHTML = `£${total.toLocaleString()}`;
 
-        // Group by date
+        // ============================
+        // FILTER — LAST 7 DAYS ONLY
+        // ============================
+        const now = new Date();
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(now.getDate() - 7);
+
+        const weeklyItems = items.filter(it => {
+            const date = new Date(it.date);
+            return date >= oneWeekAgo;
+        });
+
+        // ============================
+        // GROUP WEEKLY ITEMS BY DATE
+        // ============================
         const groups = {};
-        items.forEach(item => {
+        weeklyItems.forEach(item => {
             const d = item.date || "Unknown";
             if (!groups[d]) groups[d] = [];
             groups[d].push(item);
         });
 
-        // Render
+        // ============================
+        // RENDER WEEKLY DATA
+        // ============================
         let html = "";
+
         for (const date of Object.keys(groups)) {
             html += `<div class="section-date">${date}</div>`;
 
             groups[date].forEach(it => {
-
-                const isIn = it.cashIn && it.cashIn > 0;
-                const isOut = it.cashOut && it.cashOut > 0;
-
-                const arrow = isIn 
+                const isIn = it.cashIn > 0;
+                const arrow = isIn
                     ? `<span class="arrow-icon arrow-in">↙</span>`
                     : `<span class="arrow-icon arrow-out">↗</span>`;
 
                 html += `
                 <div class="expense-item">
 
-                    <div class="expense-icon">
-                        ${arrow}
-                    </div>
+                    <div class="expense-icon">${arrow}</div>
 
                     <div class="expense-details">
                         <div class="expense-title">${it.fundsType || ""}</div>
@@ -254,12 +268,11 @@ async function loadExpenses() {
                         ${it.cashOut ? `-£${it.cashOut}` : ""}
                     </div>
 
-                </div>
-                `;
+                </div>`;
             });
         }
 
-        container.innerHTML = html || "<p>No expenses yet.</p>";
+        container.innerHTML = html || "<p>No expenses for this week.</p>";
 
     } catch (err) {
         console.error("Load expenses error:", err);
@@ -277,6 +290,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const cashOutBtn = document.getElementById("cashOutBtn");
     if (cashInBtn)  cashInBtn.addEventListener("click", openCashInModal);
     if (cashOutBtn) cashOutBtn.addEventListener("click", openCashOutModal);
+    const viewAllBtn = document.getElementById("viewAllBtn");
+if (viewAllBtn) {
+    viewAllBtn.addEventListener("click", openAllExpensesModal);
+}
 
     // زرار الـ Submit جوه مودال الكاش إن
     const ciSubmit = document.getElementById("ci_submit");
@@ -296,3 +313,47 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 });
+function openAllExpensesModal() {
+    const modal = document.getElementById("allExpensesModal");
+    const list = document.getElementById("allExpensesList");
+
+    list.innerHTML = "";
+
+    fetch("/api/expenses")
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+            list.innerHTML = "<p>Error loading expenses</p>";
+            return;
+        }
+
+        const items = data.items;
+
+        items.forEach(it => {
+            const isIn = it.cashIn > 0;
+            const arrow = isIn 
+                ? `<span class="arrow-icon arrow-in">↙</span>`
+                : `<span class="arrow-icon arrow-out">↗</span>`;
+
+            list.innerHTML += `
+                <div class="expense-item" style="margin: 0 0 1rem 0;">
+                    <div class="expense-icon">${arrow}</div>
+                    <div class="expense-details">
+                        <div class="expense-title">${it.fundsType}</div>
+                        <div class="expense-person">${it.reason}</div>
+                        <div class="expense-person">${it.from} → ${it.to}</div>
+                    </div>
+                    <div class="expense-amount">
+                        ${it.cashIn ? `+£${it.cashIn}` : ""}
+                        ${it.cashOut ? `-£${it.cashOut}` : ""}
+                    </div>
+                </div>`;
+        });
+      });
+
+    modal.style.display = "flex";
+}
+
+function closeAllExpensesModal() {
+    document.getElementById("allExpensesModal").style.display = "none";
+}
