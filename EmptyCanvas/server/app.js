@@ -2366,29 +2366,27 @@ app.post("/api/expenses/cash-out", async (req, res) => {
         select: { name: fundsType }
       },
       "Reason": {
-        rich_text: [{ type: "text", text: { content: reason }}]
+        rich_text: [{ type: "text", text: { content: reason } }]
       },
       "Date": {
         date: { start: date }
       },
       "From": {
-        rich_text: [{ type: "text", text: { content: from || "" }}]
+        rich_text: [{ type: "text", text: { content: from || "" } }]
       },
       "To": {
-        rich_text: [{ type: "text", text: { content: to || "" }}]
+        rich_text: [{ type: "text", text: { content: to || "" } }]
+      },
+      // دايمًا نسجل الـ Cash out (العمود ده موجود و Required في الـ DB)
+      "Cash out": {
+        number: Number(amount) || 0
       }
     };
 
-    // Own car → save Kilometer only
+    // لو Own car نزود كمان Kilometer
     if (fundsType === "Own car") {
       props["Kilometer"] = {
         number: Number(kilometer) || 0
-      };
-    }
-    // Not Own car → save Cash out only
-    else {
-      props["Cash out"] = {
-        number: Number(amount) || 0
       };
     }
 
@@ -2402,14 +2400,16 @@ app.post("/api/expenses/cash-out", async (req, res) => {
   } catch (err) {
     console.error("Cash out error:", err.body || err);
 
+    const raw = err?.body || err;
+    const errorMessage =
+      typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
+
     return res.status(500).json({
       success: false,
-      error: "Cash out error",
-      details: err.body || err
+      error: errorMessage   // الـ frontend هيعرض ده في الـ alert
     });
   }
 });
-
 
 // Cash In
 app.post("/api/expenses/cash-in", async (req, res) => {
