@@ -313,11 +313,17 @@ if (viewAllBtn) {
         });
     }
 });
+
 // OPEN iOS Bottom Sheet
 function openAllExpensesModal() {
-    const modal = document.getElementById("allExpensesModal");
+    const modal = document.getElementById("allExpenses");   // <-- كان allExpensesModal
     const sheet = document.getElementById("iosSheet");
-    const list = document.getElementById("allExpensesList");
+    const list  = document.getElementById("allExpensesList");
+
+    if (!modal || !sheet || !list) {
+        console.error("All Expenses modal elements not found");
+        return;
+    }
 
     modal.style.display = "flex";
     setTimeout(() => {
@@ -327,42 +333,52 @@ function openAllExpensesModal() {
     list.innerHTML = "Loading...";
 
     fetch("/api/expenses")
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success) {
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                list.innerHTML = "<p>Error loading expenses</p>";
+                return;
+            }
+
+            const items = data.items || [];
+            if (!items.length) {
+                list.innerHTML = "<p>No expenses yet.</p>";
+                return;
+            }
+
+            list.innerHTML = "";
+            items.forEach(it => {
+                const isIn = it.cashIn > 0;
+                const arrow = isIn
+                    ? `<span class="arrow-icon arrow-in">↙</span>`
+                    : `<span class="arrow-icon arrow-out">↗</span>`;
+
+                list.innerHTML += `
+                    <div class="expense-item" style="margin:0 0 1rem 0;">
+                        <div class="expense-icon">${arrow}</div>
+                        <div class="expense-details">
+                            <div class="expense-title">${it.fundsType || ""}</div>
+                            <div class="expense-person">${it.reason || ""}</div>
+                            <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
+                        </div>
+                        <div class="expense-amount">
+                            ${it.cashIn ? `+£${it.cashIn}` : `-£${it.cashOut || 0}`}
+                        </div>
+                    </div>`;
+            });
+        })
+        .catch(err => {
+            console.error("Error loading all expenses:", err);
             list.innerHTML = "<p>Error loading expenses</p>";
-            return;
-        }
-
-        const items = data.items;
-        list.innerHTML = "";
-
-        items.forEach(it => {
-            const isIn = it.cashIn > 0;
-            const arrow = isIn 
-                ? `<span class="arrow-icon arrow-in">↙</span>`
-                : `<span class="arrow-icon arrow-out">↗</span>`;
-
-            list.innerHTML += `
-                <div class="expense-item" style="margin:0 0 1rem 0;">
-                    <div class="expense-icon">${arrow}</div>
-                    <div class="expense-details">
-                        <div class="expense-title">${it.fundsType}</div>
-                        <div class="expense-person">${it.reason}</div>
-                        <div class="expense-person">${it.from} → ${it.to}</div>
-                    </div>
-                    <div class="expense-amount">
-                        ${it.cashIn ? `+£${it.cashIn}` : `-£${it.cashOut}`}
-                    </div>
-                </div>`;
         });
-      });
 }
 
 // CLOSE
 function closeAllExpensesModal() {
-    const modal = document.getElementById("allExpensesModal");
+    const modal = document.getElementById("allExpenses");   // <-- كان allExpensesModal
     const sheet = document.getElementById("iosSheet");
+
+    if (!modal || !sheet) return;
 
     sheet.style.transform = "translateY(100%)";
 
@@ -373,11 +389,12 @@ function closeAllExpensesModal() {
 
 // Close when clicking outside
 document.addEventListener("click", (e) => {
-    const modal = document.getElementById("allExpensesModal");
+    const modal = document.getElementById("allExpenses");   // <-- كان allExpensesModal
     const sheet = document.getElementById("iosSheet");
 
-    if (modal.style.display === "flex" &&
-        !sheet.contains(e.target)) {
+    if (!modal || !sheet) return;
+
+    if (modal.style.display === "flex" && !sheet.contains(e.target)) {
         closeAllExpensesModal();
     }
 });
