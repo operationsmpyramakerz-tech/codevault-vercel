@@ -1328,6 +1328,11 @@ app.get(
     }
   },
 );
+    app.get(
+  "/api/orders/assigned/pdf",
+  requireAuth,
+  requirePage("Assigned Schools Requested Orders"),
+  async (req, res) => {
     try {
       const userId = await getCurrentUserPageId(req.session.username);
       if (!userId) return res.status(404).json({ error: "User not found." });
@@ -1625,7 +1630,7 @@ if (cleanedProducts.some(p => !p.reason)) {
       const userId = userQuery.results[0].id;
 
       const creations = await Promise.all(
-        products.map(async (product) => {
+  cleanedProducts.map(async (product) => {
           const created = await notion.pages.create({
             parent: { database_id: ordersDatabaseId },
             properties: {
@@ -1652,6 +1657,7 @@ if (cleanedProducts.some(p => !p.reason)) {
             productId: product.id,
             productName,
             quantity: Number(product.quantity),
+            reason: product.reason, 
             createdTime: created.created_time,
           };
         }),
