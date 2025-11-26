@@ -4,135 +4,127 @@
 
 let FUNDS_TYPES = [];
 
-// Load Funds Type from server (Notion Select)
+/* =============================
+   LOAD FUNDS TYPES FROM SERVER
+   ============================= */
 async function loadFundsTypes() {
     try {
         const res = await fetch("/api/expenses/types");
         const data = await res.json();
-        if (data.success) FUNDS_TYPES = data.options;
+        if (data.success) {
+            FUNDS_TYPES = data.options;
+        }
     } catch (err) {
-        console.error("Funds type load error", err);
-        FUNDS_TYPES = []; 
+        console.error("Funds Type Load Error", err);
+        FUNDS_TYPES = [];
+    }
+
+    // Fill select inside Cash Out modal
+    const sel = document.getElementById("co_type");
+    if (sel) {
+        sel.innerHTML = `<option value="">Select funds type...</option>`;
+        FUNDS_TYPES.forEach(t => {
+            sel.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+
+        // KM logic
+        sel.addEventListener("change", () => {
+            const v = sel.value;
+            document.getElementById("co_km_block").style.display = v === "Own car" ? "block" : "none";
+            document.getElementById("co_cash_block").style.display = v !== "Own car" ? "block" : "none";
+        });
     }
 }
 
 /* =============================
-   Create Option List for Select
+   OPEN / CLOSE MODALS
    ============================= */
-function buildFundsTypeSelect(id) {
-    const list = FUNDS_TYPES || [];
-    let html = `<select class="modal-input" id="${id}" required>
-        <option value="">Select Funds Type...</option>`;
-
-    for (const t of list) {
-        html += `<option value="${t}">${t}</option>`;
-    }
-
-    html += "</select>";
-    return html;
-}
-
-/* =====================================
-   OPEN CASH OUT MODAL
-   ===================================== */
-function openCashOutModal() {
-    const modal = document.getElementById("expensesModal");
-    const content = document.getElementById("modalContent");
-
-    content.innerHTML = `
-        <h2 class="modal-title">Cash Out</h2>
-
-        <label>Funds Type</label>
-        ${buildFundsTypeSelect("fundsType")}
-
-        <label>Reason</label>
-        <input type="text" id="reason" class="modal-input" placeholder="Reason" required>
-
-        <label>Date</label>
-        <input type="date" id="date" class="modal-input" required>
-
-        <label>From</label>
-        <input type="text" id="from" class="modal-input">
-
-        <label>To</label>
-        <input type="text" id="to" class="modal-input">
-
-        <div id="kmContainer" style="display:none;">
-            <label>Kilometer</label>
-            <input type="number" id="kilometer" class="modal-input" placeholder="km">
-        </div>
-
-        <label>Cash Out</label>
-        <input type="number" id="cashOut" class="modal-input" required>
-
-        <button class="btn-submit" onclick="submitCashOut()">Submit</button>
-        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-    `;
-
-    modal.style.display = "flex";
-
-    // Show/hide km depending on Funds Type
-    document.getElementById("fundsType").addEventListener("change", () => {
-        const v = document.getElementById("fundsType").value;
-        document.getElementById("kmContainer").style.display = 
-            v === "Own car" ? "block" : "none";
-    });
-}
-
-/* =====================================
-   OPEN CASH IN MODAL
-   ===================================== */
 function openCashInModal() {
-    const modal = document.getElementById("expensesModal");
-    const content = document.getElementById("modalContent");
+    document.getElementById("ci_date").value = "";
+    document.getElementById("ci_cash").value = "";
+    document.getElementById("ci_from").value = "";
+    document.getElementById("cashInModal").style.display = "flex";
+}
 
-    content.innerHTML = `
-        <h2 class="modal-title">Cash In</h2>
+function closeCashInModal() {
+    document.getElementById("cashInModal").style.display = "none";
+}
 
-        <label>Date</label>
-        <input type="date" id="date" class="modal-input" required>
+function openCashOutModal() {
+    document.getElementById("co_date").value = "";
+    document.getElementById("co_reason").value = "";
+    document.getElementById("co_from").value = "";
+    document.getElementById("co_to").value = "";
+    document.getElementById("co_km").value = "";
+    document.getElementById("co_cash").value = "";
+    document.getElementById("co_type").value = "";
 
-        <label>Cash In</label>
-        <input type="number" id="cashIn" class="modal-input" required>
+    // reset visibility
+    document.getElementById("co_km_block").style.display = "none";
+    document.getElementById("co_cash_block").style.display = "block";
 
-        <label>Cash In From</label>
-        <input type="text" id="cashInFrom" class="modal-input" placeholder="Source">
+    document.getElementById("cashOutModal").style.display = "flex";
+}
 
-        <button class="btn-submit" onclick="submitCashIn()">Submit</button>
-        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-    `;
-
-    modal.style.display = "flex";
+function closeCashOutModal() {
+    document.getElementById("cashOutModal").style.display = "none";
 }
 
 /* =============================
-   Submit Cash Out
+   SUBMIT CASH IN
+   ============================= */
+async function submitCashIn() {
+    const date = document.getElementById("ci_date").value;
+    const amount = document.getElementById("ci_cash").value;
+    const cashInFrom = document.getElementById("ci_from").value;
+
+    if (!date || !amount) {
+        return alert("Please fill required fields.");
+    }
+
+    const res = await fetch("/api/expenses/cash-in", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ date, amount, cashInFrom })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+        closeCashInModal();
+        loadExpenses();
+    } else {
+        alert("Error: " + data.error);
+    }
+}
+
+/* =============================
+   SUBMIT CASH OUT
    ============================= */
 async function submitCashOut() {
-    const fundsType = document.getElementById("fundsType").value;
-    const reason    = document.getElementById("reason").value;
-    const date      = document.getElementById("date").value;
-    const from      = document.getElementById("from").value;
-    const to        = document.getElementById("to").value;
-    const amount    = document.getElementById("cashOut").value;
-    const kilometer = fundsType === "Own car" 
-                        ? document.getElementById("kilometer").value 
-                        : null;
+    const type = document.getElementById("co_type").value;
+    const reason = document.getElementById("co_reason").value;
+    const date = document.getElementById("co_date").value;
+    const from = document.getElementById("co_from").value;
+    const to = document.getElementById("co_to").value;
 
-    if (!fundsType || !reason || !date || !amount) {
-        return alert("Please fill all required fields");
+    if (!type || !reason || !date) {
+        return alert("Please fill required fields.");
     }
 
     const body = {
-        fundsType,
+        fundsType: type,
         reason,
         date,
         from,
-        to,
-        amount,
+        to
     };
 
-    if (kilometer) body.kilometer = kilometer;
+    // Own car logic
+    if (type === "Own car") {
+        body.kilometer = document.getElementById("co_km").value || 0;
+    } else {
+        body.amount = document.getElementById("co_cash").value || 0;
+    }
 
     const res = await fetch("/api/expenses/cash-out", {
         method: "POST",
@@ -142,8 +134,7 @@ async function submitCashOut() {
 
     const data = await res.json();
     if (data.success) {
-        alert("Cash Out added");
-        closeModal();
+        closeCashOutModal();
         loadExpenses();
     } else {
         alert("Error: " + data.error);
@@ -151,38 +142,13 @@ async function submitCashOut() {
 }
 
 /* =============================
-   Submit Cash In
-   ============================= */
-async function submitCashIn() {
-    const date = document.getElementById("date").value;
-    const amount = document.getElementById("cashIn").value;
-    const cashInFrom = document.getElementById("cashInFrom").value;
-
-    if (!date || !amount) return alert("Fill required fields");
-
-    const res = await fetch("/api/expenses/cash-in", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ date, amount, cashInFrom })
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-        alert("Cash In added");
-        closeModal();
-        loadExpenses();
-    } else {
-        alert("Error: " + data.error);
-    }
-}
-
-/* =============================
-   Load & Display Expenses List
+   LOAD EXPENSES FROM SERVER
    ============================= */
 async function loadExpenses() {
-    const container = document.getElementById("expensesList");
-    container.innerHTML = "<p>Loading...</p>";
+    const container = document.getElementById("expensesContent");
+    const totalBox = document.getElementById("totalAmount");
+
+    container.innerHTML = `<p style="color:#999;">Loading...</p>`;
 
     const res = await fetch("/api/expenses");
     const data = await res.json();
@@ -194,47 +160,48 @@ async function loadExpenses() {
 
     const items = data.items;
 
+    // Calculate total
+    let total = 0;
+    items.forEach(it => {
+        if (it.cashIn) total += it.cashIn;
+        if (it.cashOut) total -= it.cashOut;
+    });
+    totalBox.innerHTML = `$${total.toLocaleString()}`;
+
     // Group by date
     const groups = {};
-    items.forEach(it => {
-        const d = it.date || "Unknown";
+    items.forEach(item => {
+        const d = item.date || "Unknown";
         if (!groups[d]) groups[d] = [];
-        groups[d].push(it);
+        groups[d].push(item);
     });
 
+    // Render
     let html = "";
+    for (const date of Object.keys(groups)) {
+        html += `<div class="section-date">${date}</div>`;
 
-    Object.keys(groups).forEach(date => {
-        html += `<div class="group-date">${date}</div>`;
-
-        groups[date].forEach(item => {
+        groups[date].forEach(it => {
             html += `
-                <div class="expense-card">
-                    <div class="exp-left">
-                        <div class="exp-type">${item.fundsType}</div>
-                        <div class="exp-reason">${item.reason}</div>
-                        <div class="exp-loc">From: ${item.from} → ${item.to}</div>
-                    </div>
+            <div class="expense-item">
+                <div class="expense-icon icon-gift"></div>
 
-                    <div class="exp-right">
-                        ${item.cashIn > 0 
-                            ? `<div class="cash-in">+${item.cashIn}</div>`
-                            : `<div class="cash-out">-${item.cashOut}</div>`
-                        }
-                    </div>
+                <div class="expense-details">
+                    <div class="expense-title">${it.fundsType || ""}</div>
+                    <div class="expense-person">${it.reason || ""}</div>
+                    <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
                 </div>
+
+                <div class="expense-amount">
+                    ${it.cashIn ? `+$${it.cashIn}` : ""}
+                    ${it.cashOut ? `-$${it.cashOut}` : ""}
+                </div>
+            </div>
             `;
         });
-    });
+    }
 
-    container.innerHTML = html;
-}
-
-/* =============================
-   Close Modal
-   ============================= */
-function closeModal() {
-    document.getElementById("expensesModal").style.display = "none";
+    container.innerHTML = html || "<p>No expenses yet.</p>";
 }
 
 /* =============================
@@ -242,8 +209,8 @@ function closeModal() {
    ============================= */
 document.addEventListener("DOMContentLoaded", async () => {
     await loadFundsTypes();
-    loadExpenses();
+    await loadExpenses();
 
-    document.getElementById("btnCashIn").addEventListener("click", openCashInModal);
-    document.getElementById("btnCashOut").addEventListener("click", openCashOutModal);
+    document.getElementById("cashInBtn").addEventListener("click", openCashInModal);
+    document.getElementById("cashOutBtn").addEventListener("click", openCashOutModal);
 });
