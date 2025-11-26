@@ -233,8 +233,8 @@ async function loadExpenses() {
                 const isOut = it.cashOut && it.cashOut > 0;
 
                 const arrow = isIn 
-                    ? `<span class="arrow-icon arrow-in">↑</span>`
-                    : `<span class="arrow-icon arrow-out">↓</span>`;
+                    ? `<span class="arrow-icon arrow-in">↙</span>`
+                    : `<span class="arrow-icon arrow-out">↗</span>`;
 
                 html += `
                 <div class="expense-item">
