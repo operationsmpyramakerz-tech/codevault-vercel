@@ -173,6 +173,24 @@ async function getCurrentUserPageId(username) {
   return userQuery.results[0].id;
 }
 
+// === Helper: get current Team Member Notion ID from session username ===
+async function getCurrentUserNotionId(req) {
+  const username = req.session?.username;
+  if (!username) return null;
+
+  try {
+    const q = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      filter: { property: "Name", title: { equals: username } }
+    });
+
+    if (q.results.length === 0) return null;
+    return q.results[0].id;  // <-- Notion page ID of team member
+  } catch (err) {
+    console.error("Error fetching user Notion ID:", err.body || err);
+    return null;
+  }
+}
 async function getOrdersDBProps() {
   const db = await notion.databases.retrieve({ database_id: ordersDatabaseId });
   return db.properties || {};
@@ -2327,32 +2345,51 @@ app.post("/api/expenses/cash-out", async (req, res) => {
   } = req.body;
 
   try {
-    const page = await notion.pages.create({
-      parent: { database_id: process.env.Expenses_Database },
-      properties: {
-        "Team Member": {
-          people: [{ id: req.session.user.notionId }]
-        },
-        "Reason": {
-          rich_text: [{ type: "text", text: { content: reason || "" }}]
-        },
-        "Funds Type": {
-          select: { name: fundsType }
-        },
-        "Date": {
-          date: { start: date }
-        },
-        "From": {
-          rich_text: [{ type: "text", text: { content: from || "" }}]
-        },
-        "To": {
-          rich_text: [{ type: "text", text: { content: to || "" }}]
-        },
-        "Cash out": {
-          number: parseFloat(amount)
-        }
+    const notionUserId = await getCurrentUserNotionId(req);
+
+    const props = {
+      "Team Member": {
+        people: notionUserId ? [{ id: notionUserId }] : []
+      },
+      "Reason": {
+        rich_text: [{ type: "text", text: { content: reason || "" }}]
+      },
+      "Funds Type": {
+        select: { name: fundsType }
+      },
+      "Date": {
+        date: { start: date }
+      },
+      "From": {
+        rich_text: [{ type: "text", text: { content: from || "" }}]
+      },
+      "To": {
+        rich_text: [{ type: "text", text: { content: to || "" }}]
+      },
+      "Cash out": {
+        number: parseFloat(amount)
       }
+    };
+
+    // Kilometer only if Own car
+    if (fundsType === "Own car") {
+      props["Kilometer"] = {
+        number: parseFloat(kilometer) || 0
+      };
+    }
+
+    await notion.pages.create({
+      parent: { database_id: process.env.Expenses_Database },
+      properties: props
     });
+
+    res.json({ success: true, message: "Cash out recorded" });
+
+  } catch (err) {
+    console.error("Cash out error:", err);
+    res.status(500).json({ success: false, error: "Failed to save cash out" });
+  }
+});
 
     // Kilometer only if Own Car
     if (fundsType === "Own car") {
@@ -2370,18 +2407,16 @@ app.post("/api/expenses/cash-out", async (req, res) => {
 });
 
 app.post("/api/expenses/cash-in", async (req, res) => {
-  const {
-    date,
-    amount,
-    cashInFrom
-  } = req.body;
+  const { date, amount, cashInFrom } = req.body;
 
   try {
+    const notionUserId = await getCurrentUserNotionId(req);
+
     await notion.pages.create({
       parent: { database_id: process.env.Expenses_Database },
       properties: {
         "Team Member": {
-          people: [{ id: req.session.user.notionId }]
+          people: notionUserId ? [{ id: notionUserId }] : []
         },
         "Date": {
           date: { start: date }
