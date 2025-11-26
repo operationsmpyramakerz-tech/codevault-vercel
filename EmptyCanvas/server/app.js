@@ -2349,14 +2349,15 @@ app.post("/api/expenses/cash-out", async (req, res) => {
   const { fundsType, reason, date, from, to, amount, kilometer } = req.body;
 
   try {
-    // get team member relation ID
     const teamMemberPageId = await getCurrentUserRelationPage(req);
 
     if (!fundsType || !reason || !date) {
-      return res.status(400).json({ success: false, error: "Missing required fields" });
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields"
+      });
     }
 
-    // Build properties
     const props = {
       "Team Member": {
         relation: teamMemberPageId ? [{ id: teamMemberPageId }] : []
@@ -2375,30 +2376,27 @@ app.post("/api/expenses/cash-out", async (req, res) => {
       },
       "To": {
         rich_text: [{ type: "text", text: { content: to || "" }}]
+      },
+
+      // ALWAYS add Cash out (REQUIRED)
+      "Cash out": {
+        number: Number(amount) || 0
       }
     };
 
-    // Own car case → save kilometer only
+    // Add Kilometer only if Own car
     if (fundsType === "Own car") {
       props["Kilometer"] = {
         number: Number(kilometer) || 0
       };
-    } 
-    else {
-      // Normal case → save cash out only
-      props["Cash out"] = {
-        number: Number(amount) || 0
-      };
     }
 
-    // Create row inside notion
     await notion.pages.create({
       parent: { database_id: process.env.Expenses_Database },
       properties: props
     });
 
     res.json({ success: true, message: "Cash out saved successfully" });
-
   } catch (err) {
     console.error("Cash out error:", err.body || err);
     res.status(500).json({ success: false, error: "Failed to save cash out" });
