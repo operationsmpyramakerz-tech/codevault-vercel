@@ -2376,18 +2376,19 @@ app.post("/api/expenses/cash-out", async (req, res) => {
       },
       "To": {
         rich_text: [{ type: "text", text: { content: to || "" }}]
-      },
-
-      // ALWAYS add Cash out (REQUIRED)
-      "Cash out": {
-        number: Number(amount) || 0
       }
     };
 
-    // Add Kilometer only if Own car
+    // Own car → save Kilometer only
     if (fundsType === "Own car") {
       props["Kilometer"] = {
         number: Number(kilometer) || 0
+      };
+    }
+    // Not Own car → save Cash out only
+    else {
+      props["Cash out"] = {
+        number: Number(amount) || 0
       };
     }
 
@@ -2397,15 +2398,18 @@ app.post("/api/expenses/cash-out", async (req, res) => {
     });
 
     res.json({ success: true, message: "Cash out saved successfully" });
-  } catch (err) {
-  console.error("Cash out error:", err.body || err);
 
-  return res.status(500).json({
-    success: false,
-    error: "Cash out error",
-    details: err.body || err
-  });
-}
+  } catch (err) {
+    console.error("Cash out error:", err.body || err);
+
+    return res.status(500).json({
+      success: false,
+      error: "Cash out error",
+      details: err.body || err
+    });
+  }
+});
+
 
 // Cash In
 app.post("/api/expenses/cash-in", async (req, res) => {
