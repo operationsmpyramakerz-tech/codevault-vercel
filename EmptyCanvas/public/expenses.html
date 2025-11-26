@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Expenses</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="">
+  <div class="app-container">
+    <!-- Sidebar موجودة عندك بالفعل في باقي الصفحات (انسخها زي ما هي) -->
+    <!--  مثال بسيط، استبدل الجزء ده بالـ sidebar الحقيقي بتاعك -->
+    <!--#include virtual="/partials/sidebar.html" -->
+
+    <main class="main-content">
+
+      <!-- نفس الـ header اللي عندك في باقي الصفحات (انسخه كما هو) -->
+      <!--#include virtual="/partials/header.html" -->
+
+      <section class="container-full-width expenses-page">
+        <div class="expenses-layout">
+
+          <!-- ===== LEFT: Dashboard / List ===== -->
+          <div class="expenses-col expenses-col--left">
+
+            <div class="exp-topbar">
+              <div class="exp-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <h1 class="exp-title">Dashboard</h1>
+              <div class="exp-avatar">
+                <img src="/images/avatar-placeholder.png" alt="User" />
+              </div>
+            </div>
+
+            <!-- Balance Card -->
+            <div class="exp-balance-card">
+              <div class="exp-balance-main">
+                <span class="exp-balance-currency">$</span>
+                <span class="exp-balance-amount">17,800</span>
+                <span class="exp-balance-currency-small">USD</span>
+              </div>
+              <p class="exp-balance-label">Available Balance</p>
+            </div>
+
+            <!-- List Header -->
+            <div class="exp-section-head">
+              <span class="exp-section-title">All Expenses</span>
+              <button class="exp-view-all">View All</button>
+            </div>
+
+            <!-- TODAY -->
+            <div class="exp-day-block">
+              <p class="exp-day-label">Today</p>
+
+              <div class="exp-list">
+                <article class="exp-item">
+                  <div class="exp-item-left">
+                    <div class="exp-icon">
+                      <span class="exp-icon-emoji">☕</span>
+                    </div>
+                    <div class="exp-item-text">
+                      <h3 class="exp-item-title">Coffee</h3>
+                      <p class="exp-item-sub">with Peter Bower</p>
+                    </div>
+                  </div>
+                  <div class="exp-item-right">
+                    <span class="exp-item-amount">$50</span>
+                  </div>
+                </article>
+
+                <article class="exp-item">
+                  <div class="exp-item-left">
+                    <div class="exp-icon">
+                      <span class="exp-icon-emoji">🎁</span>
+                    </div>
+                    <div class="exp-item-text">
+                      <h3 class="exp-item-title">Gift</h3>
+                      <p class="exp-item-sub">for Audrey Campbell</p>
+                    </div>
+                  </div>
+                  <div class="exp-item-right">
+                    <span class="exp-item-amount">$1,500</span>
+                  </div>
+                </article>
+
+                <article class="exp-item">
+                  <div class="exp-item-left">
+                    <div class="exp-icon">
+                      <span class="exp-icon-emoji">🔔</span>
+                    </div>
+                    <div class="exp-item-text">
+                      <h3 class="exp-item-title">Subscription</h3>
+                      <p class="exp-item-sub">made with Chapman</p>
+                    </div>
+                  </div>
+                  <div class="exp-item-right">
+                    <span class="exp-item-amount">$500</span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <!-- YESTERDAY -->
+            <div class="exp-day-block">
+              <p class="exp-day-label">Yesterday</p>
+
+              <div class="exp-list">
+                <article class="exp-item">
+                  <div class="exp-item-left">
+                    <div class="exp-icon">
+                      <span class="exp-icon-emoji">🍽️</span>
+                    </div>
+                    <div class="exp-item-text">
+                      <h3 class="exp-item-title">Tea &amp; Snacks</h3>
+                      <p class="exp-item-sub">with Peter Bower</p>
+                    </div>
+                  </div>
+                  <div class="exp-item-right">
+                    <span class="exp-item-amount">$50</span>
+                  </div>
+                </article>
+
+                <article class="exp-item">
+                  <div class="exp-item-left">
+                    <div class="exp-icon">
+                      <span class="exp-icon-emoji">🔔</span>
+                    </div>
+                    <div class="exp-item-text">
+                      <h3 class="exp-item-title">Subscription</h3>
+                      <p class="exp-item-sub">made with Chapman</p>
+                    </div>
+                  </div>
+                  <div class="exp-item-right">
+                    <span class="exp-item-amount">$500</span>
+                  </div>
+                </article>
+              </div>
+            </div>
+
+            <!-- Floating Add button -->
+            <button class="exp-floating-add" type="button">
+              <span>+</span>
+            </button>
+          </div>
+
+          <!-- ===== RIGHT: Add Amount ===== -->
+          <div class="expenses-col expenses-col--right">
+            <div class="exp-add-card">
+              <h2 class="exp-add-title">Add Amount</h2>
+
+              <!-- Amount row -->
+              <div class="exp-field-row exp-field-row--amount">
+                <div class="exp-field-label">Amount</div>
+                <div class="exp-amount-display">
+                  <span class="exp-amount-currency">$</span>
+                  <span class="exp-amount-value" id="expAmountValue">50</span>
+                  <span class="exp-amount-currency-small">USD</span>
+                </div>
+              </div>
+
+              <!-- Category -->
+              <div class="exp-field-group">
+                <label class="exp-field-label">Expenses made for</label>
+                <button class="exp-select">
+                  <span>Tea &amp; Snacks</span>
+                  <span class="exp-select-caret">▾</span>
+                </button>
+              </div>
+
+              <!-- Description -->
+              <div class="exp-field-group">
+                <label class="exp-field-label">Description</label>
+                <p class="exp-description">
+                  Meeting and Snacks with Victor
+                </p>
+              </div>
+
+              <!-- Keypad -->
+              <div class="exp-keypad">
+                <button type="button">1</button>
+                <button type="button">2</button>
+                <button type="button">3</button>
+                <button type="button">4</button>
+                <button type="button">5</button>
+                <button type="button">6</button>
+                <button type="button">7</button>
+                <button type="button">8</button>
+                <button type="button">9</button>
+                <button type="button" class="exp-keypad-icon">
+                  <!-- small card icon placeholder -->
+                  ⌫
+                </button>
+                <button type="button">0</button>
+                <button type="button" class="exp-keypad-icon exp-keypad-confirm">
+                  ✓
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- اختيارى: بعدين نربطه بـ Notion -->
+  <!-- <script src="/js/expenses.js"></script> -->
+</body>
+</html>
