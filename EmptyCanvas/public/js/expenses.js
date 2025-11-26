@@ -395,6 +395,6 @@ document.addEventListener("click", (e) => {
     if (!modal || !sheet) return;
 
     if (modal.style.display === "flex" && !sheet.contains(e.target)) {
-        closeAllExpensesModal();
+        closeAllExpenses();
     }
 });
