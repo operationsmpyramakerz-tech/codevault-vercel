@@ -317,7 +317,7 @@ if (viewAllBtn) {
 function openAllExpensesModal() {
     const modal = document.getElementById("allExpensesModal");
     const sheet = document.getElementById("iosSheet");
-    const list = document.getElementById("allExpensesList");
+    const list = document.getElementById("allExpensesListModal");
 
     modal.style.display = "flex";
     setTimeout(() => {
