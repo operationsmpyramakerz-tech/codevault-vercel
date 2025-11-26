@@ -2391,22 +2391,31 @@ app.post("/api/expenses/cash-in", async (req, res) => {
   const { date, amount, cashInFrom } = req.body;
 
   try {
-    const notionUserId = await getCurrentUserNotionId(req);
+    const teamMemberPageId = await getCurrentUserRelationPage(req);
 
     await notion.pages.create({
       parent: { database_id: process.env.Expenses_Database },
       properties: {
         "Team Member": {
-          people: notionUserId ? [{ id: notionUserId }] : []
+          type: "relation",
+          relation: teamMemberPageId ? [{ id: teamMemberPageId }] : []
         },
         "Date": {
+          type: "date",
           date: { start: date }
         },
         "Cash in": {
+          type: "number",
           number: parseFloat(amount)
         },
         "Cash in from": {
-          rich_text: [{ type: "text", text: { content: cashInFrom || "" }}]
+          type: "rich_text",
+          rich_text: [
+            {
+              type: "text",
+              text: { content: cashInFrom || "" }
+            }
+          ]
         }
       }
     });
