@@ -46,16 +46,17 @@
 }
 
 /* scroll area */
-#allExpensesListModal {
+#allExpensesList {
   max-height: 60vh;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-#allExpensesListModal::-webkit-scrollbar {
+/* Smooth scroll */
+#allExpensesList::-webkit-scrollbar {
   width: 5px;
 }
-#allExpensesListModal::-webkit-scrollbar-thumb {
+#allExpensesList::-webkit-scrollbar-thumb {
   background: #ccc;
   border-radius: 10px;
 }
@@ -528,14 +529,14 @@
   
 
   <!-- iOS STYLE ALL EXPENSES MODAL -->
-<div id="allExpensesModal" class="ios-modal">
+<div id="allExpenses" class="ios-modal">
   <div class="ios-sheet" id="iosSheet">
 
     <div class="ios-drag"></div>
 
     <h3 class="ex-modal-title" style="text-align:center;">All Expenses</h3>
 
-    <div id="allExpensesListModal"></div>
+    <div id="allExpensesList"></div>
 
     <button onclick="closeAllExpensesModal()" 
             style="margin-top:1rem; width:100%; padding:0.9rem;
