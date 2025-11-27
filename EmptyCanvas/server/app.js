@@ -388,11 +388,11 @@ app.get("/expenses", requireAuth, requirePage("Expenses"), (req, res) => {
 app.get(
   "/expenses/users",
   requireAuth,
-  requirePage("Expenses"),   // لو عايز تخليها للوجيستكس بس، ممكن تخليها requirePage("Logistics")
+  requirePage("Expenses Users"),   // ✅ دي الصح
   (req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "expenses-users.html"));
   }
-);
+);;
 
 // Logistics page
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
@@ -2533,7 +2533,7 @@ app.get("/api/expenses", async (req, res) => {
 app.get(
   "/api/expenses/users",
   requireAuth,
-  requirePage("Expenses"),
+  requirePage("Expenses Users"),
   async (req, res) => {
     try {
       if (!expensesDatabaseId) {
@@ -2616,7 +2616,7 @@ app.get(
 app.get(
   "/api/expenses/user/:memberId",
   requireAuth,
-  requirePage("Expenses"),
+  requirePage("Expenses Users"),
   async (req, res) => {
     try {
       if (!expensesDatabaseId) {
