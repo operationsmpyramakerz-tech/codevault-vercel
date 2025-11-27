@@ -63,6 +63,7 @@ const ALL_PAGES = [
   "Stocktaking",
   "Funds",
   "Expenses",
+  "Expenses Users",
   "Logistics",
   "S.V schools orders",
   "Damaged Assets",
@@ -93,6 +94,13 @@ function normalizePages(names = []) {
   if (set.has("stocktaking")) out.push("Stocktaking");
   if (set.has("funds")) out.push("Funds");
   if (set.has("expenses")) out.push("Expenses");
+  if (
+    set.has("expenses users") ||
+    set.has("expenses by user") ||
+    set.has("team expenses")
+  ) {
+    out.push("Expenses Users");
+  }
   if (set.has("logistics")) out.push("Logistics");  if (set.has("s.v schools orders") || set.has("sv schools orders")) out.push("S.V schools orders");
   if (set.has("damaged assets")) out.push("Damaged Assets");
   if (set.has("s.v schools assets") || set.has("sv schools assets")) 
@@ -117,6 +125,9 @@ function expandAllowedForUI(list = []) {
   }
   if (set.has("Expenses")) {
     set.add("Expenses");
+  }
+  if (set.has("Expenses Users")) {
+    set.add("Expenses Users");
   }
   if (set.has("Logistics")) {
     set.add("Logistics");
@@ -160,6 +171,8 @@ function firstAllowedPath(allowed = []) {
   if (allowed.includes("Stocktaking")) return "/stocktaking";
   if (allowed.includes("Funds")) return "/funds";
   if (allowed.includes("Expenses")) return "/expenses";
+   if (allowed.includes("Expenses Users")) return "/expenses/users";  // ⬅ الجديد
+  if (allowed.includes("Logistics")) return "/logistics";
   return "/login";
 }
 
