@@ -371,6 +371,16 @@ app.get("/expenses", requireAuth, requirePage("Expenses"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "expenses.html"));
 });
 
+// Expenses Users page (logistics / admin view)
+app.get(
+  "/expenses/users",
+  requireAuth,
+  requirePage("Expenses"),   // لو عايز تخليها للوجيستكس بس، ممكن تخليها requirePage("Logistics")
+  (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "expenses-users.html"));
+  }
+);
+
 // Logistics page
 app.get("/logistics", requireAuth, requirePage("Logistics"), (req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "logistics.html"));
@@ -2505,6 +2515,147 @@ app.get("/api/expenses", async (req, res) => {
     res.json({ success: false, error: "Cannot load expenses" });
   }
 });
+
+// List users who have expenses (for logistics/admin view)
+app.get(
+  "/api/expenses/users",
+  requireAuth,
+  requirePage("Expenses"),
+  async (req, res) => {
+    try {
+      if (!expensesDatabaseId) {
+        return res.status(500).json({
+          success: false,
+          error: "Expenses database not configured",
+        });
+      }
+
+      const perUser = new Map();
+      let hasMore = true;
+      let startCursor = undefined;
+
+      while (hasMore) {
+        const resp = await notion.databases.query({
+          database_id: expensesDatabaseId,
+          start_cursor: startCursor,
+          sorts: [{ property: "Date", direction: "descending" }],
+        });
+
+        for (const page of resp.results) {
+          const props = page.properties || {};
+          const rel = props["Team Member"]?.relation;
+
+          if (!Array.isArray(rel) || rel.length === 0) continue;
+
+          const userId = rel[0].id;
+          const cashIn = Number(props["Cash in"]?.number || 0);
+          const cashOut = Number(props["Cash out"]?.number || 0);
+          const delta = cashIn - cashOut;
+
+          if (!perUser.has(userId)) {
+            perUser.set(userId, {
+              userId,
+              total: 0,
+              count: 0,
+            });
+          }
+          const agg = perUser.get(userId);
+          agg.total += delta;
+          agg.count += 1;
+        }
+
+        hasMore = resp.has_more;
+        startCursor = resp.next_cursor;
+      }
+
+      // Fetch user names
+      const users = [];
+      for (const [userId, agg] of perUser.entries()) {
+        try {
+          const page = await notion.pages.retrieve({ page_id: userId });
+          const name =
+            page.properties?.Name?.title?.[0]?.plain_text || "Unknown User";
+
+          users.push({
+            id: userId,
+            name,
+            total: agg.total,
+            count: agg.count,
+          });
+        } catch (e) {
+          console.error("Error loading team member name:", e.body || e);
+        }
+      }
+
+      users.sort((a, b) => a.name.localeCompare(b.name));
+
+      return res.json({ success: true, users });
+    } catch (err) {
+      console.error("/api/expenses/users error:", err.body || err);
+      return res
+        .status(500)
+        .json({ success: false, error: "Failed to load expense users" });
+    }
+  }
+);
+
+// Get all expenses for a specific Team Member (by relation pageId)
+app.get(
+  "/api/expenses/user/:memberId",
+  requireAuth,
+  requirePage("Expenses"),
+  async (req, res) => {
+    try {
+      if (!expensesDatabaseId) {
+        return res.status(500).json({
+          success: false,
+          error: "Expenses database not configured",
+        });
+      }
+
+      const memberId = String(req.params.memberId || "").trim();
+      if (!memberId) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Missing memberId" });
+      }
+
+      const list = await notion.databases.query({
+        database_id: expensesDatabaseId,
+        filter: {
+          property: "Team Member",
+          relation: { contains: memberId },
+        },
+        sorts: [{ property: "Date", direction: "descending" }],
+      });
+
+      const items = list.results.map((page) => ({
+        id: page.id,
+        date: page.properties["Date"]?.date?.start || null,
+        reason:
+          page.properties["Reason"]?.rich_text?.[0]?.plain_text || "",
+        fundsType:
+          page.properties["Funds Type"]?.select?.name || "",
+        from:
+          page.properties["From"]?.rich_text?.[0]?.plain_text || "",
+        to: page.properties["To"]?.rich_text?.[0]?.plain_text || "",
+        kilometer: page.properties["Kilometer"]?.number || 0,
+        cashIn: page.properties["Cash in"]?.number || 0,
+        cashOut: page.properties["Cash out"]?.number || 0,
+        cashInFrom:
+          page.properties["Cash in from"]?.rich_text?.[0]?.plain_text ||
+          "",
+      }));
+
+      res.json({ success: true, items });
+    } catch (err) {
+      console.error("/api/expenses/user/:memberId error:", err.body || err);
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to load user expenses" });
+    }
+  }
+);
 
 // === Helper: upload base64 image to Vercel Blob (SDK v2) and return a public URL ===
 async function uploadToBlobFromBase64(dataUrl, filenameHint = "receipt.jpg") {
