@@ -29,7 +29,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     }
 
     // ---------------- HEADER BOX ----------------
-    doc.roundedRect(30, 30, 400, 150, 14).stroke("#CFCFCF");
+    doc.roundedRect(30, 30, 540, 140, 14).stroke("#CFCFCF");
 
     // ---------------- HEADER TITLE ----------------
     doc.font("Helvetica-Bold").fontSize(22).text("Expenses Report", 160, 50);
