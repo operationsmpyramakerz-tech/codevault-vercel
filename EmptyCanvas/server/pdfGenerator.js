@@ -129,7 +129,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     doc.text(`To / ${toText}`, toX + 10, durationY + 2);
 
     // نزود الـ y علشان البوكسات اللي تحت
-    doc.y = durationY + frameHeight + 20;
+    doc.y = durationY + frameHeight + 40;
 
     // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
