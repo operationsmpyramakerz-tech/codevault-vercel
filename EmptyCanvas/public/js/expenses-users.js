@@ -258,22 +258,30 @@ document.addEventListener("click", (e) => {
 document.getElementById("downloadPdfBtn").addEventListener("click", () => {
   if (!FILTERED_ITEMS.length) return alert("No expenses to download.");
 
+  const from = document.getElementById("dateFrom").value || null;
+  const to = document.getElementById("dateTo").value || null;
+
+  const userId = CURRENT_USER_ITEMS[0]?.employeeCode || "N/A";
+
   fetch(`/api/expenses/export/pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      userName: document.getElementById("userExpensesTitle").textContent,
+      userName: document.getElementById("userExpensesTitle").textContent.replace("Expenses — ", ""),
+      userId,
+      dateFrom: from,
+      dateTo: to,
       items: FILTERED_ITEMS
     })
   })
-  .then(res => res.blob())
-  .then(blob => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "expenses.pdf";
-    a.click();
-  });
+    .then(res => res.blob())
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "expenses.pdf";
+      a.click();
+    });
 });
 
 // ---------------------------
