@@ -155,112 +155,142 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     summaryBox(400, "Final Balance", `${balance} EGP`, "#2563EB");
 
     doc.moveDown(7);
+// ---------------- TABLE HEADER ----------------
+doc.font("Helvetica-Bold").fontSize(13);
 
-    // ---------------- TABLE HEADER ----------------
-    doc.font("Helvetica-Bold").fontSize(13);
+const col = {
+  date: 40,
+  type: 110,
+  reason: 190,
+  from: 315,
+  to: 380,
+  km: 445,
+  cashIn: 490,
+  cashOut: 545,
+};
 
-    const col = {
-      date: 40,
-      type: 110,
-      reason: 190,
-      from: 315,
-      to: 380,
-      km: 445,
-      cashIn: 490,
-      cashOut: 545,
-    };
+// نخلي كل الهيدر في نفس السطر
+const headerY = doc.y + 10;
 
-    doc.text("Date",     col.date);
-    doc.text("Type",     col.type);
-    doc.text("Reason",   col.reason);
-    doc.text("From",     col.from);
-    doc.text("To",       col.to);
-    doc.text("KM",       col.km);
-    doc.text("Cash in",  col.cashIn);
-    doc.text("Cash out", col.cashOut);
+doc.text("Date", col.date, headerY, {
+  width: col.type - col.date - 5,
+});
 
-    // خط تحت الهيدر
-    doc.moveTo(40, doc.y + 2).lineTo(560, doc.y + 2).stroke("#999");
-    doc.moveDown(0.8);
+doc.text("Type", col.type, headerY, {
+  width: col.reason - col.type - 5,
+});
 
-    // ---------------- TABLE ROWS ----------------
-    doc.font("Helvetica").fontSize(11);
+doc.text("Reason", col.reason, headerY, {
+  width: col.from - col.reason - 5,
+});
 
-    rows.forEach((it) => {
-      const rowY = doc.y;
+doc.text("From", col.from, headerY, {
+  width: col.to - col.from - 5,
+  align: "right",
+});
 
-      const reason = it.reason || "-";
-      const from   = it.from   || "-";
-      const to     = it.to     || "-";
+doc.text("To", col.to, headerY, {
+  width: col.km - col.to - 5,
+  align: "right",
+});
 
-      doc.fillColor("#000");
+doc.text("KM", col.km, headerY, {
+  width: col.cashIn - col.km - 5,
+  align: "right",
+});
 
-      doc.text(it.date || "-", col.date, rowY, {
-        width: col.type - col.date - 5,
-      });
+doc.text("Cash in", col.cashIn, headerY, {
+  width: col.cashOut - col.cashIn - 5,
+  align: "right",
+});
 
-      doc.text(it.fundsType || "-", col.type, rowY, {
-        width: col.reason - col.type - 5,
-      });
+doc.text("Cash out", col.cashOut, headerY, {
+  width: 50,
+  align: "right",
+});
 
-      // Reason (يمين علشان العربي)
-      doc.text(reason, col.reason, rowY, {
-        width: col.from - col.reason - 5,
-        align: "right",
-      });
+// خط تحت الهيدر
+doc.moveTo(40, headerY + 16).lineTo(560, headerY + 16).stroke("#999");
 
-      doc.text(from, col.from, rowY, {
-        width: col.to - col.from - 5,
-        align: "right",
-      });
+// نخلي بداية الصفوف تحت الهيدر بشوية
+doc.y = headerY + 22;
 
-      doc.text(to, col.to, rowY, {
-        width: col.km - col.to - 5,
-        align: "right",
-      });
+// ---------------- TABLE ROWS ----------------
+doc.font("Helvetica").fontSize(11);
 
-      doc.text(it.kilometer || "-", col.km, rowY, {
-        width: col.cashIn - col.km - 5,
-        align: "right",
-      });
+rows.forEach((it) => {
+  const rowY = doc.y;
 
-      // Cash In
-      if (it.cashIn > 0) {
-        doc.fillColor("#16A34A").text(
-          it.cashIn.toString(),
-          col.cashIn,
-          rowY,
-          { width: col.cashOut - col.cashIn - 5, align: "right" }
-        );
-      } else {
-        doc.fillColor("#000").text(
-          "-",
-          col.cashIn,
-          rowY,
-          { width: col.cashOut - col.cashIn - 5, align: "right" }
-        );
-      }
+  const reason = it.reason || "-";
+  const from   = it.from   || "-";
+  const to     = it.to     || "-";
 
-      // Cash Out
-      if (it.cashOut > 0) {
-        doc.fillColor("#DC2626").text(
-          it.cashOut.toString(),
-          col.cashOut,
-          rowY,
-          { width: 40, align: "right" }
-        );
-      } else {
-        doc.fillColor("#000").text(
-          "-",
-          col.cashOut,
-          rowY,
-          { width: 40, align: "right" }
-        );
-      }
+  doc.fillColor("#000");
 
-      doc.fillColor("#000");
-      doc.moveDown(1); // سطر جديد
-    });
+  doc.text(it.date || "-", col.date, rowY, {
+    width: col.type - col.date - 5,
+  });
+
+  doc.text(it.fundsType || "-", col.type, rowY, {
+    width: col.reason - col.type - 5,
+  });
+
+  doc.text(reason, col.reason, rowY, {
+    width: col.from - col.reason - 5,
+    align: "right",
+  });
+
+  doc.text(from, col.from, rowY, {
+    width: col.to - col.from - 5,
+    align: "right",
+  });
+
+  doc.text(to, col.to, rowY, {
+    width: col.km - col.to - 5,
+    align: "right",
+  });
+
+  doc.text(it.kilometer || "-", col.km, rowY, {
+    width: col.cashIn - col.km - 5,
+    align: "right",
+  });
+
+  if (it.cashIn > 0) {
+    doc.fillColor("#16A34A").text(
+      it.cashIn.toString(),
+      col.cashIn,
+      rowY,
+      { width: col.cashOut - col.cashIn - 5, align: "right" }
+    );
+  } else {
+    doc.fillColor("#000").text(
+      "-",
+      col.cashIn,
+      rowY,
+      { width: col.cashOut - col.cashIn - 5, align: "right" }
+    );
+  }
+
+  if (it.cashOut > 0) {
+    doc.fillColor("#DC2626").text(
+      it.cashOut.toString(),
+      col.cashOut,
+      rowY,
+      { width: 50, align: "right" }
+    );
+  } else {
+    doc.fillColor("#000").text(
+      "-",
+      col.cashOut,
+      rowY,
+      { width: 50, align: "right" }
+    );
+  }
+
+  doc.fillColor("#000");
+  doc.moveDown(1);
+});
+    
 
     // ---------------- FOOTER ----------------
     doc.moveDown(1.5);
