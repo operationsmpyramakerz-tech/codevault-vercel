@@ -183,3 +183,60 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("DOMContentLoaded", loadExpenseUsers);
+
+// --- Toggle download menu ---
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  const menu = document.getElementById("downloadMenu");
+  menu.style.display = menu.style.display === "block" ? "none" : "block";
+});
+
+// --- Close menu when clicking outside ---
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".download-wrapper")) {
+    document.getElementById("downloadMenu").style.display = "none";
+  }
+});
+
+// --- Download PDF ---
+document.getElementById("downloadPdfBtn").addEventListener("click", () => {
+  if (!CURRENT_USER_ITEMS.length) return alert("No expenses to download.");
+
+  fetch(`/api/expenses/export/pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userName: document.getElementById("userExpensesTitle").textContent,
+      items: CURRENT_USER_ITEMS
+    })
+  })
+  .then(res => res.blob())
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "expenses.pdf";
+    a.click();
+  });
+});
+
+// --- Download Excel ---
+document.getElementById("downloadExcelBtn").addEventListener("click", () => {
+  if (!CURRENT_USER_ITEMS.length) return alert("No expenses to download.");
+
+  fetch(`/api/expenses/export/excel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userName: document.getElementById("userExpensesTitle").textContent,
+      items: CURRENT_USER_ITEMS
+    })
+  })
+  .then(res => res.blob())
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "expenses.xlsx";
+    a.click();
+  });
+});
