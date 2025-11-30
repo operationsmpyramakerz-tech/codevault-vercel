@@ -3484,31 +3484,51 @@ app.post("/api/expenses/export/pdf", (req, res) => {
 });
 
 app.post("/api/expenses/export/excel", async (req, res) => {
-  const ExcelJS = require("exceljs");
-  const { userName, items } = req.body;
+  try {
+    const ExcelJS = require("exceljs");
+    const { userName, items } = req.body;
 
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Expenses");
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Expenses");
 
-  ws.addRow(["Date", "Funds Type", "Reason", "From", "To", "Cash In", "Cash Out"]);
+    sheet.columns = [
+      { header: "Date", key: "date", width: 15 },
+      { header: "Funds Type", key: "fundsType", width: 20 },
+      { header: "Reason", key: "reason", width: 30 },
+      { header: "From", key: "from", width: 20 },
+      { header: "To", key: "to", width: 20 },
+      { header: "Cash In", key: "cashIn", width: 12 },
+      { header: "Cash Out", key: "cashOut", width: 12 },
+    ];
 
-  items.forEach(it => {
-    ws.addRow([
-      it.date,
-      it.fundsType,
-      it.reason,
-      it.from,
-      it.to,
-      it.cashIn || 0,
-      it.cashOut || 0
-    ]);
-  });
+    items.forEach(it => {
+      sheet.addRow({
+        date: it.date,
+        fundsType: it.fundsType,
+        reason: it.reason,
+        from: it.from,
+        to: it.to,
+        cashIn: it.cashIn || 0,
+        cashOut: it.cashOut || 0
+      });
+    });
 
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", "attachment; filename=expenses.xlsx");
+    const buffer = await workbook.xlsx.writeBuffer();
 
-  await wb.xlsx.write(res);
-  res.end();
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${userName}-expenses.xlsx"`
+    );
+
+    res.send(buffer);
+  } catch (err) {
+    console.error("Excel export error:", err);
+    res.status(500).json({ error: "Failed to generate Excel file" });
+  }
 });
 
 module.exports = app;
