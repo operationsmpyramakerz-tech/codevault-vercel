@@ -11,8 +11,15 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     doc.on("end", () => callback(null, Buffer.concat(buffers)));
 
     // ---------------- LOGO ----------------
-    const logoPath = path.join(process.cwd(), "public/images/logo.png");
-    doc.image(logoPath, 45, 45, { width: 95 });
+let logoPath;
+
+try {
+  logoPath = path.join(__dirname, "..", "public", "images", "logo.png");
+
+  doc.image(logoPath, 45, 45, { width: 95 });
+} catch (err) {
+  console.error("Logo load failed:", err);
+}
 
     // ---------------- HEADER BOX ----------------
     doc.roundedRect(30, 30, 540, 150, 14).stroke("#CFCFCF");
