@@ -64,12 +64,50 @@ doc.font("Helvetica").text(userId || "-");
 doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true });
 doc.font("Helvetica").text(timestamp);
 
-    // ---------------- DURATION ----------------
-    doc.moveDown(4);
-    doc.font("Helvetica-Bold").fontSize(14).text("Duration:", { continued: true });
-    doc
-      .font("Helvetica")
-      .text(`   From / ${dateFrom || "-"}   To / ${dateTo || "-"}`);
+ // ---------------- DURATION ----------------
+
+// helper لتنسيق التاريخ
+function formatDate(value) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value); // لو جالك فورمات جاهز زي "09 Nov 25"
+  return d.toISOString().slice(0, 10);          // YYYY-MM-DD
+}
+
+// لو الفلتر مش محدد (الـ front ما بعثش تاريخ من/إلى) نجيب أقدم وأحدث تاريخ من ال items
+let fromVal = dateFrom;
+let toVal   = dateTo;
+
+if (!fromVal && !toVal && Array.isArray(items) && items.length > 0) {
+  const validDates = items
+    .map(it => it.date)
+    .filter(Boolean)
+    .map(d => new Date(d))
+    .filter(d => !isNaN(d.getTime()));
+
+  if (validDates.length > 0) {
+    const minDate = new Date(Math.min(...validDates));
+    const maxDate = new Date(Math.max(...validDates));
+    fromVal = minDate.toISOString().slice(0, 10);
+    toVal   = maxDate.toISOString().slice(0, 10);
+  }
+}
+
+const fromText = formatDate(fromVal);
+const toText   = formatDate(toVal);
+
+// نكتب السطر على الشمال
+doc.moveDown(3);
+const durationY = doc.y + 5;
+
+doc
+  .font("Helvetica-Bold")
+  .fontSize(14)
+  .text("Duration:", 40, durationY, { continued: true });
+
+doc
+  .font("Helvetica")
+  .text(`   From / ${fromText}   To / ${toText}`);
 
     // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
