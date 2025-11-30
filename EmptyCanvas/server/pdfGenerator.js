@@ -35,14 +35,34 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     doc.font("Helvetica-Bold").fontSize(22).text("Expenses Report", 160, 50);
 
     // ---------------- HEADER INFO ----------------
-    const now = new Date();
-    const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
+const now = new Date();
+const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
 
-    doc.font("Helvetica").fontSize(12);
-    doc.text(`User Name: ${userName || "-"}`, 160, 88);
-    doc.text(`User ID: ${userId || "-"}`, 160, 108);
-    doc.text(`Type: All`, 160, 128);
-    doc.text(`Date: ${timestamp}`, 160, 148);
+// أماكن الأعمدة
+const leftX  = 160;
+const rightX = 380;
+
+// أماكن السطور
+const row1Y = 100;
+const row2Y = 122;
+
+doc.fontSize(12);
+
+// سطر 1 – User Name (شمال)
+doc.font("Helvetica-Bold").text("User Name ", leftX, row1Y, { continued: true });
+doc.font("Helvetica").text(userName || "-");
+
+// سطر 1 – Type (يمين)
+doc.font("Helvetica-Bold").text("Type ", rightX, row1Y, { continued: true });
+doc.font("Helvetica").text("All");
+
+// سطر 2 – User ID (شمال)
+doc.font("Helvetica-Bold").text("User ID ", leftX, row2Y, { continued: true });
+doc.font("Helvetica").text(userId || "-");
+
+// سطر 2 – Date (يمين)
+doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true });
+doc.font("Helvetica").text(timestamp);
 
     // ---------------- DURATION ----------------
     doc.moveDown(4);
