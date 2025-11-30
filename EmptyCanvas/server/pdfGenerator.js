@@ -97,8 +97,9 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const toText   = formatDate(toVal);
 
     // ---- draw Duration label and frames ----
-    doc.moveDown(3);
-    const durationY = doc.y + 5;
+    // نخلي الـ Duration تحت الهيدر بهامش مريح
+    const durationY = 210;      // لو عايز مسافة أكتر جرّب 215 أو 220
+    doc.y = durationY;
 
     // عنوان Duration
     doc.font("Helvetica-Bold")
@@ -127,8 +128,8 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
 
     doc.text(`To / ${toText}`, toX + 10, durationY + 2);
 
-    // نعدّل الـ y علشان البوكسات اللي تحت
-    doc.y = durationY + frameHeight + 10;
+    // نزود الـ y علشان البوكسات اللي تحت
+    doc.y = durationY + frameHeight + 20;
 
     // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
