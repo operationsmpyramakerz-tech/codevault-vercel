@@ -1,4 +1,5 @@
 // expenses-users.js
+let CURRENT_USER_ITEMS = [];
 
 async function loadExpenseUsers() {
   const tabsEl = document.getElementById("userTabs");
@@ -90,7 +91,8 @@ async function openUserExpensesModal(userId, userName) {
       return;
     }
 
-    const items = data.items || [];
+    CURRENT_USER_ITEMS = data.items || [];
+renderUserExpenses(CURRENT_USER_ITEMS, totalEl, listEl);
 
     if (items.length === 0) {
       listEl.innerHTML = "<p style='color:#9ca3af;'>No expenses for this user.</p>";
@@ -180,4 +182,92 @@ document.addEventListener("click", (e) => {
 
 document.addEventListener("DOMContentLoaded", () => {
   loadExpenseUsers();
+});
+function renderUserExpenses(items, totalEl, listEl) {
+  if (!items || items.length === 0) {
+    listEl.innerHTML = "<p style='color:#9ca3af;'>No expenses for this user.</p>";
+    totalEl.textContent = "Total: £0";
+    return;
+  }
+
+  let total = 0;
+  listEl.innerHTML = "";
+
+  items.forEach((it) => {
+    const cashIn = Number(it.cashIn || 0);
+    const cashOut = Number(it.cashOut || 0);
+    total += cashIn - cashOut;
+
+    const isIn = cashIn > 0;
+    const arrow = isIn
+      ? `<span class="arrow-icon arrow-in">↙</span>`
+      : `<span class="arrow-icon arrow-out">↗</span>`;
+
+    const dateStr = it.date || "";
+
+    const amountHtml = `
+      ${cashIn ? `<span style="color:#16a34a;">+£${cashIn}</span>` : ""}
+      ${cashOut ? `<span style="color:#dc2626;">-£${cashOut}</span>` : ""}
+    `;
+
+    const div = document.createElement("div");
+    div.className = "expense-item";
+    div.innerHTML = `
+      <div class="expense-icon">${arrow}</div>
+      <div class="expense-details">
+        <div class="expense-title">
+          ${it.fundsType || ""} <span style="font-size:0.8rem;color:#9ca3af;">${dateStr}</span>
+        </div>
+        <div class="expense-person">${it.reason || ""}</div>
+        <div class="expense-person">
+          ${(it.from || "") || (it.cashInFrom ? \`From: ${it.cashInFrom}\` : "")}
+          ${it.to ? \` → ${it.to}\` : ""}
+        </div>
+      </div>
+      <div class="expense-amount">${amountHtml}</div>
+    `;
+    listEl.appendChild(div);
+  });
+
+  const totalStr = total.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
+  totalEl.textContent = `Total: £${totalStr}`;
+}
+
+                document.getElementById("applyDateFilterBtn").addEventListener("click", () => {
+  const from = document.getElementById("dateFrom").value;
+  const to = document.getElementById("dateTo").value;
+
+  if (!from && !to) {
+    alert("Choose a date range.");
+    return;
+  }
+
+  let filtered = CURRENT_USER_ITEMS.filter((it) => {
+    const d = new Date(it.date);
+    const fromD = from ? new Date(from) : null;
+    const toD = to ? new Date(to) : null;
+
+    if (fromD && d < fromD) return false;
+    if (toD && d > toD) return false;
+    return true;
+  });
+
+  const totalEl = document.getElementById("userExpensesTotal");
+  const listEl = document.getElementById("userExpensesList");
+
+  renderUserExpenses(filtered, totalEl, listEl);
+});
+
+document.getElementById("resetDateFilterBtn").addEventListener("click", () => {
+  document.getElementById("dateFrom").value = "";
+  document.getElementById("dateTo").value = "";
+
+  const totalEl = document.getElementById("userExpensesTotal");
+  const listEl = document.getElementById("userExpensesList");
+
+  renderUserExpenses(CURRENT_USER_ITEMS, totalEl, listEl);
 });
