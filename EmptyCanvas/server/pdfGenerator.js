@@ -107,7 +107,39 @@ doc
 
 doc
   .font("Helvetica")
-  .text(`   From / ${fromText}   To / ${toText}`);
+// ---- draw Duration label and frames ----
+doc.moveDown(3);
+const durationY = doc.y + 5;
+
+// عنوان Duration
+doc.font("Helvetica-Bold")
+   .fontSize(14)
+   .fillColor("#000")
+   .text("Duration:", 40, durationY);
+
+// أبعاد الفريمات
+const frameWidth  = 150;
+const frameHeight = 26;
+const fromX = 150;
+const toX   = 330;
+
+// فريم From
+doc.roundedRect(fromX, durationY - 4, frameWidth, frameHeight, 6)
+   .stroke("#CFCFCF");
+
+doc.font("Helvetica")
+   .fontSize(12)
+   .fillColor("#000")
+   .text(`From / ${fromText}`, fromX + 10, durationY + 2);
+
+// فريم To
+doc.roundedRect(toX, durationY - 4, frameWidth, frameHeight, 6)
+   .stroke("#CFCFCF");
+
+doc.text(`To / ${toText}`, toX + 10, durationY + 2);
+
+// ضبط الـ y علشان البوكسات اللي تحت
+doc.y = durationY + frameHeight + 10;
 
     // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
