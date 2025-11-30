@@ -109,7 +109,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
 
     // أبعاد الفريمات
     const frameWidth  = 150;
-    const frameHeight = 15;
+    const frameHeight = 20;
     const fromX = 150;
     const toX   = 330;
 
