@@ -29,7 +29,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     }
 
     // ---------------- HEADER BOX ----------------
-    doc.roundedRect(30, 30, 540, 140, 14).stroke("#CFCFCF");
+    doc.roundedRect(30, 30, 540, 130, 14).stroke("#CFCFCF");
 
     // ---------------- HEADER TITLE ----------------
     doc.font("Helvetica-Bold").fontSize(22).text("Expenses Report", 160, 50);
@@ -98,7 +98,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
 
     // ---- draw Duration label and frames ----
     // نخلي الـ Duration تحت الهيدر بهامش مريح
-    const durationY = 189;      // لو عايز مسافة أكتر جرّب 215 أو 220
+    const durationY = 180;      // لو عايز مسافة أكتر جرّب 215 أو 220
     doc.y = durationY;
 
     // عنوان Duration
