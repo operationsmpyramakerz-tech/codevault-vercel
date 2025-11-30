@@ -35,111 +35,100 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     doc.font("Helvetica-Bold").fontSize(22).text("Expenses Report", 160, 50);
 
     // ---------------- HEADER INFO ----------------
-const now = new Date();
-const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
 
-// أماكن الأعمدة
-const leftX  = 160;
-const rightX = 380;
+    // أماكن الأعمدة
+    const leftX  = 160;
+    const rightX = 380;
 
-// أماكن السطور
-const row1Y = 100;
-const row2Y = 122;
+    // أماكن السطور
+    const row1Y = 100;
+    const row2Y = 122;
 
-doc.fontSize(12);
+    doc.fontSize(12);
 
-// سطر 1 – User Name (شمال)
-doc.font("Helvetica-Bold").text("User Name ", leftX, row1Y, { continued: true });
-doc.font("Helvetica").text(userName || "-");
+    // سطر 1 – User Name (شمال)
+    doc.font("Helvetica-Bold").text("User Name ", leftX, row1Y, { continued: true });
+    doc.font("Helvetica").text(userName || "-");
 
-// سطر 1 – Type (يمين)
-doc.font("Helvetica-Bold").text("Type ", rightX, row1Y, { continued: true });
-doc.font("Helvetica").text("All");
+    // سطر 1 – Type (يمين)
+    doc.font("Helvetica-Bold").text("Type ", rightX, row1Y, { continued: true });
+    doc.font("Helvetica").text("All");
 
-// سطر 2 – User ID (شمال)
-doc.font("Helvetica-Bold").text("User ID ", leftX, row2Y, { continued: true });
-doc.font("Helvetica").text(userId || "-");
+    // سطر 2 – User ID (شمال)
+    doc.font("Helvetica-Bold").text("User ID ", leftX, row2Y, { continued: true });
+    doc.font("Helvetica").text(userId || "-");
 
-// سطر 2 – Date (يمين)
-doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true });
-doc.font("Helvetica").text(timestamp);
+    // سطر 2 – Date (يمين)
+    doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true });
+    doc.font("Helvetica").text(timestamp);
 
- // ---------------- DURATION ----------------
+    // ---------------- DURATION ----------------
 
-// helper لتنسيق التاريخ
-function formatDate(value) {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return String(value); // لو جالك فورمات جاهز زي "09 Nov 25"
-  return d.toISOString().slice(0, 10);          // YYYY-MM-DD
-}
+    // helper لتنسيق التاريخ
+    function formatDate(value) {
+      if (!value) return "-";
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return String(value); // لو جالك فورمات جاهز زي "09 Nov 25"
+      return d.toISOString().slice(0, 10);          // YYYY-MM-DD
+    }
 
-// لو الفلتر مش محدد (الـ front ما بعثش تاريخ من/إلى) نجيب أقدم وأحدث تاريخ من ال items
-let fromVal = dateFrom;
-let toVal   = dateTo;
+    // لو الفلتر مش محدد نجيب أقدم وأحدث تاريخ من الـ items
+    let fromVal = dateFrom;
+    let toVal   = dateTo;
 
-if (!fromVal && !toVal && Array.isArray(items) && items.length > 0) {
-  const validDates = items
-    .map(it => it.date)
-    .filter(Boolean)
-    .map(d => new Date(d))
-    .filter(d => !isNaN(d.getTime()));
+    if (!fromVal && !toVal && rows.length > 0) {
+      const validDates = rows
+        .map(it => it.date)
+        .filter(Boolean)
+        .map(d => new Date(d))
+        .filter(d => !isNaN(d.getTime()));
 
-  if (validDates.length > 0) {
-    const minDate = new Date(Math.min(...validDates));
-    const maxDate = new Date(Math.max(...validDates));
-    fromVal = minDate.toISOString().slice(0, 10);
-    toVal   = maxDate.toISOString().slice(0, 10);
-  }
-}
+      if (validDates.length > 0) {
+        const minDate = new Date(Math.min(...validDates));
+        const maxDate = new Date(Math.max(...validDates));
+        fromVal = minDate.toISOString().slice(0, 10);
+        toVal   = maxDate.toISOString().slice(0, 10);
+      }
+    }
 
-const fromText = formatDate(fromVal);
-const toText   = formatDate(toVal);
+    const fromText = formatDate(fromVal);
+    const toText   = formatDate(toVal);
 
-// نكتب السطر على الشمال
-doc.moveDown(3);
-const durationY = doc.y + 5;
+    // ---- draw Duration label and frames ----
+    doc.moveDown(3);
+    const durationY = doc.y + 5;
 
-doc
-  .font("Helvetica-Bold")
-  .fontSize(14)
-  .text("Duration:", 40, durationY, { continued: true });
+    // عنوان Duration
+    doc.font("Helvetica-Bold")
+       .fontSize(14)
+       .fillColor("#000")
+       .text("Duration:", 40, durationY);
 
-doc
-  .font("Helvetica")
-// ---- draw Duration label and frames ----
-doc.moveDown(3);
-const durationY = doc.y + 5;
+    // أبعاد الفريمات
+    const frameWidth  = 150;
+    const frameHeight = 26;
+    const fromX = 150;
+    const toX   = 330;
 
-// عنوان Duration
-doc.font("Helvetica-Bold")
-   .fontSize(14)
-   .fillColor("#000")
-   .text("Duration:", 40, durationY);
+    // فريم From
+    doc.roundedRect(fromX, durationY - 4, frameWidth, frameHeight, 6)
+       .stroke("#CFCFCF");
 
-// أبعاد الفريمات
-const frameWidth  = 150;
-const frameHeight = 26;
-const fromX = 150;
-const toX   = 330;
+    doc.font("Helvetica")
+       .fontSize(12)
+       .fillColor("#000")
+       .text(`From / ${fromText}`, fromX + 10, durationY + 2);
 
-// فريم From
-doc.roundedRect(fromX, durationY - 4, frameWidth, frameHeight, 6)
-   .stroke("#CFCFCF");
+    // فريم To
+    doc.roundedRect(toX, durationY - 4, frameWidth, frameHeight, 6)
+       .stroke("#CFCFCF");
 
-doc.font("Helvetica")
-   .fontSize(12)
-   .fillColor("#000")
-   .text(`From / ${fromText}`, fromX + 10, durationY + 2);
+    doc.text(`To / ${toText}`, toX + 10, durationY + 2);
 
-// فريم To
-doc.roundedRect(toX, durationY - 4, frameWidth, frameHeight, 6)
-   .stroke("#CFCFCF");
-
-doc.text(`To / ${toText}`, toX + 10, durationY + 2);
-
-// ضبط الـ y علشان البوكسات اللي تحت
-doc.y = durationY + frameHeight + 10;
+    // نعدّل الـ y علشان البوكسات اللي تحت
+    doc.y = durationY + frameHeight + 10;
 
     // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
@@ -160,7 +149,7 @@ doc.y = durationY + frameHeight + 10;
       doc.fillColor("#000");
     }
 
-    summaryBox(40, "Total Cash In", `${totalIn} EGP`, "#16A34A");
+    summaryBox(40,  "Total Cash In",  `${totalIn} EGP`,  "#16A34A");
     summaryBox(220, "Total Cash Out", `${totalOut} EGP`, "#DC2626");
     summaryBox(400, "Final Balance", `${balance} EGP`, "#2563EB");
 
@@ -180,13 +169,13 @@ doc.y = durationY + frameHeight + 10;
       cashOut: 545,
     };
 
-    doc.text("Date", col.date);
-    doc.text("Type", col.type);
-    doc.text("Reason", col.reason);
-    doc.text("From", col.from);
-    doc.text("To", col.to);
-    doc.text("KM", col.km);
-    doc.text("Cash in", col.cashIn);
+    doc.text("Date",     col.date);
+    doc.text("Type",     col.type);
+    doc.text("Reason",   col.reason);
+    doc.text("From",     col.from);
+    doc.text("To",       col.to);
+    doc.text("KM",       col.km);
+    doc.text("Cash in",  col.cashIn);
     doc.text("Cash out", col.cashOut);
 
     // خط تحت الهيدر
@@ -197,24 +186,21 @@ doc.y = durationY + frameHeight + 10;
     doc.font("Helvetica").fontSize(11);
 
     rows.forEach((it) => {
-      // نخلي سطر ثابت
       const rowY = doc.y;
 
       const reason = it.reason || "-";
-      const from = it.from || "-";
-      const to = it.to || "-";
+      const from   = it.from   || "-";
+      const to     = it.to     || "-";
 
       doc.fillColor("#000");
 
-      // كل عمود بنفس الـ y علشان المحاذاة تكون مظبوطة
-      doc.text(it.date || "-", col.date, rowY, { width: col.type - col.date - 5 });
+      doc.text(it.date || "-", col.date, rowY, {
+        width: col.type - col.date - 5,
+      });
 
-      doc.text(
-        it.fundsType || "-",
-        col.type,
-        rowY,
-        { width: col.reason - col.type - 5 }
-      );
+      doc.text(it.fundsType || "-", col.type, rowY, {
+        width: col.reason - col.type - 5,
+      });
 
       // Reason (يمين علشان العربي)
       doc.text(reason, col.reason, rowY, {
@@ -232,12 +218,10 @@ doc.y = durationY + frameHeight + 10;
         align: "right",
       });
 
-      doc.text(
-        it.kilometer || "-",
-        col.km,
-        rowY,
-        { width: col.cashIn - col.km - 5, align: "right" }
-      );
+      doc.text(it.kilometer || "-", col.km, rowY, {
+        width: col.cashIn - col.km - 5,
+        align: "right",
+      });
 
       // Cash In
       if (it.cashIn > 0) {
@@ -274,8 +258,7 @@ doc.y = durationY + frameHeight + 10;
       }
 
       doc.fillColor("#000");
-      // انزل سطر بعد الرو
-      doc.moveDown(1);
+      doc.moveDown(1); // سطر جديد
     });
 
     // ---------------- FOOTER ----------------
