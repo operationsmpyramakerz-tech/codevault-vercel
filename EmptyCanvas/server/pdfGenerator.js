@@ -2,18 +2,13 @@ const PDFDocument = require("pdfkit");
 const path = require("path");
 
 function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callback) {
-  // نخليها آمنة حتى لو items مش مبعوتة أو مش Array
   const rows = Array.isArray(items) ? items : [];
 
   try {
     const doc = new PDFDocument({ size: "A4", margin: 40 });
-
-    // --------- تجميع الـ PDF في Buffer ---------
     const buffers = [];
     doc.on("data", buffers.push.bind(buffers));
     doc.on("end", () => callback(null, Buffer.concat(buffers)));
-
-    // لو حصل Error جوه PDFKit نفسه
     doc.on("error", (err) => {
       console.error("PDFKit error:", err);
       callback(err);
@@ -25,7 +20,6 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
       doc.image(logoPath, 45, 45, { width: 95 });
     } catch (err) {
       console.error("Logo load failed (but PDF will continue):", err.message || err);
-      // هنكمّل من غير لوجو
     }
 
     // ---------------- HEADER BOX ----------------
@@ -38,264 +32,170 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const now = new Date();
     const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
 
-    // أماكن الأعمدة
-    const leftX  = 160;
+    const leftX = 160;
     const rightX = 380;
-
-    // أماكن السطور
     const row1Y = 100;
     const row2Y = 122;
 
     doc.fontSize(12);
-
-    // سطر 1 – User Name (شمال)
     doc.font("Helvetica-Bold").text("User Name ", leftX, row1Y, { continued: true });
     doc.font("Helvetica").text(userName || "-");
 
-    // سطر 1 – Type (يمين)
     doc.font("Helvetica-Bold").text("Type ", rightX, row1Y, { continued: true });
     doc.font("Helvetica").text("All");
 
-    // سطر 2 – User ID (شمال)
     doc.font("Helvetica-Bold").text("User ID ", leftX, row2Y, { continued: true });
     doc.font("Helvetica").text(userId || "-");
 
-    // سطر 2 – Date (يمين)
     doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true });
     doc.font("Helvetica").text(timestamp);
 
-    // ---------------- DURATION ----------------
-
-    // helper لتنسيق التاريخ
-    function formatDate(value) {
-      if (!value) return "-";
-      const d = new Date(value);
-      if (isNaN(d.getTime())) return String(value); // لو جالك فورمات جاهز زي "09 Nov 25"
-      return d.toISOString().slice(0, 10);          // YYYY-MM-DD
+    // ---------------- DURATION (نفس الشكل في الصورة) ----------------
+    function formatDisplayDate(dateStr) {
+      if (!dateStr) return "-";
+      // إذا كان الشكل بالفعل زي "09 Nov 25" نرجعه كما هو
+      if (/^\d{2} [A-Za-z]{3} \d{2}$/.test(dateStr)) return dateStr;
+      const d = new Date(dateStr);
+      if (isNaN(d)) return dateStr;
+      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, " ");
     }
 
-    // لو الفلتر مش محدد نجيب أقدم وأحدث تاريخ من الـ items
-    let fromVal = dateFrom;
-    let toVal   = dateTo;
+    let fromText = formatDisplayDate(dateFrom);
+    let toText = formatDisplayDate(dateTo);
 
-    if (!fromVal && !toVal && rows.length > 0) {
-      const validDates = rows
-        .map(it => it.date)
-        .filter(Boolean)
-        .map(d => new Date(d))
-        .filter(d => !isNaN(d.getTime()));
-
-      if (validDates.length > 0) {
-        const minDate = new Date(Math.min(...validDates));
-        const maxDate = new Date(Math.max(...validDates));
-        fromVal = minDate.toISOString().slice(0, 10);
-        toVal   = maxDate.toISOString().slice(0, 10);
+    if ((!dateFrom || !dateTo) && rows.length > 0) {
+      const dates = rows.map(r => r.date).filter(Boolean);
+      if (dates.length > 0) {
+        const sorted = dates.sort((a, b) => new Date(a) - new Date(b));
+        fromText = formatDisplayDate(sorted[0]);
+        toText = formatDisplayDate(sorted[sorted.length - 1]);
       }
     }
 
-    const fromText = formatDate(fromVal);
-    const toText   = formatDate(toVal);
+    const durationY = 170;
+    doc.font("Helvetica-Bold").fontSize(14).text("Duration:", 40, durationY);
 
-    // ---- draw Duration label and frames ----
-    // نخلي الـ Duration تحت الهيدر بهامش مريح
-    const durationY = 160;      // لو عايز مسافة أكتر جرّب 215 أو 220
-    doc.y = durationY;
+    doc.roundedRect(130, durationY - 5, 170, 30, 8).stroke("#CFCFCF");
+    doc.roundedRect(320, durationY - 5, 170, 30, 8).stroke("#CFCFCF");
 
-    // عنوان Duration
-    doc.font("Helvetica-Bold")
-       .fontSize(14)
-       .fillColor("#000")
-       .text("Duration:", 40, durationY);
+    doc.font("Helvetica").fontSize(13);
+    doc.text(fromText, 140, durationY + 5);
+    doc.text(toText, 330, durationY + 5);
 
-    // أبعاد الفريمات
-    const frameWidth  = 150;
-    const frameHeight = 20;
-    const fromX = 150;
-    const toX   = 330;
-
-    // فريم From
-    doc.roundedRect(fromX, durationY - 4, frameWidth, frameHeight, 6)
-       .stroke("#CFCFCF");
-
-    doc.font("Helvetica")
-       .fontSize(12)
-       .fillColor("#000")
-       .text(`From / ${fromText}`, fromX + 10, durationY + 2);
-
-    // فريم To
-    doc.roundedRect(toX, durationY - 4, frameWidth, frameHeight, 6)
-       .stroke("#CFCFCF");
-
-    doc.text(`To / ${toText}`, toX + 10, durationY + 2);
-
-    // نزود الـ y علشان البوكسات اللي تحت
-    doc.y = durationY + frameHeight + 0;
-
-    // ---------------- SUMMARY BOXES ----------------
+    // ---------------- SUMMARY BOXES (نفس الشكل والألوان في الصورة) ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
     const totalOut = rows.reduce((s, i) => s + (i.cashOut || 0), 0);
     const balance = totalIn - totalOut;
 
-    const boxY = doc.y + 10;
+    const summaryY = durationY + 50;
 
-    function summaryBox(x, title, value, color) {
-      doc.roundedRect(x, boxY, 140, 70, 12).stroke("#D9D9D9");
+    // Total Cash in
+    doc.roundedRect(40, summaryY, 150, 70, 12).stroke("#D9D9D9");
+    doc.font("Helvetica").fontSize(12).fillColor("#666666").text("Total Cash in", 50, summaryY + 15);
+    doc.font("Helvetica-Bold").fontSize(20).fillColor("#16A34A").text(`${totalIn.toLocaleString()} EGP`, 50, summaryY + 38);
 
-      doc.fontSize(11).font("Helvetica").fillColor("#666");
-      doc.text(title, x + 10, boxY + 12);
+    // Total Cash out
+    doc.roundedRect(210, summaryY, 150, 70, 12).stroke("#D9D9D9");
+    doc.font("Helvetica").fontSize(12).fillColor("#666666").text("Total Cash out", 220, summaryY + 15);
+    doc.font("Helvetica-Bold").fontSize(20).fillColor("#DC2626").text(`${totalOut.toLocaleString()} EGP`, 220, summaryY + 38);
 
-      doc.fontSize(18).font("Helvetica-Bold").fillColor(color);
-      doc.text(value, x + 10, boxY + 32);
+    // Final Balance
+    doc.roundedRect(380, summaryY, 150, 70, 12).stroke("#D9D9D9");
+    doc.font("Helvetica").fontSize(12).fillColor("#666666").text("Final Balance", 390, summaryY + 15);
+    doc.font("Helvetica-Bold").fontSize(20).fillColor("#2563EB").text(`${balance.toLocaleString()} EGP`, 390, summaryY + 38);
+
+    // ---------------- Total No. of entries ----------------
+    doc.font("Helvetica-Bold").fontSize(13).fillColor("#000").text(`Total No. of entries: ${rows.length}`, 40, summaryY + 90);
+
+    // ---------------- TABLE (بالضبط زي الصورة) ----------------
+    const tableTop = summaryY + 130;
+    const rowHeight = 35;
+    let y = tableTop;
+
+    // Header خلفية رمادية فاتحة
+    doc.rect(40, y, 520, rowHeight).fill("#F5F5F5");
+    doc.fillColor("#000");
+
+    // عناوين الأعمدة
+    doc.font("Helvetica-Bold").fontSize(12);
+
+    const cols = {
+      date: 50,
+      type: 120,
+      reason: 200,
+      from: 300,
+      to: 370,
+      km: 430,
+      cashIn: 480,
+      cashOut: 530
+    };
+
+    doc.text("Date", cols.date, y + 12);
+    doc.text("Type", cols.type, y + 12);
+    doc.text("Reason", cols.reason, y + 12);
+    doc.text("From", cols.from, y + 12, { align: "center" });
+    doc.text("To", cols.to, y + 12, { align: "center" });
+    doc.text("KM", cols.km, y + 12, { align: "center" });
+    doc.text("Cash in", cols.cashIn, y + 12, { align: "right" });
+    doc.text("Cash out", cols.cashOut, y + 12, { align: "right" });
+
+    y += rowHeight;
+
+    // خط تحت الهيدر
+    doc.moveTo(40, y).lineTo(560, y).lineWidth(1).stroke("#DDDDDD");
+    y += 8;
+
+    // الصفوف
+    doc.font("Helvetica").fontSize(11);
+
+    rows.forEach((item, i) => {
+      const rowY = y;
+
+      // تاريخ بنفس الفورمات الموجود في الصورة
+      const displayDate = formatDisplayDate(item.date);
 
       doc.fillColor("#000");
-    }
+      doc.text(displayDate, cols.date, rowY + 8, { width: 60 });
 
-    summaryBox(40,  "Total Cash In",  `${totalIn} EGP`,  "#16A34A");
-    summaryBox(220, "Total Cash Out", `${totalOut} EGP`, "#DC2626");
-    summaryBox(400, "Final Balance", `${balance} EGP`, "#2563EB");
+      doc.text(item.fundsType || "-", cols.type, rowY + 8, { width: 70 });
 
-    doc.moveDown(7);
-// ---------------- TABLE HEADER ----------------
-doc.font("Helvetica-Bold").fontSize(13);
+      // Reason يمين
+      doc.text(item.reason || "-", cols.reason, rowY + 8, { width: 90, align: "right" });
 
-const col = {
-  date: 40,
-  type: 110,
-  reason: 190,
-  from: 315,
-  to: 380,
-  km: 445,
-  cashIn: 490,
-  cashOut: 545,
-};
+      // From و To في المنتصف
+      doc.text(item.from || "", cols.from, rowY + 8, { width: 60, align: "center" });
+      doc.text(item.to || "", cols.to, rowY + 8, { width: 50, align: "center" });
 
-// نخلي كل الهيدر في نفس السطر
-const headerY = doc.y + 10;
+      // KM
+      doc.text(item.kilometer != null ? item.kilometer.toString() : "-", cols.km, rowY + 8, { width: 40, align: "center" });
 
-doc.text("Date", col.date, headerY, {
-  width: col.type - col.date - 5,
-});
+      // Cash In أخضر
+      if (item.cashIn > 0) {
+        doc.fillColor("#16A34A").font("Helvetica-Bold")
+           .text(item.cashIn.toLocaleString(), cols.cashIn, rowY + 8, { width: 70, align: "right" });
+      } else {
+        doc.fillColor("#000").text("-", cols.cashIn, rowY + 8, { width: 70, align: "right" });
+      }
 
-doc.text("Type", col.type, headerY, {
-  width: col.reason - col.type - 5,
-});
+      // Cash Out أحمر
+      if (item.cashOut > 0) {
+        doc.fillColor("#DC2626").font("Helvetica-Bold")
+           .text(item.cashOut.toLocaleString(), cols.cashOut, rowY + 8, { width: 50, align: "right" });
+      } else {
+        doc.fillColor("#000").text("-", cols.cashOut, rowY + 8, { width: 50, align: "right" });
+      }
 
-doc.text("Reason", col.reason, headerY, {
-  width: col.from - col.reason - 5,
-});
-
-doc.text("From", col.from, headerY, {
-  width: col.to - col.from - 5,
-  align: "right",
-});
-
-doc.text("To", col.to, headerY, {
-  width: col.km - col.to - 5,
-  align: "right",
-});
-
-doc.text("KM", col.km, headerY, {
-  width: col.cashIn - col.km - 5,
-  align: "right",
-});
-
-doc.text("Cash in", col.cashIn, headerY, {
-  width: col.cashOut - col.cashIn - 5,
-  align: "right",
-});
-
-doc.text("Cash out", col.cashOut, headerY, {
-  width: 50,
-  align: "right",
-});
-
-// خط تحت الهيدر
-doc.moveTo(40, headerY + 16).lineTo(560, headerY + 16).stroke("#999");
-
-// نخلي بداية الصفوف تحت الهيدر بشوية
-doc.y = headerY + 22;
-
-// ---------------- TABLE ROWS ----------------
-doc.font("Helvetica").fontSize(11);
-
-rows.forEach((it) => {
-  const rowY = doc.y;
-
-  const reason = it.reason || "-";
-  const from   = it.from   || "-";
-  const to     = it.to     || "-";
-
-  doc.fillColor("#000");
-
-  doc.text(it.date || "-", col.date, rowY, {
-    width: col.type - col.date - 5,
-  });
-
-  doc.text(it.fundsType || "-", col.type, rowY, {
-    width: col.reason - col.type - 5,
-  });
-
-  doc.text(reason, col.reason, rowY, {
-    width: col.from - col.reason - 5,
-    align: "right",
-  });
-
-  doc.text(from, col.from, rowY, {
-    width: col.to - col.from - 5,
-    align: "right",
-  });
-
-  doc.text(to, col.to, rowY, {
-    width: col.km - col.to - 5,
-    align: "right",
-  });
-
-  doc.text(it.kilometer || "-", col.km, rowY, {
-    width: col.cashIn - col.km - 5,
-    align: "right",
-  });
-
-  if (it.cashIn > 0) {
-    doc.fillColor("#16A34A").text(
-      it.cashIn.toString(),
-      col.cashIn,
-      rowY,
-      { width: col.cashOut - col.cashIn - 5, align: "right" }
-    );
-  } else {
-    doc.fillColor("#000").text(
-      "-",
-      col.cashIn,
-      rowY,
-      { width: col.cashOut - col.cashIn - 5, align: "right" }
-    );
-  }
-
-  if (it.cashOut > 0) {
-    doc.fillColor("#DC2626").text(
-      it.cashOut.toString(),
-      col.cashOut,
-      rowY,
-      { width: 50, align: "right" }
-    );
-  } else {
-    doc.fillColor("#000").text(
-      "-",
-      col.cashOut,
-      rowY,
-      { width: 50, align: "right" }
-    );
-  }
-
-  doc.fillColor("#000");
-  doc.moveDown(1);
-});
-    
+      // خط فاصل بين الصفوف (خفيف)
+      y += rowHeight;
+      if (i < rows.length - 1) {
+        doc.moveTo(40, y).lineTo(560, y).lineWidth(0.5).stroke("#EEEEEE");
+      }
+    });
 
     // ---------------- FOOTER ----------------
-    doc.moveDown(1.5);
-    doc.fontSize(10).font("Helvetica").fillColor("#777");
-    doc.text(`Generated ${timestamp}`, 40);
+    const finalY = y + 40;
+    doc.fontSize(10).fillColor("#777777")
+       .text(`Generated ${timestamp}`, 40, finalY);
 
     doc.end();
   } catch (err) {
