@@ -9,6 +9,19 @@
 
   <style>
 
+    .sort-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.sort-select {
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1.3px solid #d1d5db;
+  font-size: 0.9rem;
+}
     .download-wrapper {
   position: relative;
   display: inline-block;
@@ -410,6 +423,16 @@
     <button class="download-option" id="downloadPdfBtn">Download as PDF</button>
     <button class="download-option" id="downloadExcelBtn">Download as Excel</button>
   </div>
+</div>
+    <!-- SORTING DROPDOWN -->
+<div class="sort-wrapper">
+  <label style="font-weight:600;">Sort:</label>
+  <select id="sortSelect" class="sort-select">
+    <option value="newest">Newest first</option>
+    <option value="oldest">Oldest first</option>
+    <option value="high">Highest amount</option>
+    <option value="low">Lowest amount</option>
+  </select>
 </div>
     <!-- DATE FILTER -->
 <div class="date-filter">
