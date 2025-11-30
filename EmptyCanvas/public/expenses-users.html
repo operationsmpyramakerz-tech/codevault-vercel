@@ -8,6 +8,33 @@
   <script src="https://unpkg.com/feather-icons"></script>
 
   <style>
+
+    .date-filter {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.date-filter input {
+  padding: 0.4rem 0.6rem;
+  border: 1.4px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+}
+
+.reset-btn {
+  background: #6b7280;
+}
     .expenses-layout {
       max-width: 980px;
       margin: 0 auto;
@@ -319,6 +346,23 @@
       </div>
       <div class="user-expenses-total" id="userExpensesTotal">Total: £0</div>
     </div>
+
+    <!-- DATE FILTER -->
+<div class="date-filter">
+  <label>From:</label>
+  <input type="date" id="dateFrom" />
+
+  <label>To:</label>
+  <input type="date" id="dateTo" />
+
+  <button id="applyDateFilterBtn" class="filter-btn">
+    Apply Filter
+  </button>
+
+  <button id="resetDateFilterBtn" class="filter-btn reset-btn">
+    Reset
+  </button>
+</div>
 
     <div id="userExpensesList">
       <!-- list items -->
