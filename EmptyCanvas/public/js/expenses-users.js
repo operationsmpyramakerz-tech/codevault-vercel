@@ -1,6 +1,14 @@
+// =======================
 // expenses-users.js
-let CURRENT_USER_ITEMS = [];
+// =======================
 
+// GLOBAL DATA HOLDERS
+let CURRENT_USER_ITEMS = [];
+let FILTERED_ITEMS = [];
+
+// ---------------------------
+// LOAD USERS + BUILD TABS
+// ---------------------------
 async function loadExpenseUsers() {
   const tabsEl = document.getElementById("userTabs");
   const infoEl = document.getElementById("usersInfo");
@@ -43,7 +51,7 @@ async function loadExpenseUsers() {
       `;
 
       btn.addEventListener("click", () => {
-        document.querySelectorAll(".user-tab").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".user-tab").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
 
         openUserExpensesModal(u.id, u.name);
@@ -51,13 +59,16 @@ async function loadExpenseUsers() {
 
       tabsEl.appendChild(btn);
     });
+
   } catch (err) {
     console.error("loadExpenseUsers error:", err);
     infoEl.textContent = "Error loading expense users.";
   }
 }
 
-// ---- OPEN MODAL ----
+// ---------------------------
+// OPEN MODAL + LOAD USER DATA
+// ---------------------------
 async function openUserExpensesModal(userId, userName) {
   const modal = document.getElementById("userExpensesModal");
   const sheet = document.getElementById("userExpensesSheet");
@@ -81,36 +92,12 @@ async function openUserExpensesModal(userId, userName) {
       return;
     }
 
-    // SAVE FULL LIST
-    CURRENT_USER_ITEMS = data.items || [];
+    // Save full items
+    CURRENT_USER_ITEMS = [...data.items];
+    FILTERED_ITEMS = [...data.items];
 
-    // INITIAL RENDER
-    renderUserExpenses(CURRENT_USER_ITEMS, totalEl, listEl);
-
-    // ---- APPLY FILTER BTN ----
-    document.getElementById("applyDateFilterBtn").onclick = () => {
-      const from = document.getElementById("dateFrom").value;
-      const to = document.getElementById("dateTo").value;
-
-      let filtered = CURRENT_USER_ITEMS.filter((it) => {
-        const d = new Date(it.date);
-        const f = from ? new Date(from) : null;
-        const t = to ? new Date(to) : null;
-
-        if (f && d < f) return false;
-        if (t && d > t) return false;
-        return true;
-      });
-
-      renderUserExpenses(filtered, totalEl, listEl);
-    };
-
-    // ---- RESET FILTER ----
-    document.getElementById("resetDateFilterBtn").onclick = () => {
-      document.getElementById("dateFrom").value = "";
-      document.getElementById("dateTo").value = "";
-      renderUserExpenses(CURRENT_USER_ITEMS, totalEl, listEl);
-    };
+    // Initial Render
+    renderUserExpenses(FILTERED_ITEMS, totalEl, listEl);
 
   } catch (err) {
     console.error("openUserExpensesModal error:", err);
@@ -118,16 +105,65 @@ async function openUserExpensesModal(userId, userName) {
   }
 }
 
-// ---- RENDER LIST ----
+// ---------------------------
+// APPLY FILTERS + SORTING
+// ---------------------------
+function applyFiltersAndSorting() {
+  let result = [...CURRENT_USER_ITEMS];
+
+  // ---- DATE FILTER ----
+  const from = document.getElementById("dateFrom").value;
+  const to = document.getElementById("dateTo").value;
+
+  if (from || to) {
+    const fromD = from ? new Date(from) : null;
+    const toD = to ? new Date(to) : null;
+
+    result = result.filter((it) => {
+      const d = new Date(it.date);
+      if (fromD && d < fromD) return false;
+      if (toD && d > toD) return false;
+      return true;
+    });
+  }
+
+  // ---- SORTING ----
+  const sortType = document.getElementById("sortSelect").value;
+
+  result.sort((a, b) => {
+    const da = new Date(a.date);
+    const db = new Date(b.date);
+    const amtA = (a.cashIn || 0) - (a.cashOut || 0);
+    const amtB = (b.cashIn || 0) - (b.cashOut || 0);
+
+    switch (sortType) {
+      case "oldest":
+        return da - db;
+      case "newest":
+        return db - da;
+      case "high":
+        return amtB - amtA;
+      case "low":
+        return amtA - amtB;
+    }
+  });
+
+  FILTERED_ITEMS = result;
+  return result;
+}
+
+// ---------------------------
+// RENDER EXPENSES LIST
+// ---------------------------
 function renderUserExpenses(items, totalEl, listEl) {
   if (!items || items.length === 0) {
-    listEl.innerHTML = "<p style='color:#9ca3af;'>No expenses for this user.</p>";
     totalEl.textContent = "Total: £0";
+    listEl.innerHTML = "<p style='color:#9ca3af;'>No expenses for this user.</p>";
     return;
   }
 
-  let total = 0;
   listEl.innerHTML = "";
+  let total = 0;
 
   items.forEach((it) => {
     const cashIn = Number(it.cashIn || 0);
@@ -143,11 +179,15 @@ function renderUserExpenses(items, totalEl, listEl) {
 
     div.innerHTML = `
       <div class="expense-icon">${arrow}</div>
+
       <div class="expense-details">
-        <div class="expense-title">${it.fundsType} <span style="color:#9ca3af;">${it.date}</span></div>
-        <div class="expense-person">${it.reason}</div>
+        <div class="expense-title">
+          ${it.fundsType || ""} <span style="color:#9ca3af;">${it.date}</span>
+        </div>
+        <div class="expense-person">${it.reason || ""}</div>
         <div class="expense-person">${it.from || ""} ${it.to ? "→ " + it.to : ""}</div>
       </div>
+
       <div class="expense-amount">
         ${cashIn ? `<span style="color:#16a34a;">+£${cashIn}</span>` : ""}
         ${cashOut ? `<span style="color:#dc2626;">-£${cashOut}</span>` : ""}
@@ -157,56 +197,73 @@ function renderUserExpenses(items, totalEl, listEl) {
     listEl.appendChild(div);
   });
 
-  totalEl.textContent = `Total: £${total}`;
+  totalEl.textContent = `Total: £${total.toLocaleString()}`;
 }
 
-// ---- CLOSE MODAL ----
-function closeUserExpensesModal() {
-  const modal = document.getElementById("userExpensesModal");
-  const sheet = document.getElementById("userExpensesSheet");
-
-  sheet.style.transform = "translateY(100%)";
-  setTimeout(() => modal.style.display = "none", 300);
-}
-
-// close when clicking outside
-document.addEventListener("click", (e) => {
-  const modal = document.getElementById("userExpensesModal");
-  const sheet = document.getElementById("userExpensesSheet");
-
-  if (modal.style.display !== "flex") return;
-  if (e.target.closest(".user-tab")) return;
-
-  if (!sheet.contains(e.target)) {
-    closeUserExpensesModal();
-  }
+// ---------------------------
+// FILTER BUTTON
+// ---------------------------
+document.getElementById("applyDateFilterBtn").addEventListener("click", () => {
+  const updated = applyFiltersAndSorting();
+  renderUserExpenses(updated,
+    document.getElementById("userExpensesTotal"),
+    document.getElementById("userExpensesList")
+  );
 });
 
-document.addEventListener("DOMContentLoaded", loadExpenseUsers);
+// ---------------------------
+// RESET FILTER
+// ---------------------------
+document.getElementById("resetDateFilterBtn").addEventListener("click", () => {
+  document.getElementById("dateFrom").value = "";
+  document.getElementById("dateTo").value = "";
 
-// --- Toggle download menu ---
+  FILTERED_ITEMS = [...CURRENT_USER_ITEMS];
+  renderUserExpenses(FILTERED_ITEMS,
+    document.getElementById("userExpensesTotal"),
+    document.getElementById("userExpensesList")
+  );
+});
+
+// ---------------------------
+// SORTING CHANGE EVENT
+// ---------------------------
+document.getElementById("sortSelect").addEventListener("change", () => {
+  const updated = applyFiltersAndSorting();
+  renderUserExpenses(updated,
+    document.getElementById("userExpensesTotal"),
+    document.getElementById("userExpensesList")
+  );
+});
+
+// ---------------------------
+// DOWNLOAD MENU TOGGLE
+// ---------------------------
 document.getElementById("downloadBtn").addEventListener("click", () => {
   const menu = document.getElementById("downloadMenu");
   menu.style.display = menu.style.display === "block" ? "none" : "block";
 });
 
-// --- Close menu when clicking outside ---
+// Close download menu when clicking outside
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".download-wrapper")) {
-    document.getElementById("downloadMenu").style.display = "none";
+    const m = document.getElementById("downloadMenu");
+    if (m) m.style.display = "none";
   }
 });
 
-// --- Download PDF ---
+// ---------------------------
+// DOWNLOAD PDF
+// ---------------------------
 document.getElementById("downloadPdfBtn").addEventListener("click", () => {
-  if (!CURRENT_USER_ITEMS.length) return alert("No expenses to download.");
+  if (!FILTERED_ITEMS.length) return alert("No expenses to download.");
 
   fetch(`/api/expenses/export/pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       userName: document.getElementById("userExpensesTitle").textContent,
-      items: CURRENT_USER_ITEMS
+      items: FILTERED_ITEMS
     })
   })
   .then(res => res.blob())
@@ -219,16 +276,18 @@ document.getElementById("downloadPdfBtn").addEventListener("click", () => {
   });
 });
 
-// --- Download Excel ---
+// ---------------------------
+// DOWNLOAD EXCEL
+// ---------------------------
 document.getElementById("downloadExcelBtn").addEventListener("click", () => {
-  if (!CURRENT_USER_ITEMS.length) return alert("No expenses to download.");
+  if (!FILTERED_ITEMS.length) return alert("No expenses to download.");
 
   fetch(`/api/expenses/export/excel`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       userName: document.getElementById("userExpensesTitle").textContent,
-      items: CURRENT_USER_ITEMS
+      items: FILTERED_ITEMS
     })
   })
   .then(res => res.blob())
@@ -240,3 +299,28 @@ document.getElementById("downloadExcelBtn").addEventListener("click", () => {
     a.click();
   });
 });
+
+// ---------------------------
+// CLOSE MODAL (outside click)
+// ---------------------------
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("userExpensesModal");
+  const sheet = document.getElementById("userExpensesSheet");
+
+  if (modal.style.display !== "flex") return;
+  if (e.target.closest(".user-tab")) return;
+
+  if (!sheet.contains(e.target)) closeUserExpensesModal();
+});
+
+// ---------------------------
+function closeUserExpensesModal() {
+  const modal = document.getElementById("userExpensesModal");
+  const sheet = document.getElementById("userExpensesSheet");
+
+  sheet.style.transform = "translateY(100%)";
+  setTimeout(() => modal.style.display = "none", 300);
+}
+
+// ---------------------------
+document.addEventListener("DOMContentLoaded", loadExpenseUsers);
