@@ -3460,4 +3460,55 @@ app.get("/api/logistics/receivers", requireAuth, async (req, res) => {
     return res.status(500).json({ ok:false, error:"Failed to load receiver users" });
   }
 });
+app.post("/api/expenses/export/pdf", (req, res) => {
+  const { userName, items } = req.body;
+
+  const PDFDocument = require("pdfkit");
+  const doc = new PDFDocument();
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", "attachment; filename=expenses.pdf");
+
+  doc.fontSize(20).text(`Expenses — ${userName}`, { underline: true });
+
+  doc.moveDown();
+
+  items.forEach(it => {
+    doc.fontSize(12).text(
+      `${it.date} — ${it.fundsType} — ${it.reason} — ${it.from || ""} ${it.to || ""} | In: ${it.cashIn || 0}, Out: ${it.cashOut || 0}`
+    );
+  });
+
+  doc.end();
+  doc.pipe(res);
+});
+
+app.post("/api/expenses/export/excel", async (req, res) => {
+  const ExcelJS = require("exceljs");
+  const { userName, items } = req.body;
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Expenses");
+
+  ws.addRow(["Date", "Funds Type", "Reason", "From", "To", "Cash In", "Cash Out"]);
+
+  items.forEach(it => {
+    ws.addRow([
+      it.date,
+      it.fundsType,
+      it.reason,
+      it.from,
+      it.to,
+      it.cashIn || 0,
+      it.cashOut || 0
+    ]);
+  });
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", "attachment; filename=expenses.xlsx");
+
+  await wb.xlsx.write(res);
+  res.end();
+});
+
 module.exports = app;
