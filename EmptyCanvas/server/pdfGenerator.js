@@ -136,7 +136,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const totalOut = rows.reduce((s, i) => s + (i.cashOut || 0), 0);
     const balance = totalIn - totalOut;
 
-    const boxY = doc.y + 10;
+    const boxY = doc.y + 20;
 
     function summaryBox(x, title, value, color) {
       doc.roundedRect(x, boxY, 140, 70, 12).stroke("#D9D9D9");
