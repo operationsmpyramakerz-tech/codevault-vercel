@@ -2,24 +2,31 @@ const PDFDocument = require("pdfkit");
 const path = require("path");
 
 function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callback) {
+  // نخليها آمنة حتى لو items مش مبعوتة أو مش Array
+  const rows = Array.isArray(items) ? items : [];
+
   try {
     const doc = new PDFDocument({ size: "A4", margin: 40 });
 
-    // Collect PDF buffer
+    // --------- تجميع الـ PDF في Buffer ---------
     const buffers = [];
     doc.on("data", buffers.push.bind(buffers));
     doc.on("end", () => callback(null, Buffer.concat(buffers)));
 
+    // لو حصل Error جوه PDFKit نفسه
+    doc.on("error", (err) => {
+      console.error("PDFKit error:", err);
+      callback(err);
+    });
+
     // ---------------- LOGO ----------------
-let logoPath;
-
-try {
-  logoPath = path.join(__dirname, "..", "public", "images", "logo.png");
-
-  doc.image(logoPath, 45, 45, { width: 95 });
-} catch (err) {
-  console.error("Logo load failed:", err);
-}
+    try {
+      const logoPath = path.join(__dirname, "..", "public", "images", "logo.png");
+      doc.image(logoPath, 45, 45, { width: 95 });
+    } catch (err) {
+      console.error("Logo load failed (but PDF will continue):", err.message || err);
+      // هنكمّل من غير لوجو
+    }
 
     // ---------------- HEADER BOX ----------------
     doc.roundedRect(30, 30, 540, 150, 14).stroke("#CFCFCF");
@@ -32,19 +39,21 @@ try {
     const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
 
     doc.font("Helvetica").fontSize(12);
-    doc.text(`User Name: ${userName}`, 160, 88);
-    doc.text(`User ID: ${userId}`, 160, 108);
+    doc.text(`User Name: ${userName || "-"}`, 160, 88);
+    doc.text(`User ID: ${userId || "-"}`, 160, 108);
     doc.text(`Type: All`, 160, 128);
     doc.text(`Date: ${timestamp}`, 160, 148);
 
     // ---------------- DURATION ----------------
     doc.moveDown(4);
     doc.font("Helvetica-Bold").fontSize(14).text("Duration:", { continued: true });
-    doc.font("Helvetica").text(`   From / ${dateFrom || "-"}   To / ${dateTo || "-"}`);
+    doc
+      .font("Helvetica")
+      .text(`   From / ${dateFrom || "-"}   To / ${dateTo || "-"}`);
 
     // ---------------- SUMMARY BOXES ----------------
-    const totalIn = items.reduce((s, i) => s + (i.cashIn || 0), 0);
-    const totalOut = items.reduce((s, i) => s + (i.cashOut || 0), 0);
+    const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
+    const totalOut = rows.reduce((s, i) => s + (i.cashOut || 0), 0);
     const balance = totalIn - totalOut;
 
     const boxY = doc.y + 10;
@@ -57,6 +66,7 @@ try {
 
       doc.fontSize(18).font("Helvetica-Bold").fillColor(color);
       doc.text(value, x + 10, boxY + 32);
+
       doc.fillColor("#000");
     }
 
@@ -89,50 +99,93 @@ try {
     doc.text("Cash in", col.cashIn);
     doc.text("Cash out", col.cashOut);
 
+    // خط تحت الهيدر
     doc.moveTo(40, doc.y + 2).lineTo(560, doc.y + 2).stroke("#999");
-
     doc.moveDown(0.8);
 
     // ---------------- TABLE ROWS ----------------
     doc.font("Helvetica").fontSize(11);
 
-    items.forEach((it) => {
-      // **Arabic text right-aligned**
+    rows.forEach((it) => {
+      // نخلي سطر ثابت
+      const rowY = doc.y;
+
       const reason = it.reason || "-";
       const from = it.from || "-";
       const to = it.to || "-";
 
-      // Text columns
       doc.fillColor("#000");
-      doc.text(it.date || "-", col.date);
-      doc.text(it.fundsType || "-", col.type);
 
-      // Reason RIGHT aligned
-      doc.text(reason, col.reason, { width: 110, align: "right" });
+      // كل عمود بنفس الـ y علشان المحاذاة تكون مظبوطة
+      doc.text(it.date || "-", col.date, rowY, { width: col.type - col.date - 5 });
 
-      // From / To
-      doc.text(from, col.from, { width: 60, align: "right" });
-      doc.text(to, col.to, { width: 60, align: "right" });
+      doc.text(
+        it.fundsType || "-",
+        col.type,
+        rowY,
+        { width: col.reason - col.type - 5 }
+      );
 
-      // KM
-      doc.text(it.kilometer || "-", col.km, { width: 40, align: "right" });
+      // Reason (يمين علشان العربي)
+      doc.text(reason, col.reason, rowY, {
+        width: col.from - col.reason - 5,
+        align: "right",
+      });
 
-      // Cash In color
+      doc.text(from, col.from, rowY, {
+        width: col.to - col.from - 5,
+        align: "right",
+      });
+
+      doc.text(to, col.to, rowY, {
+        width: col.km - col.to - 5,
+        align: "right",
+      });
+
+      doc.text(
+        it.kilometer || "-",
+        col.km,
+        rowY,
+        { width: col.cashIn - col.km - 5, align: "right" }
+      );
+
+      // Cash In
       if (it.cashIn > 0) {
-        doc.fillColor("#16A34A").text(it.cashIn.toString(), col.cashIn, { width: 40, align: "right" });
+        doc.fillColor("#16A34A").text(
+          it.cashIn.toString(),
+          col.cashIn,
+          rowY,
+          { width: col.cashOut - col.cashIn - 5, align: "right" }
+        );
       } else {
-        doc.fillColor("#000").text("-", col.cashIn, { width: 40, align: "right" });
+        doc.fillColor("#000").text(
+          "-",
+          col.cashIn,
+          rowY,
+          { width: col.cashOut - col.cashIn - 5, align: "right" }
+        );
       }
 
-      // Cash Out color
+      // Cash Out
       if (it.cashOut > 0) {
-        doc.fillColor("#DC2626").text(it.cashOut.toString(), col.cashOut, { width: 40, align: "right" });
+        doc.fillColor("#DC2626").text(
+          it.cashOut.toString(),
+          col.cashOut,
+          rowY,
+          { width: 40, align: "right" }
+        );
       } else {
-        doc.fillColor("#000").text("-", col.cashOut, { width: 40, align: "right" });
+        doc.fillColor("#000").text(
+          "-",
+          col.cashOut,
+          rowY,
+          { width: 40, align: "right" }
+        );
       }
 
       doc.fillColor("#000");
-      doc.moveDown(0.6);
+      // انزل سطر بعد الرو
+      doc.moveDown(1);
     });
 
     // ---------------- FOOTER ----------------
@@ -142,6 +195,7 @@ try {
 
     doc.end();
   } catch (err) {
+    console.error("generateExpensePDF error:", err);
     callback(err);
   }
 }
