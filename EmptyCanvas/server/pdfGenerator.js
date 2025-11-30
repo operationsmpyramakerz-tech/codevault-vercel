@@ -2,171 +2,270 @@ const PDFDocument = require("pdfkit");
 const path = require("path");
 
 function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callback) {
+  // نخليها آمنة حتى لو items مش مبعوتة أو مش Array
   const rows = Array.isArray(items) ? items : [];
 
   try {
     const doc = new PDFDocument({ size: "A4", margin: 40 });
+
+    // --------- تجميع الـ PDF في Buffer ---------
     const buffers = [];
     doc.on("data", buffers.push.bind(buffers));
     doc.on("end", () => callback(null, Buffer.concat(buffers)));
-    doc.on("error", (err) => callback(err));
+
+    // لو حصل Error جوه PDFKit نفسه
+    doc.on("error", (err) => {
+      console.error("PDFKit error:", err);
+      callback(err);
+    });
 
     // ---------------- LOGO ----------------
     try {
       const logoPath = path.join(__dirname, "..", "public", "images", "logo.png");
       doc.image(logoPath, 45, 45, { width: 95 });
-    } catch (err) {}
+    } catch (err) {
+      console.error("Logo load failed (but PDF will continue):", err.message || err);
+      // هنكمّل من غير لوجو
+    }
 
-    // ---------------- HEADER BOX & TITLE ----------------
+    // ---------------- HEADER BOX ----------------
     doc.roundedRect(30, 30, 540, 120, 14).stroke("#CFCFCF");
+
+    // ---------------- HEADER TITLE ----------------
     doc.font("Helvetica-Bold").fontSize(22).text("Expenses Report", 160, 50);
 
+    // ---------------- HEADER INFO ----------------
     const now = new Date();
     const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
 
-    const leftX = 160, rightX = 380, row1Y = 100, row2Y = 122;
+    // أماكن الأعمدة
+    const leftX  = 160;
+    const rightX = 380;
+
+    // أماكن السطور
+    const row1Y = 100;
+    const row2Y = 122;
+
     doc.fontSize(12);
-    doc.font("Helvetica-Bold").text("User Name ", leftX, row1Y, { continued: true }).font("Helvetica").text(userName || "-");
-    doc.font("Helvetica-Bold").text("Type ", rightX, row1Y, { continued: true }).font("Helvetica").text("All");
-    doc.font("Helvetica-Bold").text("User ID ", leftX, row2Y, { continued: true }).font("Helvetica").text(userId || "-");
-    doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true }).font("Helvetica").text(timestamp);
+
+    // سطر 1 – User Name (شمال)
+    doc.font("Helvetica-Bold").text("User Name ", leftX, row1Y, { continued: true });
+    doc.font("Helvetica").text(userName || "-");
+
+    // سطر 1 – Type (يمين)
+    doc.font("Helvetica-Bold").text("Type ", rightX, row1Y, { continued: true });
+    doc.font("Helvetica").text("All");
+
+    // سطر 2 – User ID (شمال)
+    doc.font("Helvetica-Bold").text("User ID ", leftX, row2Y, { continued: true });
+    doc.font("Helvetica").text(userId || "-");
+
+    // سطر 2 – Date (يمين)
+    doc.font("Helvetica-Bold").text("Date ", rightX, row2Y, { continued: true });
+    doc.font("Helvetica").text(timestamp);
 
     // ---------------- DURATION ----------------
-    function formatDisplayDate(dateStr) {
-      if (!dateStr) return "-";
-      if (/^\d{2} [A-Za-z]{3} \d{2}$/.test(dateStr)) return dateStr;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, " ");
+
+    // helper لتنسيق التاريخ
+    function formatDate(value) {
+      if (!value) return "-";
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return String(value); // لو جالك فورمات جاهز زي "09 Nov 25"
+      return d.toISOString().slice(0, 10);          // YYYY-MM-DD
     }
 
-    let fromText = formatDisplayDate(dateFrom);
-    let toText = formatDisplayDate(dateTo);
-    if ((!dateFrom || !dateTo) && rows.length > 0) {
-      const dates = rows.map(r => r.date).filter(Boolean);
-      if (dates.length > 0) {
-        const sorted = dates.sort();
-        fromText = formatDisplayDate(sorted[0]);
-        toText = formatDisplayDate(sorted[sorted.length - 1]);
+    // لو الفلتر مش محدد نجيب أقدم وأحدث تاريخ من الـ items
+    let fromVal = dateFrom;
+    let toVal   = dateTo;
+
+    if (!fromVal && !toVal && rows.length > 0) {
+      const validDates = rows
+        .map(it => it.date)
+        .filter(Boolean)
+        .map(d => new Date(d))
+        .filter(d => !isNaN(d.getTime()));
+
+      if (validDates.length > 0) {
+        const minDate = new Date(Math.min(...validDates));
+        const maxDate = new Date(Math.max(...validDates));
+        fromVal = minDate.toISOString().slice(0, 10);
+        toVal   = maxDate.toISOString().slice(0, 10);
       }
     }
 
-    const durationY = 170;
-    doc.font("Helvetica-Bold").fontSize(14).text("Duration:", 40, durationY);
-    doc.roundedRect(130, durationY - 5, 170, 30, 8).stroke("#CFCFCF");
-    doc.roundedRect(320, durationY - 5, 170, 30, 8).stroke("#CFCFCF");
-    doc.font("Helvetica").fontSize(13).text(fromText, 140, durationY + 5);
-    doc.text(toText, 330, durationY + 5);
+    const fromText = formatDate(fromVal);
+    const toText   = formatDate(toVal);
 
-    // ---------------- SUMMARY BOXES (صغيرة في الأعلى زي الصورة) ----------------
+    // ---- draw Duration label and frames ----
+    // نخلي الـ Duration تحت الهيدر بهامش مريح
+    const durationY = 160;      // لو عايز مسافة أكتر جرّب 215 أو 220
+    doc.y = durationY;
+
+    // عنوان Duration
+    doc.font("Helvetica-Bold")
+       .fontSize(14)
+       .fillColor("#000")
+       .text("Duration:", 40, durationY);
+
+    // أبعاد الفريمات
+    const frameWidth  = 150;
+    const frameHeight = 20;
+    const fromX = 150;
+    const toX   = 330;
+
+    // فريم From
+    doc.roundedRect(fromX, durationY - 4, frameWidth, frameHeight, 6)
+       .stroke("#CFCFCF");
+
+    doc.font("Helvetica")
+       .fontSize(12)
+       .fillColor("#000")
+       .text(`From / ${fromText}`, fromX + 10, durationY + 2);
+
+    // فريم To
+    doc.roundedRect(toX, durationY - 4, frameWidth, frameHeight, 6)
+       .stroke("#CFCFCF");
+
+    doc.text(`To / ${toText}`, toX + 10, durationY + 2);
+
+    // نزود الـ y علشان البوكسات اللي تحت
+    doc.y = durationY + frameHeight + 20;
+
+    // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
     const totalOut = rows.reduce((s, i) => s + (i.cashOut || 0), 0);
     const balance = totalIn - totalOut;
 
-    const boxY = durationY + 50;
-    const boxWidth = 140;
-    const boxSpacing = 25;
+    const boxY = doc.y + 10;
 
-    function smallBox(x, value, color) {
-      doc.roundedRect(x, boxY, boxWidth, 40, 12).fillAndStroke(color + "20", color);
-      doc.font("Helvetica-Bold").fontSize(18).fillColor(color).text(value, x + 10, boxY + 12);
-    }
+    function summaryBox(x, title, value, color) {
+      doc.roundedRect(x, boxY, 140, 70, 12).stroke("#D9D9D9");
 
-    smallBox(70, `${totalIn.toLocaleString()} EGP`, "#16A34A");
-    smallBox(70 + boxWidth + boxSpacing, `${totalOut.toLocaleString()} EGP`, "#DC2626");
-    smallBox(70 + 2 * (boxWidth + boxSpacing), `${balance.toLocaleString()} EGP`, "#2563EB");
+      doc.fontSize(11).font("Helvetica").fillColor("#666");
+      doc.text(title, x + 10, boxY + 12);
 
-    // ---------------- Total No. of entries ----------------
-    doc.font("Helvetica-Bold").fontSize(14).fillColor("#000")
-       .text(`Total No. of entries: ${rows.length}`, 40, boxY + 60);
-
-    // ---------------- TABLE (مضغوط ومنسق تمامًا زي الصورة) ----------------
-    const tableTop = boxY + 100;
-    const rowHeight = 38;
-    let y = tableTop;
-
-    // Header
-    doc.rect(40, y, 520, rowHeight).fill("#F8F9FA");
-    doc.fillColor("#000").font("Helvetica-Bold").fontSize(11.5);
-
-    const col = {
-      date: 50,
-      type: 115,
-      reason: 195,
-      from: 290,
-      to: 370,
-      km: 420,
-      cashIn: 470,
-      cashOut: 520
-    };
-
-    doc.text("Date", col.date, y + 14);
-    doc.text("Type", col.type, y + 14);
-    doc.text("Reason", col.reason, y + 14);
-    doc.text("From", col.from, y + 14);
-    doc.text("To", col.to, y + 14);
-    doc.text("KM", col.km, y + 14, { width: 40, align: "center" });
-    doc.text("Cash in", col.cashIn, y + 14, { align: "right" });
-    doc.text("Cash out", col.cashOut, y + 14, { align: "right" });
-
-    y += rowHeight;
-
-    // خط تحت الهيدر
-    doc.moveTo(40, y).lineTo(560, y).lineWidth(1).stroke("#DDDDDD");
-
-    // خطوط عمودية خفيفة
-    [col.type, col.reason, col.from, col.to, col.km, col.cashIn, col.cashOut].forEach(x => {
-      doc.moveTo(x, tableTop).lineTo(x, tableTop + rowHeight + rows.length * rowHeight + 20)
-         .lineWidth(0.5).stroke("#EEEEEE");
-    });
-
-    // صفوف البيانات
-    doc.font("Helvetica").fontSize(11);
-
-    rows.forEach((item, i) => {
-      const rowY = y + 8;
-
-      const displayDate = formatDisplayDate(item.date);
+      doc.fontSize(18).font("Helvetica-Bold").fillColor(color);
+      doc.text(value, x + 10, boxY + 32);
 
       doc.fillColor("#000");
-      doc.text(displayDate, col.date, rowY, { width: 60 });
+    }
 
-      // Type مع كسر السطر
-      const typeText = (item.fundsType || "-").replace(" transportation", "\ntransportation");
-      doc.text(typeText, col.type, rowY - 3, { width: 75, lineBreak: true });
+    summaryBox(40,  "Total Cash In",  `${totalIn} EGP`,  "#16A34A");
+    summaryBox(220, "Total Cash Out", `${totalOut} EGP`, "#DC2626");
+    summaryBox(400, "Final Balance", `${balance} EGP`, "#2563EB");
 
-      doc.text(item.reason || "-", col.reason, rowY, { width: 90 });
+    doc.moveDown(7);
 
-      doc.text(item.from || "-", col.from, rowY, { width: 75, align: "center" });
-      doc.text(item.to || "-", col.to, rowY, { width: 45, align: "center" });
-      doc.text(item.kilometer != null ? item.kilometer.toString() : "0", col.km, rowY, { width: 40, align: "center" });
+    // ---------------- TABLE HEADER ----------------
+    doc.font("Helvetica-Bold").fontSize(13);
+
+    const col = {
+      date: 40,
+      type: 110,
+      reason: 190,
+      from: 315,
+      to: 380,
+      km: 445,
+      cashIn: 490,
+      cashOut: 545,
+    };
+
+    doc.text("Date",     col.date);
+    doc.text("Type",     col.type);
+    doc.text("Reason",   col.reason);
+    doc.text("From",     col.from);
+    doc.text("To",       col.to);
+    doc.text("KM",       col.km);
+    doc.text("Cash in",  col.cashIn);
+    doc.text("Cash out", col.cashOut);
+
+    // خط تحت الهيدر
+    doc.moveTo(40, doc.y + 2).lineTo(560, doc.y + 2).stroke("#999");
+    doc.moveDown(0.8);
+
+    // ---------------- TABLE ROWS ----------------
+    doc.font("Helvetica").fontSize(11);
+
+    rows.forEach((it) => {
+      const rowY = doc.y;
+
+      const reason = it.reason || "-";
+      const from   = it.from   || "-";
+      const to     = it.to     || "-";
+
+      doc.fillColor("#000");
+
+      doc.text(it.date || "-", col.date, rowY, {
+        width: col.type - col.date - 5,
+      });
+
+      doc.text(it.fundsType || "-", col.type, rowY, {
+        width: col.reason - col.type - 5,
+      });
+
+      // Reason (يمين علشان العربي)
+      doc.text(reason, col.reason, rowY, {
+        width: col.from - col.reason - 5,
+        align: "right",
+      });
+
+      doc.text(from, col.from, rowY, {
+        width: col.to - col.from - 5,
+        align: "right",
+      });
+
+      doc.text(to, col.to, rowY, {
+        width: col.km - col.to - 5,
+        align: "right",
+      });
+
+      doc.text(it.kilometer || "-", col.km, rowY, {
+        width: col.cashIn - col.km - 5,
+        align: "right",
+      });
 
       // Cash In
-      if (item.cashIn > 0) {
-        doc.fillColor("#16A34A").font("Helvetica-Bold")
-           .text(item.cashIn.toLocaleString(), col.cashIn, rowY, { width: 45, align: "right" });
+      if (it.cashIn > 0) {
+        doc.fillColor("#16A34A").text(
+          it.cashIn.toString(),
+          col.cashIn,
+          rowY,
+          { width: col.cashOut - col.cashIn - 5, align: "right" }
+        );
       } else {
-        doc.text("-", col.cashIn, rowY, { width: 45, align: "right" });
+        doc.fillColor("#000").text(
+          "-",
+          col.cashIn,
+          rowY,
+          { width: col.cashOut - col.cashIn - 5, align: "right" }
+        );
       }
 
       // Cash Out
-      if (item.cashOut > 0) {
-        doc.fillColor("#DC2626").font("Helvetica-Bold")
-           .text(item.cashOut.toLocaleString(), col.cashOut, rowY, { width: 50, align: "right" });
+      if (it.cashOut > 0) {
+        doc.fillColor("#DC2626").text(
+          it.cashOut.toString(),
+          col.cashOut,
+          rowY,
+          { width: 40, align: "right" }
+        );
       } else {
-        doc.text("-", col.cashOut, rowY, { width: 50, align: "right" });
+        doc.fillColor("#000").text(
+          "-",
+          col.cashOut,
+          rowY,
+          { width: 40, align: "right" }
+        );
       }
 
-      y += rowHeight;
-
-      if (i < rows.length - 1) {
-        doc.moveTo(40, y).lineTo(560, y).lineWidth(0.5).stroke("#EEEEEE");
-      }
+      doc.fillColor("#000");
+      doc.moveDown(1); // سطر جديد
     });
 
     // ---------------- FOOTER ----------------
-    doc.fontSize(10).fillColor("#777777")
-       .text(`Generated ${timestamp}`, 40, y + 40);
+    doc.moveDown(1.5);
+    doc.fontSize(10).font("Helvetica").fillColor("#777");
+    doc.text(`Generated ${timestamp}`, 40);
 
     doc.end();
   } catch (err) {
