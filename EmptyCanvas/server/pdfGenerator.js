@@ -14,57 +14,58 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const logoPath = path.join(__dirname, "../public/images/logo.png");
     doc.image(logoPath, 40, 40, { width: 80 });
 
-    // ---- HEADER TEXT ----
+    // ---- HEADER TITLE ----
     doc
       .fontSize(22)
       .font("Helvetica-Bold")
       .text("Expenses Report", 140, 40);
 
+    // Current timestamp
     const now = new Date();
     const timestamp = now.toISOString().slice(0, 16).replace("T", " ");
 
+    // ---- HEADER INFO ----
     doc.fontSize(12).font("Helvetica");
     doc.text(`User Name: ${userName}`, 140, 75);
     doc.text(`User ID: ${userId}`, 140, 95);
     doc.text(`Type: All`, 140, 115);
     doc.text(`Date: ${timestamp}`, 140, 135);
 
-    // ---- HEADER OUTLINE ----
+    // ---- HEADER BORDER ----
     doc.roundedRect(30, 30, 540, 130, 12).stroke("#D9D9D9");
 
     // ---- DURATION ----
     doc.moveDown(3);
     doc.fontSize(14).font("Helvetica-Bold").text(`Duration:`, { continued: true });
     doc.font("Helvetica").text(
-      `   From: ${dateFrom || "-"}     To: ${dateTo || "-"}`
+      `  From: ${dateFrom || "-"}     To: ${dateTo || "-"}`
     );
 
-    // ---- SUMMARY DATA ----
+    // ---- SUMMARY ----
     const totalIn = items.reduce((s, i) => s + (i.cashIn || 0), 0);
     const totalOut = items.reduce((s, i) => s + (i.cashOut || 0), 0);
     const balance = totalIn - totalOut;
 
     doc.moveDown(1.5);
 
-    // Summary boxes
+    const boxY = doc.y;
     function summaryBox(x, title, value, color) {
-      doc.roundedRect(x, doc.y, 160, 70, 12).stroke("#D9D9D9");
+      doc.roundedRect(x, boxY, 160, 70, 12).stroke("#D9D9D9");
 
-      doc.fontSize(11).font("Helvetica").fillColor("#555").text(title, x + 10, doc.y + 10);
-      doc
-        .fontSize(18)
-        .font("Helvetica-Bold")
-        .fillColor(color)
-        .text(value, x + 10, doc.y + 25);
-      doc.fillColor("black");
+      doc.fontSize(11).font("Helvetica").fillColor("#555");
+      doc.text(title, x + 10, boxY + 10);
+
+      doc.fontSize(18).font("Helvetica-Bold").fillColor(color);
+      doc.text(value, x + 10, boxY + 30);
+
+      doc.fillColor("#000");
     }
 
-    const summaryStartY = doc.y;
     summaryBox(40, "Total Cash In", `${totalIn} EGP`, "#16A34A");
     summaryBox(220, "Total Cash Out", `${totalOut} EGP`, "#DC2626");
     summaryBox(400, "Final Balance", `${balance} EGP`, "#2563EB");
 
-    doc.moveDown(5);
+    doc.moveDown(6);
 
     // ---- TABLE HEADER ----
     doc.fontSize(13).font("Helvetica-Bold");
@@ -75,7 +76,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
 
     doc.moveTo(40, doc.y + 2).lineTo(550, doc.y + 2).stroke("#999");
 
-    doc.moveDown(0.7);
+    doc.moveDown(1);
 
     // ---- TABLE ROWS ----
     doc.font("Helvetica").fontSize(11);
@@ -92,7 +93,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
       doc.fillColor(amtColor).text(amount, 500);
       doc.fillColor("#000");
 
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
     });
 
     doc.end();
