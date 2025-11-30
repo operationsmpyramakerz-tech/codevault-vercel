@@ -189,8 +189,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.ok) throw new Error("Failed to load users");
       const data = await res.json();
 
-      if (!data.success) throw new Error(data.error || "Cannot load users");
-      const users = Array.isArray(data.users) ? data.users : [];
+      if (!data.success) {
+  throw new Error(data.error || "Failed to load users");
+}
+
+// هنا التعديل المهم 👇
+const users = Array.isArray(data.users) ? data.users : [];
 
       if (!users.length) {
         if (infoText) {
