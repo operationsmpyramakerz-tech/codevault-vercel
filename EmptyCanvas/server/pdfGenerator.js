@@ -139,7 +139,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const boxY = doc.y + 10;
 
     function summaryBox(x, title, value, color) {
-      doc.roundedRect(x, boxY, 140, 70, 12).stroke("#D9D9D9");
+      doc.roundedRect(x, boxY, 100, 70, 12).stroke("#D9D9D9");
 
       doc.fontSize(11).font("Helvetica").fillColor("#666");
       doc.text(title, x + 10, boxY + 12);
