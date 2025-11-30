@@ -3515,16 +3515,16 @@ app.post("/api/expenses/export/excel", async (req, res) => {
 
     const buffer = await workbook.xlsx.writeBuffer();
 
-    res.setHeader(
-      "Content-Type",
+    res.setHeader("Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${userName}-expenses.xlsx"`
+    res.setHeader("Content-Disposition",
+      `attachment; filename="${userName.replace(/[^a-z0-9]/gi, "_")}.xlsx"`
     );
+    res.setHeader("Content-Length", buffer.length);
 
-    res.send(buffer);
+    res.end(buffer);
+
   } catch (err) {
     console.error("Excel export error:", err);
     res.status(500).json({ error: "Failed to generate Excel file" });
