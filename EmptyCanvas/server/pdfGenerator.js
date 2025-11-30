@@ -89,39 +89,35 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     // ================   MODERN TABLE  ======================
     // ======================================================
 
-    const tableTop    = summaryY + 120;
-    const tableLeft   = 40;
-    const tableWidth  = 520;
-    const tableRight  = tableLeft + tableWidth;
-    const headerHeight = 24;
-    const rowHeight    = 20;
+    const tableTop     = summaryY + 120;
+    const tableLeft    = 40;
+    const tableRight   = 560;
+    const tableWidth   = tableRight - tableLeft;
+    const headerHeight = 22;
 
-    // أعمدة أضيق شوية
-    const col = {
-      date:   tableLeft + 8,
-      type:   tableLeft + 70,
-      reason: tableLeft + 150,
-      from:   tableLeft + 290,
-      to:     tableLeft + 340,
-      km:     tableLeft + 390,
-      cashIn: tableLeft + 445,
-      cashOut:tableLeft + 495,
-    };
+    // تعريف الأعمدة (x + width + align)
+    const columns = [
+      { key: "date",     label: "Date",    x: tableLeft + 8,   width: 60, align: "left" },
+      { key: "fundsType",label: "Type",    x: tableLeft + 76,  width: 80, align: "left" },
+      { key: "reason",   label: "Reason",  x: tableLeft + 162, width: 130,align: "left" },
+      { key: "from",     label: "From",    x: tableLeft + 300, width: 50, align: "center" },
+      { key: "to",       label: "To",      x: tableLeft + 354, width: 50, align: "center" },
+      { key: "kilometer",label: "KM",      x: tableLeft + 408, width: 35, align: "center" },
+      { key: "cashIn",   label: "Cash In", x: tableLeft + 450, width: 45, align: "right" },
+      { key: "cashOut",  label: "Cash Out",x: tableLeft + 502, width: 45, align: "right" },
+    ];
 
     let y = tableTop;
 
     // --- Header background ---
     doc.rect(tableLeft, y, tableWidth, headerHeight).fill("#F5F5F5");
-    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(11);
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10);
 
-    doc.text("Date",    col.date,   y + 6);
-    doc.text("Type",    col.type,   y + 6);
-    doc.text("Reason",  col.reason, y + 6);
-    doc.text("From",    col.from,   y + 6);
-    doc.text("To",      col.to,     y + 6);
-    doc.text("KM",      col.km,     y + 6);
-    doc.text("Cash in", col.cashIn, y + 6, { width: 40, align: "right" });
-    doc.text("Cash out",col.cashOut,y + 6, { width: 40, align: "right" });
+    columns.forEach((col) => {
+      const opts = { width: col.width, align: col.align === "right" ? "right" :
+                                     col.align === "center" ? "center" : "left" };
+      doc.text(col.label, col.x, y + 5, opts);
+    });
 
     // خط تحت الهيدر
     doc.moveTo(tableLeft, y + headerHeight)
@@ -132,86 +128,79 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     y += headerHeight;
 
     // --- Rows ---
-    doc.font("Helvetica").fontSize(10);
+    doc.font("Helvetica").fontSize(9);
 
     rows.forEach((item, index) => {
-      const rowY = y + 4;
+      const rowData = {
+        date:       formatDisplayDate(item.date),
+        fundsType:  item.fundsType || "-",
+        reason:     item.reason || "-",
+        from:       item.from || "-",
+        to:         item.to || "-",
+        kilometer:  item.kilometer != null ? String(item.kilometer) : "-",
+        cashIn:     item.cashIn > 0 ? item.cashIn.toLocaleString() : "-",
+        cashOut:    item.cashOut > 0 ? item.cashOut.toLocaleString() : "-",
+      };
 
-      // تاريخ بشكل مختصر
-      const displayDate = formatDisplayDate(item.date);
-
-      // تاريخ
-      doc.fillColor("#111827").text(displayDate || "-", col.date, rowY, { width: 60 });
-
-      // Type
-      const typeText = item.fundsType || "-";
-      doc.text(typeText, col.type, rowY, { width: 70 });
-
-      // Reason
-      doc.text(item.reason || "-", col.reason, rowY, { width: 130 });
-
-      // From / To / KM
-      doc.text(item.from || "-", col.from, rowY, {
-        width: 40,
-        align: "center",
+      // نحسب أكبر ارتفاع محتاجينه للصف ده
+      const cellHeights = columns.map((col) => {
+        const txt = rowData[col.key];
+        return doc.heightOfString(txt, {
+          width: col.width,
+          align: col.align === "right" ? "right" :
+                 col.align === "center" ? "center" : "left",
+        });
       });
-      doc.text(item.to || "-", col.to, rowY, {
-        width: 40,
-        align: "center",
-      });
-      doc.text(
-        item.kilometer != null ? item.kilometer.toString() : "-",
-        col.km,
-        rowY,
-        { width: 40, align: "center" }
-      );
 
-      // Cash In (green)
-      if (item.cashIn > 0) {
-        doc.fillColor("#16A34A").font("Helvetica-Bold").text(
-          item.cashIn.toLocaleString(),
-          col.cashIn,
-          rowY,
-          { width: 45, align: "right" }
-        );
-      } else {
-        doc.fillColor("#9CA3AF").font("Helvetica").text(
-          "-",
-          col.cashIn,
-          rowY,
-          { width: 45, align: "right" }
-        );
+      let rowHeight = Math.max(...cellHeights) + 6;
+      if (rowHeight < 18) rowHeight = 18;
+
+      // zebra background
+      if (index % 2 === 0) {
+        doc.rect(tableLeft, y, tableWidth, rowHeight).fill("#FAFAFA");
       }
 
-      // Cash Out (red)
-      if (item.cashOut > 0) {
-        doc.fillColor("#DC2626").font("Helvetica-Bold").text(
-          item.cashOut.toLocaleString(),
-          col.cashOut,
-          rowY,
-          { width: 45, align: "right" }
-        );
-      } else {
-        doc.fillColor("#9CA3AF").font("Helvetica").text(
-          "-",
-          col.cashOut,
-          rowY,
-          { width: 45, align: "right" }
-        );
-      }
+      // محتوى الصف
+      columns.forEach((col) => {
+        const txt  = rowData[col.key];
+        const opts = { width: col.width, align: col.align || "left" };
+        const textY = y + 4;
 
-      // خط فاصل خفيف تحت كل صف
+        // ألوان خاصة للكاش
+        if (col.key === "cashIn") {
+          if (item.cashIn > 0) {
+            doc.fillColor("#16A34A").font("Helvetica-Bold");
+          } else {
+            doc.fillColor("#9CA3AF").font("Helvetica");
+          }
+        } else if (col.key === "cashOut") {
+          if (item.cashOut > 0) {
+            doc.fillColor("#DC2626").font("Helvetica-Bold");
+          } else {
+            doc.fillColor("#9CA3AF").font("Helvetica");
+          }
+        } else {
+          doc.fillColor("#111827").font("Helvetica");
+        }
+
+        // نخلي الـ Reason دايمًا left align عشان العربي
+        if (col.key === "reason") {
+          opts.align = "left";
+        }
+
+        doc.text(txt, col.x, textY, opts);
+      });
+
+      // خط فاصل تحت الصف
       y += rowHeight;
-      if (index < rows.length - 1) {
-        doc.moveTo(tableLeft, y)
-           .lineTo(tableRight, y)
-           .lineWidth(0.5)
-           .stroke("#F1F5F9");
-      }
+      doc.moveTo(tableLeft, y)
+         .lineTo(tableRight, y)
+         .lineWidth(0.4)
+         .stroke("#E5E7EB");
     });
 
     // ---------------- FOOTER ----------------
-    const footerY = y + 30;
+    const footerY = y + 25;
     doc.fontSize(10).font("Helvetica").fillColor("#777777")
        .text(`Generated ${timestamp}`, 40, footerY);
 
