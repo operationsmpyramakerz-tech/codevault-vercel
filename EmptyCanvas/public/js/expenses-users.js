@@ -169,6 +169,10 @@ document.addEventListener("click", (e) => {
   if (!modal || !sheet) return;
   if (modal.style.display !== "flex") return;
 
+  // Ignore clicks on the tab buttons
+  if (e.target.closest(".user-tab")) return;
+
+  // Close only if click is outside sheet
   if (!sheet.contains(e.target)) {
     closeUserExpensesModal();
   }
