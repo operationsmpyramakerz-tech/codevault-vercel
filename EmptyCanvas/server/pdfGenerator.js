@@ -129,14 +129,14 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     doc.text(`To / ${toText}`, toX + 10, durationY + 2);
 
     // نزود الـ y علشان البوكسات اللي تحت
-    doc.y = durationY + frameHeight + 40;
+    doc.y = durationY + frameHeight + 8;
 
     // ---------------- SUMMARY BOXES ----------------
     const totalIn = rows.reduce((s, i) => s + (i.cashIn || 0), 0);
     const totalOut = rows.reduce((s, i) => s + (i.cashOut || 0), 0);
     const balance = totalIn - totalOut;
 
-    const boxY = doc.y + 20;
+    const boxY = doc.y + 10;
 
     function summaryBox(x, title, value, color) {
       doc.roundedRect(x, boxY, 140, 70, 12).stroke("#D9D9D9");
