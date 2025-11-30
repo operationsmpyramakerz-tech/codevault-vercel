@@ -3464,23 +3464,116 @@ app.post("/api/expenses/export/pdf", (req, res) => {
   const { userName, items } = req.body;
 
   const PDFDocument = require("pdfkit");
-  const doc = new PDFDocument();
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
 
+  // Response headers
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", "attachment; filename=expenses.pdf");
+  res.setHeader("Content-Disposition", `attachment; filename=Expenses_${userName}.pdf`);
+  doc.pipe(res);
 
-  doc.fontSize(20).text(`Expenses — ${userName}`, { underline: true });
+  // ===== HEADER =====
+  doc
+    .fontSize(24)
+    .fillColor("#111")
+    .font("Helvetica-Bold")
+    .text(`Expenses — ${userName}`, { align: "left" });
 
-  doc.moveDown();
+  doc.moveDown(0.3);
 
+  doc
+    .fontSize(10)
+    .font("Helvetica")
+    .fillColor("#444")
+    .text(`Generated: ${new Date().toLocaleString()}`);
+
+  doc.moveDown(1);
+
+  // ===== TOTAL =====
+  let total = 0;
+  items.forEach(it => (total += (it.cashIn || 0) - (it.cashOut || 0)));
+
+  doc
+    .roundedRect(40, doc.y, 200, 40, 8)
+    .fill("#F5F5F5")
+    .stroke("#E0E0E0");
+
+  doc
+    .fillColor("#111")
+    .fontSize(18)
+    .font("Helvetica-Bold")
+    .text(`Total: £${total}`, 50, doc.y - 28);
+
+  doc.moveDown(2);
+
+  // ===== TABLE HEADER =====
+  const tableX = 40;
+  const tableWidth = doc.page.width - 80;
+
+  function drawTableHeader() {
+    const y = doc.y;
+
+    doc
+      .roundedRect(tableX, y, tableWidth, 28, 6)
+      .fill("#EDEDED")
+      .stroke("#DADADA");
+
+    doc
+      .fontSize(11)
+      .fillColor("#333")
+      .font("Helvetica-Bold")
+      .text("Date", tableX + 10, y + 8, { width: 80 })
+      .text("Type", tableX + 90, y + 8, { width: 100 })
+      .text("Reason", tableX + 180, y + 8, { width: 180 })
+      .text("Amount", tableX + 370, y + 8, { width: 100, align: "right" });
+
+    doc.moveDown(1.8);
+  }
+
+  drawTableHeader();
+
+  // ===== ROWS =====
   items.forEach(it => {
-    doc.fontSize(12).text(
-      `${it.date} — ${it.fundsType} — ${it.reason} — ${it.from || ""} ${it.to || ""} | In: ${it.cashIn || 0}, Out: ${it.cashOut || 0}`
-    );
+    const startY = doc.y;
+
+    // Auto-page-break
+    if (startY > doc.page.height - 80) {
+      doc.addPage();
+      drawTableHeader();
+    }
+
+    const isIn = it.cashIn > 0;
+    const bgColor = isIn ? "#E8F8F0" : "#FDECEC";
+    const textColor = isIn ? "#0F7A4A" : "#B91C1C";
+    const amountText = isIn
+      ? `+£${it.cashIn}`
+      : `-£${it.cashOut}`;
+
+    // Row background
+    doc
+      .roundedRect(tableX, startY, tableWidth, 30, 6)
+      .fill(bgColor)
+      .stroke("#EEEEEE");
+
+    // Text
+    doc
+      .fillColor("#333")
+      .font("Helvetica")
+      .fontSize(10)
+      .text(it.date || "", tableX + 10, startY + 9, { width: 80 })
+      .text(it.fundsType || "", tableX + 90, startY + 9, { width: 100 })
+      .text(it.reason || "", tableX + 180, startY + 9, { width: 180 });
+
+    doc
+      .fillColor(textColor)
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .text(amountText, tableX + 370, startY + 9, { width: 100, align: "right" });
+
+    doc.moveDown(1.2);
   });
 
+  // END
   doc.end();
-  doc.pipe(res);
 });
 
 app.post("/api/expenses/export/excel", async (req, res) => {
