@@ -3460,85 +3460,33 @@ app.get("/api/logistics/receivers", requireAuth, async (req, res) => {
     return res.status(500).json({ ok:false, error:"Failed to load receiver users" });
   }
 });
-app.post("/api/expenses/export/pdf", (req, res) => {
-  const { userName, items } = req.body;
 
-  const PDFDocument = require("pdfkit");
+const generateExpensePDF = require("./pdfGenerator");
 
-  // Response headers MUST be set before pipe
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="${userName.replace(/[^a-z0-9]/gi, "_")}_expenses.pdf"`
-  );
+app.post("/api/expenses/export/pdf", async (req, res) => {
+  try {
+    const { userName, items, dateFrom, dateTo, userId } = req.body;
 
-  const doc = new PDFDocument({
-    size: "A4",
-    margin: 40
-  });
+    generateExpensePDF(
+      { userName, items, dateFrom, dateTo, userId },
+      (err, buffer) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).send("PDF generation failed");
+        }
 
-  // MUST pipe first
-  doc.pipe(res);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${userName.replace(/[^a-z0-9]/gi, "_")}_expenses.pdf"`
+        );
 
-  // ===== HEADER =====
-  doc
-    .fontSize(22)
-    .font("Helvetica-Bold")
-    .text(`Expenses Report`, { align: "left" })
-    .moveDown(0.3);
-
-  doc
-    .font("Helvetica")
-    .fontSize(12)
-    .fillColor("#444")
-    .text(`User: ${userName}`)
-    .text(`Generated: ${new Date().toLocaleString()}`)
-    .moveDown(1.2);
-
-  // ===== TABLE HEADER =====
-  const tableTop = doc.y;
-  const col1 = 40;
-  const col2 = 140;
-  const col3 = 260;
-  const col4 = 360;
-  const col5 = 450;
-
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(11);
-
-  doc.text("Date", col1, tableTop);
-  doc.text("Funds Type", col2, tableTop);
-  doc.text("Reason", col3, tableTop);
-  doc.text("In", col4, tableTop);
-  doc.text("Out", col5, tableTop);
-
-  doc.moveTo(40, tableTop + 15)
-     .lineTo(550, tableTop + 15)
-     .strokeColor("#ccc")
-     .stroke();
-
-  // ===== TABLE ROWS =====
-  doc.font("Helvetica").fontSize(10).fillColor("#000");
-  let y = tableTop + 25;
-
-  items.forEach((it) => {
-    if (y > 750) {
-      doc.addPage();
-      y = 40;
-    }
-
-    doc.text(it.date || "-", col1, y);
-    doc.text(it.fundsType || "-", col2, y);
-    doc.text(it.reason || "-", col3, y, { width: 90 });
-    doc.text(String(it.cashIn || 0), col4, y);
-    doc.text(String(it.cashOut || 0), col5, y);
-
-    y += 20;
-  });
-
-  // ===== END PDF =====
-  doc.end();
+        res.send(buffer);
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post("/api/expenses/export/excel", async (req, res) => {
