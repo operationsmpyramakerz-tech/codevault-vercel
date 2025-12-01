@@ -228,6 +228,6 @@ const columns = [
          .lineWidth(0.4)
          .stroke("#E5E7EB");
     });
-
+  }
 
 module.exports = generateExpensePDF;
