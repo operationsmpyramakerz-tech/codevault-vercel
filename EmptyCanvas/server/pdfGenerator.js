@@ -1,6 +1,15 @@
 const PDFDocument = require("pdfkit");
 const path = require("path");
 
+// Helper بسيط جدًا عشان نحسّن شكل العربي في PDFKit
+function fixRTL(text) {
+  if (!text) return text;
+  // لو مفيش حروف عربية رجّع النص زي ما هو
+  if (!/[\u0600-\u06FF]/.test(text)) return text;
+  // نقلب الحروف علشان pdfkit بيرسم من الشمال لليمين
+  return text.split("").reverse().join("");
+}
+
 function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callback) {
   const rows = Array.isArray(items) ? items : [];
 
@@ -85,7 +94,7 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     doc.font("Helvetica-Bold").fontSize(13).fillColor("#000")
        .text(`Total No. of entries: ${rows.length}`, 40, summaryY + 90);
 
-    // ======================================================
+// ======================================================
     // ================   MODERN TABLE  ======================
     // ======================================================
 
@@ -93,30 +102,44 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const tableLeft    = 40;
     const tableRight   = 560;
     const tableWidth   = tableRight - tableLeft;
-    const headerHeight = 22;
+    const headerHeight = 24;
+    const cellPaddingX = 6;
 
     // تعريف الأعمدة (x + width + align)
     const columns = [
-      { key: "date",     label: "Date",    x: tableLeft + 8,   width: 60, align: "left" },
-      { key: "fundsType",label: "Type",    x: tableLeft + 76,  width: 80, align: "left" },
-      { key: "reason",   label: "Reason",  x: tableLeft + 162, width: 130,align: "left" },
-      { key: "from",     label: "From",    x: tableLeft + 300, width: 50, align: "center" },
-      { key: "to",       label: "To",      x: tableLeft + 354, width: 50, align: "center" },
-      { key: "kilometer",label: "KM",      x: tableLeft + 408, width: 35, align: "center" },
-      { key: "cashIn",   label: "Cash In", x: tableLeft + 450, width: 45, align: "right" },
-      { key: "cashOut",  label: "Cash Out",x: tableLeft + 502, width: 45, align: "right" },
+      { key: "date",      label: "Date",    width: 65,  align: "left"   },
+      { key: "fundsType", label: "Type",    width: 85,  align: "left"   },
+      { key: "reason",    label: "Reason",  width: 135, align: "left"   },
+      { key: "from",      label: "From",    width: 55,  align: "center" },
+      { key: "to",        label: "To",      width: 55,  align: "center" },
+      { key: "kilometer", label: "KM",      width: 40,  align: "center" },
+      { key: "cashIn",    label: "Cash In", width: 55,  align: "right"  },
+      { key: "cashOut",   label: "Cash Out",width: 55,  align: "right"  },
     ];
 
+    // حساب الـ x لكل عمود
+    let accX = tableLeft;
+    columns.forEach((col) => {
+      col.x = accX;
+      accX += col.width;
+    });
+
     let y = tableTop;
+
+    // إطار كامل حوالين الجدول
+    const tableTotalHeight = 300; // تقريبًا، مش critical لأننا بنرسم الصفوف جوّه
+    doc.roundedRect(tableLeft, y, tableWidth, tableTotalHeight, 6).stroke("#E5E7EB");
 
     // --- Header background ---
     doc.rect(tableLeft, y, tableWidth, headerHeight).fill("#F5F5F5");
     doc.fillColor("#111827").font("Helvetica-Bold").fontSize(10);
 
     columns.forEach((col) => {
-      const opts = { width: col.width, align: col.align === "right" ? "right" :
-                                     col.align === "center" ? "center" : "left" };
-      doc.text(col.label, col.x, y + 5, opts);
+      const opts = {
+        width: col.width - 2 * cellPaddingX,
+        align: col.align,
+      };
+      doc.text(col.label, col.x + cellPaddingX, y + 6, opts);
     });
 
     // خط تحت الهيدر
@@ -134,21 +157,20 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
       const rowData = {
         date:       formatDisplayDate(item.date),
         fundsType:  item.fundsType || "-",
-        reason:     item.reason || "-",
-        from:       item.from || "-",
-        to:         item.to || "-",
+        reason:     fixRTL(item.reason || "-"),
+        from:       fixRTL(item.from || "-"),
+        to:         fixRTL(item.to || "-"),
         kilometer:  item.kilometer != null ? String(item.kilometer) : "-",
         cashIn:     item.cashIn > 0 ? item.cashIn.toLocaleString() : "-",
         cashOut:    item.cashOut > 0 ? item.cashOut.toLocaleString() : "-",
       };
 
-      // نحسب أكبر ارتفاع محتاجينه للصف ده
+      // نحسب ارتفاع الصف بناءً على أكبر خلية
       const cellHeights = columns.map((col) => {
         const txt = rowData[col.key];
         return doc.heightOfString(txt, {
-          width: col.width,
-          align: col.align === "right" ? "right" :
-                 col.align === "center" ? "center" : "left",
+          width: col.width - 2 * cellPaddingX,
+          align: col.align,
         });
       });
 
@@ -160,10 +182,23 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
         doc.rect(tableLeft, y, tableWidth, rowHeight).fill("#FAFAFA");
       }
 
+      // حدود رأسية بين الأعمدة
+      doc.lineWidth(0.4).strokeColor("#E5E7EB");
+      columns.forEach((col, i) => {
+        if (i > 0) {
+          doc.moveTo(col.x, y).lineTo(col.x, y + rowHeight).stroke();
+        }
+      });
+      // خط يمين الجدول
+      doc.moveTo(tableRight, y).lineTo(tableRight, y + rowHeight).stroke();
+
       // محتوى الصف
       columns.forEach((col) => {
         const txt  = rowData[col.key];
-        const opts = { width: col.width, align: col.align || "left" };
+        const opts = {
+          width: col.width - 2 * cellPaddingX,
+          align: col.align,
+        };
         const textY = y + 4;
 
         // ألوان خاصة للكاش
@@ -183,12 +218,12 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
           doc.fillColor("#111827").font("Helvetica");
         }
 
-        // نخلي الـ Reason دايمًا left align عشان العربي
+        // Reason نخليه دايمًا align left عشان العربي
         if (col.key === "reason") {
           opts.align = "left";
         }
 
-        doc.text(txt, col.x, textY, opts);
+        doc.text(txt, col.x + cellPaddingX, textY, opts);
       });
 
       // خط فاصل تحت الصف
@@ -203,7 +238,6 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const footerY = y + 25;
     doc.fontSize(10).font("Helvetica").fillColor("#777777")
        .text(`Generated ${timestamp}`, 40, footerY);
-
     doc.end();
   } catch (err) {
     console.error("generateExpensePDF error:", err);
