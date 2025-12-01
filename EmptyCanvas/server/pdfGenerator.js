@@ -229,15 +229,5 @@ const columns = [
          .stroke("#E5E7EB");
     });
 
-    // ---------------- FOOTER ----------------
-    const footerY = y + 25;
-    doc.fontSize(10).font("Helvetica").fillColor("#777777")
-       .text(`Generated ${timestamp}`, 40, footerY);
-    doc.end();
-  } catch (err) {
-    console.error("generateExpensePDF error:", err);
-    callback(err);
-  }
-}
 
 module.exports = generateExpensePDF;
