@@ -230,4 +230,6 @@ const columns = [
     });
   }
 
+}
+
 module.exports = generateExpensePDF;
