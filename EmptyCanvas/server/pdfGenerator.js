@@ -105,16 +105,16 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const headerHeight = 24;
     const cellPaddingX = 6;
 
-    // كل الأعمدة left-align
+    // تعريف الأعمدة (x + width) - كل الأعمدة left aligned
     const columns = [
-      { key: "date",      label: "Date",    width: 60 },
-      { key: "fundsType", label: "Type",    width: 80 },
-      { key: "reason",    label: "Reason",  width: 130 },
-      { key: "from",      label: "From",    width: 55 },
-      { key: "to",        label: "To",      width: 55 },
-      { key: "kilometer", label: "KM",      width: 35 },
-      { key: "cashIn",    label: "Cash In", width: 50 },
-      { key: "cashOut",   label: "Cash Out",width: 55 },
+      { key: "date",      label: "Date",     width: 60 },
+      { key: "fundsType", label: "Type",     width: 80 },
+      { key: "reason",    label: "Reason",   width: 120 }, // أصغر شوية
+      { key: "from",      label: "From",     width: 50 },
+      { key: "to",        label: "To",       width: 50 },
+      { key: "kilometer", label: "KM",       width: 35 },
+      { key: "cashIn",    label: "Cash In",  width: 45 },  // أصغر شوية
+      { key: "cashOut",   label: "Cash Out", width: 80 },  // أكبر بكتير علشان الكلمة متتكسرش
     ];
 
     // حساب الـ x لكل عمود
