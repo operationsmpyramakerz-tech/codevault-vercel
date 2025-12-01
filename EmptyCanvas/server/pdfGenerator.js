@@ -105,17 +105,17 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
     const headerHeight = 24;
     const cellPaddingX = 6;
 
-    // تعريف الأعمدة (x + width) - كل الأعمدة left aligned
-    const columns = [
-      { key: "date",      label: "Date",     width: 60 },
-      { key: "fundsType", label: "Type",     width: 80 },
-      { key: "reason",    label: "Reason",   width: 120 }, // أصغر شوية
-      { key: "from",      label: "From",     width: 50 },
-      { key: "to",        label: "To",       width: 50 },
-      { key: "kilometer", label: "KM",       width: 35 },
-      { key: "cashIn",    label: "Cash In",  width: 45 },  // أصغر شوية
-      { key: "cashOut",   label: "Cash Out", width: 80 },  // أكبر بكتير علشان الكلمة متتكسرش
-    ];
+    // تعريف الأعمدة (x + width + align)
+const columns = [
+  { key: "date",      label: "Date",     width: 60,  align: "left"   },
+  { key: "fundsType", label: "Type",     width: 75,  align: "left"   },   // أصغر شوية
+  { key: "reason",    label: "Reason",   width: 115, align: "left"   },   // أصغر شوية
+  { key: "from",      label: "From",     width: 45,  align: "center" },
+  { key: "to",        label: "To",       width: 45,  align: "center" },
+  { key: "kilometer", label: "KM",       width: 30,  align: "center" },
+  { key: "cashIn",    label: "Cash In",  width: 70,  align: "right"  },   // وسّعناه
+  { key: "cashOut",   label: "Cash Out", width: 80,  align: "right"  },   // زي ما هو واسع
+];
 
     // حساب الـ x لكل عمود
     let accX = tableLeft;
