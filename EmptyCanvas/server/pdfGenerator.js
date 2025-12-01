@@ -165,7 +165,6 @@ const columns = [
         cashOut:    item.cashOut > 0 ? item.cashOut.toLocaleString() : "-",
       };
 
-      // ارتفاع الصف بناءً على أكبر خلية (left align للكل)
       const cellHeights = columns.map((col) => {
         const txt = rowData[col.key];
         return doc.heightOfString(txt, {
@@ -177,22 +176,18 @@ const columns = [
       let rowHeight = Math.max(...cellHeights) + 6;
       if (rowHeight < 18) rowHeight = 18;
 
-      // zebra background
       if (index % 2 === 0) {
         doc.rect(tableLeft, y, tableWidth, rowHeight).fill("#FAFAFA");
       }
 
-      // حدود رأسية بين الأعمدة
       doc.lineWidth(0.4).strokeColor("#E5E7EB");
       columns.forEach((col, i) => {
         if (i > 0) {
           doc.moveTo(col.x, y).lineTo(col.x, y + rowHeight).stroke();
         }
       });
-      // خط يمين الجدول
       doc.moveTo(tableRight, y).lineTo(tableRight, y + rowHeight).stroke();
 
-      // محتوى الصف – كله left aligned
       columns.forEach((col) => {
         const txt  = rowData[col.key];
         const opts = {
@@ -201,7 +196,6 @@ const columns = [
         };
         const textY = y + 4;
 
-        // ألوان خاصة للكاش
         if (col.key === "cashIn") {
           if (item.cashIn > 0) {
             doc.fillColor("#16A34A").font("Helvetica-Bold");
@@ -221,15 +215,19 @@ const columns = [
         doc.text(txt, col.x + cellPaddingX, textY, opts);
       });
 
-      // خط فاصل تحت الصف
       y += rowHeight;
       doc.moveTo(tableLeft, y)
          .lineTo(tableRight, y)
          .lineWidth(0.4)
          .stroke("#E5E7EB");
     });
-  }
 
+    // مفيش footer ولا Generated تحت
+    doc.end();
+  } catch (err) {
+    console.error("generateExpensePDF error:", err);
+    callback(err);
+  }
 }
 
 module.exports = generateExpensePDF;
