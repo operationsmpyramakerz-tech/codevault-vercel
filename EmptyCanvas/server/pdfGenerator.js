@@ -107,15 +107,15 @@ function generateExpensePDF({ userName, userId, items, dateFrom, dateTo }, callb
 
     // تعريف الأعمدة (x + width + align)
     const columns = [
-      { key: "date",      label: "Date",    width: 65,  align: "left"   },
-      { key: "fundsType", label: "Type",    width: 85,  align: "left"   },
-      { key: "reason",    label: "Reason",  width: 135, align: "left"   },
-      { key: "from",      label: "From",    width: 55,  align: "center" },
-      { key: "to",        label: "To",      width: 55,  align: "center" },
-      { key: "kilometer", label: "KM",      width: 40,  align: "center" },
-      { key: "cashIn",    label: "Cash In", width: 55,  align: "right"  },
-      { key: "cashOut",   label: "Cash Out",width: 55,  align: "right"  },
-    ];
+  { key: "date",      label: "Date",    width: 60,  align: "left"   },
+  { key: "fundsType", label: "Type",    width: 80,  align: "left"   },
+  { key: "reason",    label: "Reason",  width: 130, align: "left"   },
+  { key: "from",      label: "From",    width: 55,  align: "center" },
+  { key: "to",        label: "To",      width: 55,  align: "center" },
+  { key: "kilometer", label: "KM",      width: 35,  align: "center" },
+  { key: "cashIn",    label: "Cash In", width: 50,  align: "right"  },
+  { key: "cashOut",   label: "Cash Out",width: 55,  align: "right"  },
+];
 
     // حساب الـ x لكل عمود
     let accX = tableLeft;
