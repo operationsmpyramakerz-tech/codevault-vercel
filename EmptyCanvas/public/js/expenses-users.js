@@ -81,11 +81,7 @@ async function openUserExpensesModal(userId, userName) {
   listEl.innerHTML = "Loading...";
 
   modal.style.display = "flex";
-
-// نخلي الـ CSS يتحكم في الأنيميشن (opacity + slide up)
-requestAnimationFrame(() => {
-  modal.classList.add("open");
-});
+  setTimeout(() => sheet.style.transform = "translateY(0)", 10);
 
   try {
     const res = await fetch(`/api/expenses/user/${encodeURIComponent(userId)}`);
@@ -330,14 +326,8 @@ function closeUserExpensesModal() {
   const modal = document.getElementById("userExpensesModal");
   const sheet = document.getElementById("userExpensesSheet");
 
-  // رجّع المودال لحالة الإغلاق (يبدأ ترانزيشن الـ opacity + slide down)
-  modal.classList.remove("open");
   sheet.style.transform = "translateY(100%)";
-
-  // بعد ما الأنيميشن يخلص نخفيه خالص
-  setTimeout(() => {
-    modal.style.display = "none";
-  }, 350);
+  setTimeout(() => modal.style.display = "none", 300);
 }
 
 // ---------------------------
