@@ -6,323 +6,284 @@
   <title>Expenses by User</title>
   <link rel="stylesheet" href="/css/style.css"/>
   <script src="https://unpkg.com/feather-icons"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
+    :root {
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --primary-dark: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+    }
 
-    .sort-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 1rem;
-}
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      min-height: 100vh;
+    }
 
-.sort-select {
-  padding: 0.45rem 0.6rem;
-  border-radius: 8px;
-  border: 1.3px solid #d1d5db;
-  font-size: 0.9rem;
-}
-    .download-wrapper {
-  position: relative;
-  display: inline-block;
-  margin-bottom: 1rem;
-}
-
-.download-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #357ae8;
-  color: white;
-  padding: 0.55rem 1rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.download-btn .arrow {
-  font-size: 0.85rem;
-  opacity: 0.9;
-}
-
-.download-menu {
-  position: absolute;
-  top: 110%;
-  left: 0;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-  display: none;
-  min-width: 180px;
-  z-index: 100;
-}
-
-.download-option {
-  padding: 0.7rem 1rem;
-  width: 100%;
-  background: white;
-  border: none;
-  text-align: left;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.download-option:hover {
-  background: #f3f4f6;
-}
-
-    .date-filter {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.date-filter input {
-  padding: 0.4rem 0.6rem;
-  border: 1.4px solid #d1d5db;
-  border-radius: 8px;
-}
-
-.filter-btn {
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  border: none;
-  background: #3b82f6;
-  color: white;
-  cursor: pointer;
-}
-
-.reset-btn {
-  background: #6b7280;
-}
     .expenses-layout {
-      max-width: 980px;
+      max-width: 1100px;
       margin: 0 auto;
-      padding: 1.5rem 1rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem 1rem;
     }
 
     .page-title {
-      font-size: 1.6rem;
+      font-size: 2.2rem;
       font-weight: 800;
+      background: linear-gradient(to right, var(--primary), var(--primary-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       margin-bottom: 0.5rem;
     }
 
     .page-sub {
-      color: #64748b;
-      margin-bottom: 1.5rem;
+      color: var(--gray-500);
+      font-size: 1.05rem;
+      margin-bottom: 2.5rem;
     }
 
-    /* Tabs bar */
+    /* ======== Modern Large Tabs ======== */
     .user-tabs {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
+      gap: 1.2rem;
+      margin-bottom: 2.5rem;
+      justify-content: center;
     }
 
     .user-tab {
-      padding: 0.5rem 0.9rem;
-      border-radius: 999px;
-      border: 1px solid #e5e7eb;
-      background: #f9fafb;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #374151;
+      min-width: 220px;
+      padding: 1.4rem 2rem;
+      border-radius: 20px;
+      background: white;
+      border: 2px solid var(--gray-200);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--gray-700);
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 0.4rem;
-      transition: all 0.18s ease;
+      gap: 0.6rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .user-tab::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: -1;
     }
 
     .user-tab:hover {
-      background: #eef2ff;
-      border-color: #4f46e5;
-      color: #111827;
-      transform: translateY(-1px);
+      transform: translateY(-10px) scale(1.03);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary-light);
+    }
+
+    .user-tab:hover::before {
+      opacity: 0.08;
     }
 
     .user-tab.active {
-      background: #4f46e5;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
       color: white;
-      border-color: #4f46e5;
-      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
+      border-color: var(--primary);
+      box-shadow: 0 20px 40px rgba(99, 102, 241, 0.35);
+      transform: translateY(-6px);
     }
 
-    .user-tab .user-total {
-      font-weight: 700;
+    .user-tab.active::before {
+      opacity: 1;
+    }
+
+    .user-tab.active .user-total,
+    .user-tab.active .user-count {
+      color: white;
+    }
+
+    .user-total {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+    }
+
+    .user-count {
       font-size: 0.9rem;
-    }
-
-    .user-tab .user-count {
-      font-size: 0.75rem;
-      opacity: 0.85;
+      opacity: 0.8;
+      font-weight: 500;
     }
 
     .users-empty {
-      color: #9ca3af;
-      font-size: 0.95rem;
-      margin-top: 1rem;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--gray-500);
+      font-size: 1.2rem;
+      background: white;
+      border-radius: 20px;
+      box-shadow: var(--shadow);
     }
 
-    /* Modal (bottom sheet style) */
-
+    /* ======== Bottom Sheet Modal (Modern iOS Style) ======== */
     .ios-modal {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.35);
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
       display: none;
       justify-content: center;
       align-items: flex-end;
       z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .ios-modal.open {
+      opacity: 1;
     }
 
     .ios-sheet {
       width: 100%;
-      max-width: 720px;
-      background: #ffffff;
-      border-radius: 22px 22px 0 0;
-      padding: 1.4rem 1.4rem 1.1rem;
-      box-shadow: 0 -6px 30px rgba(0,0,0,0.15);
-
+      max-width: 780px;
+      background: white;
+      border-radius: 28px 28px 0 0;
+      padding: 2rem 2rem 1.5rem;
+      box-shadow: 0 -20px 50px rgba(0,0,0,0.2);
       transform: translateY(100%);
-      transition: transform 0.35s cubic-bezier(.25,.1,.25,1);
-      max-height: 80vh;
+      transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
+      max-height: 90vh;
       display: flex;
       flex-direction: column;
     }
 
-    .ios-drag {
-      width: 45px;
-      height: 5px;
-      background: #ddd;
-      border-radius: 4px;
-      margin: 0 auto 14px;
+    .ios-modal.open .ios-sheet {
+      transform: translateY(0);
     }
 
-    .user-expenses-header {
-      text-align: center;
-      margin-bottom: 0.5rem;
+    .ios-drag {
+      width: 50px;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      margin: 0 auto 1.5rem;
     }
 
     .user-expenses-title {
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin-bottom: 0.2rem;
-    }
-
-    .user-expenses-sub {
-      font-size: 0.9rem;
-      color: #6b7280;
+      font-size: 1.8rem;
+      font-weight: 800;
+      text-align: center;
+      background: linear-gradient(to right, var(--primary), var(--primary-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .user-expenses-total {
-      font-size: 1.3rem;
-      font-weight: 800;
-      margin-top: 0.3rem;
+      font-size: 2rem;
+      font-weight: 900;
+      text-align: center;
+      margin: 1rem 0;
+      color: var(--primary-dark);
     }
 
-    #userExpensesList {
-      flex: 1;
-      overflow-y: auto;
-      margin-top: 1rem;
-      padding-right: 4px;
+    /* Buttons & Filters */
+    .download-btn {
+      background: var(--primary);
+      padding: 0.8rem 1.8rem;
+      border-radius: 16px;
+      font-weight: 600;
+      font-size: 1rem;
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+      transition: all 0.2s ease;
     }
 
-    #userExpensesList::-webkit-scrollbar {
-      width: 6px;
-    }
-    #userExpensesList::-webkit-scrollbar-thumb {
-      background: #d4d4d4;
-      border-radius: 10px;
+    .download-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 25px rgba(99, 102, 241, 0.4);
     }
 
+    .sort-select, .date-filter input {
+      padding: 0.8rem 1rem;
+      border-radius: 14px;
+      border: 2px solid var(--gray-200);
+      font-size: 1rem;
+      transition: all 0.2s;
+    }
+
+    .sort-select:focus, .date-filter input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+    }
+
+    .filter-btn {
+      padding: 0.8rem 1.5rem;
+      border-radius: 14px;
+      font-weight: 600;
+    }
+
+    /* Expense Items */
     .expense-item {
-      background: white;
-      border-radius: 18px;
-      padding: 1rem 1rem;
-      margin-bottom: 0.8rem;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.06);
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-      border: 1px solid #e5e7eb;
+      background: linear-gradient(135deg, #ffffff, #f8fafc);
+      border-radius: 20px;
+      padding: 1.4rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--gray-200);
+      transition: all 0.3s ease;
+      animation: slideUp 0.4s ease forwards;
+    }
+
+    .expense-item:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .expense-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f9fafb;
-      font-size: 1.4rem;
-    }
-
-    .arrow-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
       font-size: 1.6rem;
-      font-weight: 900;
-    }
-
-    .arrow-in {
-      color: #16a34a;
-    }
-    .arrow-out {
-      color: #dc2626;
-    }
-
-    .expense-details {
-      flex: 1;
-    }
-
-    .expense-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 0.1rem;
-    }
-
-    .expense-person {
-      font-size: 0.85rem;
-      color: #6b7280;
-    }
-
-    .expense-amount {
-      margin-left: auto;
-      font-size: 1.05rem;
-      font-weight: 800;
-      text-align: right;
-    }
-
-    .expense-amount span {
-      display: block;
+      background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
     }
 
     .modal-close-btn {
-      margin-top: 0.7rem;
-      width: 100%;
-      padding: 0.9rem;
-      border: none;
-      background: #ef4444;
-      color: white;
-      border-radius: 14px;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 16px;
+      background: var(--danger);
       font-weight: 700;
-      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.2s;
     }
 
+    .modal-close-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(239, 68, 68, 0.4);
+    }
   </style>
 </head>
-
 <body>
+
 <script>
   (function() {
     if (window.innerWidth > 768 && localStorage.getItem('ui.sidebarMini') === '1') {
@@ -332,8 +293,7 @@
 </script>
 
 <div class="app-container">
-
-  <!-- Sidebar (انسخ نفس اللي في باقي الصفحات عندك وعدل active لو حابب) -->
+  <!-- Sidebar (نفس اللي عندك) -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <h2>Dashboard</h2>
@@ -341,7 +301,6 @@
         <i data-feather="chevrons-left"></i>
       </button>
     </div>
-
     <nav class="sidebar-nav">
       <ul class="nav-list">
         <li><a class="nav-link" href="/orders"><i data-feather="list"></i><span class="nav-label">Current Orders</span></a></li>
@@ -355,7 +314,6 @@
         <li><a class="nav-link active" href="/expenses/users"><i data-feather="users"></i><span class="nav-label">Expenses by User</span></a></li>
       </ul>
     </nav>
-
     <div class="sidebar-footer">
       <button id="logoutBtn" class="logout-btn"><i data-feather="log-out"></i> Logout</button>
     </div>
@@ -381,7 +339,6 @@
           </a>
         </div>
       </div>
-
       <div class="header-row2">
         <h1 class="page-title">Expenses by User</h1>
         <div class="page-sub">Choose a user tab to see all their expenses in a detailed window.</div>
@@ -390,9 +347,8 @@
 
     <main class="expenses-layout">
       <div id="userTabs" class="user-tabs">
-        <!-- Tabs will be injected here -->
+        <!-- Tabs injected here -->
       </div>
-
       <div id="usersInfo" class="users-empty">
         Loading users with expenses...
       </div>
@@ -400,60 +356,48 @@
   </div>
 </div>
 
-<!-- Modal: User Expenses Bottom Sheet -->
+<!-- Modern Bottom Sheet Modal -->
 <div id="userExpensesModal" class="ios-modal">
   <div class="ios-sheet" id="userExpensesSheet">
     <div class="ios-drag"></div>
-
     <div class="user-expenses-header">
       <div class="user-expenses-title" id="userExpensesTitle">User Expenses</div>
-      <div class="user-expenses-sub">
+      <div class="user-expenses-sub" style="color:var(--gray-500); text-align:center;">
         All expenses for this team member
       </div>
       <div class="user-expenses-total" id="userExpensesTotal">Total: £0</div>
     </div>
 
     <div class="download-wrapper">
-  <button id="downloadBtn" class="download-btn">
-    Download
-    <span class="arrow">▼</span>
-  </button>
-
-  <div id="downloadMenu" class="download-menu">
-    <button class="download-option" id="downloadPdfBtn">Download as PDF</button>
-    <button class="download-option" id="downloadExcelBtn">Download as Excel</button>
-  </div>
-</div>
-    <!-- SORTING DROPDOWN -->
-<div class="sort-wrapper">
-  <label style="font-weight:600;">Sort:</label>
-  <select id="sortSelect" class="sort-select">
-    <option value="newest">Newest first</option>
-    <option value="oldest">Oldest first</option>
-    <option value="high">Highest amount</option>
-    <option value="low">Lowest amount</option>
-  </select>
-</div>
-    <!-- DATE FILTER -->
-<div class="date-filter">
-  <label>From:</label>
-  <input type="date" id="dateFrom" />
-
-  <label>To:</label>
-  <input type="date" id="dateTo" />
-
-  <button id="applyDateFilterBtn" class="filter-btn">
-    Apply Filter
-  </button>
-
-  <button id="resetDateFilterBtn" class="filter-btn reset-btn">
-    Reset
-  </button>
-</div>
-
-    <div id="userExpensesList">
-      <!-- list items -->
+      <button id="downloadBtn" class="download-btn">
+        Download <span class="arrow">▼</span>
+      </button>
+      <div id="downloadMenu" class="download-menu">
+        <button class="download-option" id="downloadPdfBtn">Download as PDF</button>
+        <button class="download-option" id="downloadExcelBtn">Download as Excel</button>
+      </div>
     </div>
+
+    <div class="sort-wrapper">
+      <label style="font-weight:600;">Sort:</label>
+      <select id="sortSelect" class="sort-select">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="high">Highest amount</option>
+        <option value="low">Lowest amount</option>
+      </select>
+    </div>
+
+    <div class="date-filter">
+      <label>From:</label>
+      <input type="date" id="dateFrom" />
+      <label>To:</label>
+      <input type="date" id="dateTo" />
+      <button id="applyDateFilterBtn" class="filter-btn">Apply Filter</button>
+      <button id="resetDateFilterBtn" class="filter-btn reset-btn">Reset</button>
+    </div>
+
+    <div id="userExpensesList"></div>
 
     <button class="modal-close-btn" onclick="closeUserExpensesModal()">
       Close
@@ -464,6 +408,5 @@
 <script>feather.replace();</script>
 <script src="/js/common-ui.js"></script>
 <script src="/js/expenses-users.js"></script>
-
 </body>
 </html>
