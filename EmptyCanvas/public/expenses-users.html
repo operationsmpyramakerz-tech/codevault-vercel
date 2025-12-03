@@ -120,57 +120,106 @@
     }
 
     /* Tabs bar */
-    .user-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
+    /* ============================= */
+/*     MODERN USER TABS UI      */
+/* ============================= */
 
-    .user-tab {
-      padding: 0.5rem 0.9rem;
-      border-radius: 999px;
-      border: 1px solid #e5e7eb;
-      background: #f9fafb;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #374151;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      transition: all 0.18s ease;
-    }
+.user-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.3rem;
+  justify-content: center;
+  margin: 2rem auto 2.8rem;
+  max-width: 900px;
+}
 
-    .user-tab:hover {
-      background: #eef2ff;
-      border-color: #4f46e5;
-      color: #111827;
-      transform: translateY(-1px);
-    }
+/* Modern Card Tab */
+.user-tab {
+  min-width: 260px;
+  padding: 1.4rem 1.8rem;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #ffffff, #f4f4f7);
+  border: 2px solid #e5e7eb;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #374151;
 
-    .user-tab.active {
-      background: #4f46e5;
-      color: white;
-      border-color: #4f46e5;
-      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
-    }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 
-    .user-tab .user-total {
-      font-weight: 700;
-      font-size: 0.9rem;
-    }
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 
-    .user-tab .user-count {
-      font-size: 0.75rem;
-      opacity: 0.85;
-    }
+  box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+  transition:
+    transform 0.3s cubic-bezier(.25,.8,.25,1),
+    box-shadow 0.3s cubic-bezier(.25,.8,.25,1),
+    border-color 0.25s,
+    background 0.25s,
+    color 0.25s;
 
-    .users-empty {
-      color: #9ca3af;
-      font-size: 0.95rem;
-      margin-top: 1rem;
-    }
+  /* Animation entrance */
+  opacity: 0;
+  transform: translateY(20px) scale(.95);
+  animation: userTabPop .45s cubic-bezier(.25,.8,.25,1) forwards;
+}
+
+/* Stagger effect */
+.user-tab:nth-child(2) { animation-delay: .05s; }
+.user-tab:nth-child(3) { animation-delay: .1s; }
+.user-tab:nth-child(4) { animation-delay: .15s; }
+.user-tab:nth-child(5) { animation-delay: .2s; }
+
+@keyframes userTabPop {
+  0%   { opacity:0; transform: translateY(20px) scale(.93); }
+  100% { opacity:1; transform: translateY(0) scale(1); }
+}
+
+/* Hover effect */
+.user-tab:hover {
+  transform: translateY(-8px) scale(1.04);
+  border-color: #6366f1;
+  box-shadow: 0 16px 40px rgba(99,102,241,0.18);
+}
+
+/* Activated tab (selected) */
+.user-tab.active {
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  color: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 20px 50px rgba(99,102,241,0.35);
+  transform: translateY(-6px) scale(1.03);
+}
+
+/* Glow effect inside active card */
+.user-tab.active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left,
+      rgba(255,255,255,0.25),
+      rgba(255,255,255,0) 70%);
+  opacity: 1;
+}
+
+/* Text inside card */
+.user-total {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #4f46e5;
+}
+
+.user-tab.active .user-total {
+  color: #fff;
+}
+
+.user-count {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
 
     /* Modal (bottom sheet style) */
 
