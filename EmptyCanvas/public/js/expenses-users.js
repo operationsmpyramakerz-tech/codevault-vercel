@@ -15,7 +15,7 @@ async function loadExpenseUsers() {
 
   if (!tabsEl || !infoEl) return;
 
-  infoEl.textContent = "Loading users with expenses...";
+  infoEl.innerHTML = '<div class="loader"></div>';
 
   try {
     const res = await fetch("/api/expenses/users");
