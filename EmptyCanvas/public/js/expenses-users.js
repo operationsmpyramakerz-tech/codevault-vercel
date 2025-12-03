@@ -34,7 +34,7 @@ async function loadExpenseUsers() {
       return;
     }
 
-    infoEl.textContent = `${users.length} user(s) have expenses. Click on a tab to view details.`;
+    infoEl.textContent = "";
 
     users.forEach((u) => {
       const btn = document.createElement("button");
