@@ -185,12 +185,11 @@ function renderUserExpenses(items, totalEl, listEl) {
           ${it.fundsType || ""} <span style="color:#9ca3af;">${it.date}</span>
         </div>
 
-        <!-- Added clearer REASON line -->
-        ${it.reason ? `<div class="expense-reason" style="font-size:0.9rem; font-weight:600; color:#111827; margin-bottom:2px;">
-            ${it.reason}
-        </div>` : ""}
+        <!-- CLEAR & VISIBLE REASON -->
+        <div class="expense-reason" style="font-size:0.95rem; font-weight:700; color:#111827; margin-bottom:4px;">
+          ${it.reason || ""}
+        </div>
 
-        <div class="expense-person">${it.reason || ""}</div>
         <div class="expense-person">${it.from || ""} ${it.to ? "→ " + it.to : ""}</div>
       </div>
 
