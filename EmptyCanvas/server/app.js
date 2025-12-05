@@ -2368,6 +2368,30 @@ app.get("/api/expenses/types", async (req, res) => {
   }
 });
 
+// Get Team Members for Cash in from dropdown
+app.get("/api/expenses/team-members", requireAuth, async (req, res) => {
+  try {
+    if (!teamMembersDatabaseId) {
+      return res.json({ success: false, members: [], error: "Team Members DB not configured" });
+    }
+
+    const result = await notion.databases.query({
+      database_id: teamMembersDatabaseId,
+      sorts: [{ property: "Name", direction: "ascending" }],
+    });
+
+    const members = result.results.map((p) => ({
+      id: p.id,
+      name: p.properties?.Name?.title?.[0]?.plain_text || "Unnamed",
+    }));
+
+    res.json({ success: true, members });
+  } catch (err) {
+    console.error("Error loading team members:", err);
+    res.json({ success: false, members: [], error: "Cannot load team members" });
+  }
+});
+
 app.post("/api/expenses/cash-out", async (req, res) => {
   const { fundsType, reason, date, from, to, amount, kilometer } = req.body;
 
@@ -2441,10 +2465,17 @@ app.post("/api/expenses/cash-out", async (req, res) => {
 
 // Cash In
 app.post("/api/expenses/cash-in", async (req, res) => {
-  const { date, amount, cashInFrom } = req.body;
+  const { date, amount, cashInFromId } = req.body;
 
   try {
     const teamMemberPageId = await getCurrentUserRelationPage(req);
+
+    if (!date || !amount || !cashInFromId) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: date, amount, or cashInFromId"
+      });
+    }
 
     await notion.pages.create({
       parent: { database_id: process.env.Expenses_Database },
@@ -2462,13 +2493,8 @@ app.post("/api/expenses/cash-in", async (req, res) => {
           number: parseFloat(amount)
         },
         "Cash in from": {
-          type: "rich_text",
-          rich_text: [
-            {
-              type: "text",
-              text: { content: cashInFrom || "" }
-            }
-          ]
+          type: "relation",
+          relation: [{ id: cashInFromId }]
         }
       }
     });
@@ -2508,17 +2534,31 @@ app.get("/api/expenses", async (req, res) => {
     });
 
     // Format results
-    const formatted = list.results.map(page => ({
-      id: page.id,
-      date: page.properties["Date"]?.date?.start || null,
-      reason: page.properties["Reason"]?.rich_text?.[0]?.plain_text || "",
-      fundsType: page.properties["Funds Type"]?.select?.name || "",
-      from: page.properties["From"]?.rich_text?.[0]?.plain_text || "",
-      to: page.properties["To"]?.rich_text?.[0]?.plain_text || "",
-      kilometer: page.properties["Kilometer"]?.number || 0,
-      cashIn: page.properties["Cash in"]?.number || 0,
-      cashOut: page.properties["Cash out"]?.number || 0,
-      cashInFrom: page.properties["Cash in from"]?.rich_text?.[0]?.plain_text || ""
+    const formatted = await Promise.all(list.results.map(async page => {
+      // Extract Cash in from relation (team member name)
+      let cashInFromName = "";
+      const cashInFromRel = page.properties["Cash in from"]?.relation;
+      if (Array.isArray(cashInFromRel) && cashInFromRel.length > 0) {
+        try {
+          const memberPage = await notion.pages.retrieve({ page_id: cashInFromRel[0].id });
+          cashInFromName = memberPage.properties?.Name?.title?.[0]?.plain_text || "";
+        } catch (e) {
+          console.error("Error fetching Cash in from member:", e);
+        }
+      }
+
+      return {
+        id: page.id,
+        date: page.properties["Date"]?.date?.start || null,
+        reason: page.properties["Reason"]?.rich_text?.[0]?.plain_text || "",
+        fundsType: page.properties["Funds Type"]?.select?.name || "",
+        from: page.properties["From"]?.rich_text?.[0]?.plain_text || "",
+        to: page.properties["To"]?.rich_text?.[0]?.plain_text || "",
+        kilometer: page.properties["Kilometer"]?.number || 0,
+        cashIn: page.properties["Cash in"]?.number || 0,
+        cashOut: page.properties["Cash out"]?.number || 0,
+        cashInFrom: cashInFromName
+      };
     }));
 
     res.json({ success: true, items: formatted });
@@ -2642,22 +2682,34 @@ app.get(
         sorts: [{ property: "Date", direction: "descending" }],
       });
 
-      const items = list.results.map((page) => ({
-        id: page.id,
-        date: page.properties["Date"]?.date?.start || null,
-        reason:
-          page.properties["Reason"]?.rich_text?.[0]?.plain_text || "",
-        fundsType:
-          page.properties["Funds Type"]?.select?.name || "",
-        from:
-          page.properties["From"]?.rich_text?.[0]?.plain_text || "",
-        to: page.properties["To"]?.rich_text?.[0]?.plain_text || "",
-        kilometer: page.properties["Kilometer"]?.number || 0,
-        cashIn: page.properties["Cash in"]?.number || 0,
-        cashOut: page.properties["Cash out"]?.number || 0,
-        cashInFrom:
-          page.properties["Cash in from"]?.rich_text?.[0]?.plain_text ||
-          "",
+      const items = await Promise.all(list.results.map(async (page) => {
+        // Extract Cash in from relation (team member name)
+        let cashInFromName = "";
+        const cashInFromRel = page.properties["Cash in from"]?.relation;
+        if (Array.isArray(cashInFromRel) && cashInFromRel.length > 0) {
+          try {
+            const memberPage = await notion.pages.retrieve({ page_id: cashInFromRel[0].id });
+            cashInFromName = memberPage.properties?.Name?.title?.[0]?.plain_text || "";
+          } catch (e) {
+            console.error("Error fetching Cash in from member:", e);
+          }
+        }
+
+        return {
+          id: page.id,
+          date: page.properties["Date"]?.date?.start || null,
+          reason:
+            page.properties["Reason"]?.rich_text?.[0]?.plain_text || "",
+          fundsType:
+            page.properties["Funds Type"]?.select?.name || "",
+          from:
+            page.properties["From"]?.rich_text?.[0]?.plain_text || "",
+          to: page.properties["To"]?.rich_text?.[0]?.plain_text || "",
+          kilometer: page.properties["Kilometer"]?.number || 0,
+          cashIn: page.properties["Cash in"]?.number || 0,
+          cashOut: page.properties["Cash out"]?.number || 0,
+          cashInFrom: cashInFromName,
+        };
       }));
 
       res.json({ success: true, items });
