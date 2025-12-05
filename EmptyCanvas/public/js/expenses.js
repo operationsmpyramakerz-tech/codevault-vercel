@@ -259,7 +259,7 @@ async function loadExpenses() {
 
                     <div class="expense-details">
                         <div class="expense-title">${it.fundsType || ""}</div>
-                        <div class="expense-person">${it.reason || ""}</div>
+                        <div class="expense-person"><strong>Reason:</strong> ${it.reason || ""}</div>
                         <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
                     </div>
 
@@ -358,7 +358,7 @@ function openAllExpensesModal() {
                         <div class="expense-icon">${arrow}</div>
                         <div class="expense-details">
                             <div class="expense-title">${it.fundsType || ""}</div>
-                            <div class="expense-person">${it.reason || ""}</div>
+                            <div class="expense-person"><strong>Reason:</strong> ${it.reason || ""}</div>
                             <div class="expense-person">${it.from || ""} → ${it.to || ""}</div>
                         </div>
                         <div class="expense-amount">
