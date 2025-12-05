@@ -3,6 +3,7 @@
    ============================= */
 
 let FUNDS_TYPES = [];
+let TEAM_MEMBERS = [];
 
 /* =============================
    LOAD FUNDS TYPES FROM SERVER
@@ -41,6 +42,31 @@ async function loadFundsTypes() {
 }
 
 /* =============================
+   LOAD TEAM MEMBERS FROM SERVER
+   ============================= */
+async function loadTeamMembers() {
+    try {
+        const res = await fetch("/api/expenses/team-members");
+        const data = await res.json();
+        if (data.success) {
+            TEAM_MEMBERS = data.members;
+        }
+    } catch (err) {
+        console.error("Team Members Load Error", err);
+        TEAM_MEMBERS = [];
+    }
+
+    // Fill select inside Cash In modal
+    const sel = document.getElementById("ci_from");
+    if (sel) {
+        sel.innerHTML = `<option value="">Select team member...</option>`;
+        TEAM_MEMBERS.forEach(m => {
+            sel.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+    }
+}
+
+/* =============================
    OPEN / CLOSE MODALS
    ============================= */
 function openCashInModal() {
@@ -49,7 +75,7 @@ function openCashInModal() {
     const f = document.getElementById("ci_from");
     if (d) d.value = "";
     if (c) c.value = "";
-    if (f) f.value = "";
+    if (f) f.value = ""; // Reset dropdown selection
     const modal = document.getElementById("cashInModal");
     if (modal) modal.style.display = "flex";
 }
@@ -96,14 +122,19 @@ function closeCashOutModal() {
 async function submitCashIn() {
     const dateInput = document.getElementById("ci_date");
     const amountInput = document.getElementById("ci_cash");
-    const fromInput = document.getElementById("ci_from");
+    const fromSelect = document.getElementById("ci_from");
 
     const date = dateInput ? dateInput.value : "";
     const amount = amountInput ? amountInput.value : "";
-    const cashInFrom = fromInput ? fromInput.value : "";
+    const cashInFromId = fromSelect ? fromSelect.value : "";
 
     if (!date || !amount) {
         alert("Please fill required fields.");
+        return;
+    }
+
+    if (!cashInFromId) {
+        alert("Please select a team member.");
         return;
     }
 
@@ -111,7 +142,7 @@ async function submitCashIn() {
         const res = await fetch("/api/expenses/cash-in", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ date, amount, cashInFrom }),
+            body: JSON.stringify({ date, amount, cashInFromId }),
         });
 
         const data = await res.json();
@@ -284,6 +315,7 @@ async function loadExpenses() {
    ============================= */
 document.addEventListener("DOMContentLoaded", async () => {
     await loadFundsTypes();
+    await loadTeamMembers();
     await loadExpenses();
 
     const cashInBtn  = document.getElementById("cashInBtn");
